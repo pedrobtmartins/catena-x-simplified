@@ -1,10 +1,10 @@
 # catena-x-simplified
 
-Aplicação de rastreabilidade leve e interoperável para a Catena-X, baseada no
-Traceability KIT (8.0.0) e na release Eclipse Tractus-X 26.03.
+A lightweight, interoperable traceability application for Catena-X, based on the
+Traceability KIT (8.0.0) and the Eclipse Tractus-X 26.03 release.
 
-- Quality Alerts e Quality Investigations (Notification API 1.2.1 e 2.0.0)
-- Aspect models SerialPart/Batch/BoM/Usage v3 e v4
-- Saturn-only (DSP 2025-1); EDC, DTR e identidade são pré-requisitos do participante
+- Quality Alerts and Quality Investigations (Notification API 1.2.1 and 2.0.0)
+- SerialPart/Batch/BoM/Usage aspect models, v3 and v4
+- Saturn-only (DSP 2025-1); EDC, DTR and identity are participant prerequisites
 
-Ver [docs/architecture.md](docs/architecture.md).
+See [docs/architecture.md](docs/architecture.md).
