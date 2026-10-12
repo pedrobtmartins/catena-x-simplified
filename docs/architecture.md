@@ -13,9 +13,9 @@ maintained since release 25.06.
 
 | KIT requirement                            | Mandatory | In this app             |
 |--------------------------------------------|:---------:|-------------------------|
-| Visualize Digital Twin data                | Yes       | Phase 1                 |
-| Data sharing via a CX-0018 connector       | Yes       | Phase 1 (prerequisite)  |
-| Data sovereignty (access/usage policies)   | Yes       | Phase 1                 |
+| Visualize Digital Twin data                | Yes       | Phase 1 (own twins) ✅, phase 2 (partner twins) |
+| Data sharing via a CX-0018 connector       | Yes       | Phase 2 (EDC is a prerequisite) |
+| Data sovereignty (access/usage policies)   | Yes       | Phase 2                 |
 | Quality Alerts                             | Yes       | Phase 2                 |
 | Quality Investigations                     | Yes       | Phase 2                 |
 | Block Notifications                        | No        | Phase 4                 |
@@ -97,14 +97,15 @@ flowchart LR
 
 ### 4.1 Modules
 
-| Module          | Responsibility                                                                         |
-|-----------------|----------------------------------------------------------------------------------------|
-| `dataspace`     | Single gateway to EDC/DTR/submodels. Uses the Tractus-X SDK. Contract and EDR cache.     |
-| `aspects`       | Per-version aspect model adapters → internal model. Registry of `semanticId`s.          |
-| `traceability`  | One-level tree, affected-parts calculation, recipient suggestions.                      |
-| `notifications` | 1.2.1/2.0.0 payloads, state machine, send/receive, registering the assets in the EDC.   |
-| `api`           | REST API for the UI.                                                                    |
-| `web`           | React UI.                                                                               |
+| Module          | Responsibility                                                              | Status  |
+|-----------------|-----------------------------------------------------------------------------|---------|
+| `dataspace`     | Single gateway to EDC/DTR/submodels. Uses the Tractus-X SDK. Contract and EDR cache. | DTR + own submodels ✅; EDC in phase 2 |
+| `aspects`       | Per-version aspect model adapters → internal model. Registry of `semanticId`s. | ✅ |
+| `storage`       | Local cache of parts and one-level relations (SQLAlchemy).                  | ✅ |
+| `traceability`  | Own-twin sync, one-level tree, affected-parts calculation, recipient suggestions. | sync + tree ✅ |
+| `notifications` | 1.2.1/2.0.0 payloads, state machine, send/receive, registering the assets in the EDC. | phase 2 |
+| `api`           | REST API for the UI.                                                        | ✅ |
+| `web`           | React UI.                                                                   | parts list + detail ✅ |
 
 ## 5. Performance principles (lessons from Trace-X)
 
@@ -225,6 +226,12 @@ an investigation with Tier-2.
 ## 8. Development and test environment
 
 - **Unit tests**: no infrastructure; EDC/DTR are mocked behind the `dataspace` module interfaces.
+  The aspect adapters are tested against the official example payloads of
+  `eclipse-tractusx/sldt-semantic-models`; the SDK-based DTR client against mocked AAS v3 HTTP
+  responses.
+- **Local development**: `backend/devtools/mock_participant.py` serves a small DTR + submodel
+  server (battery modules mixing SerialPart 3.0.0 and 4.0.0), enough to run the API and UI without
+  a dataspace. It is not a conformance test.
 - **Integration/E2E**: umbrella chart `26.03.00` (local Kubernetes, e.g. kind/minikube), which already
   ships three participants with EDC + DTR + submodel server (`tx-data-provider`, `dataconsumerOne`,
   `dataconsumerTwo`) and the wallet stub. Mapping to the demo scenario:
@@ -241,15 +248,18 @@ Having one node on v3 ensures the mixed-version scenario is tested from day one.
 
 | Layer      | Choice                                    |
 |------------|-------------------------------------------|
-| Backend    | Python 3.12, FastAPI, Tractus-X SDK       |
+| Backend    | Python 3.12+, FastAPI, SQLAlchemy, Tractus-X SDK |
 | Database   | PostgreSQL 15+                            |
-| Frontend   | React + TypeScript                        |
-| Deployment | Container image + Helm chart              |
+| Frontend   | React + TypeScript (Vite)                 |
+| Deployment | Container image + Helm chart (phase 3)    |
+| CI         | GitHub Actions: lint, format, tests, UI build |
 
 ## 10. Phases
 
-1. **Core** ✅ — `dataspace` and `aspects` modules (v3/v4), reading the own DTR via the SDK,
-   local cache, one-level tree, API and minimal parts UI.
+1. **Core** ✅ — `aspects` adapters (v3, v4, industry_core v4), own DTR read via the SDK with
+   pagination, value-only submodel reads with href rewriting, local cache, own-twin sync (manual
+   and periodic, with per-submodel issue reporting and stale-part removal), one-level tree, REST
+   API, minimal UI, mock participant, CI.
 2. **Notifications** — EDC consumption of direct partners (catalog, negotiation, EDR reuse, partner
    twin cache), EDC assets, sending/receiving 1.2.1 and 2.0.0, state machine, alerts and
    investigations, assisted forwarding.
@@ -275,5 +285,9 @@ Having one node on v3 ensures the mixed-version scenario is tested from day one.
 - **Partners on Jupiter until the end of 2026**: not reachable by the app until they migrate.
 - **Tractus-X SDK and EDC 0.12.0**: phase 1 uses the SDK (0.8.x) for the DTR only; its EDC
   (Saturn) controllers are first exercised in phase 2.
-- **Discovery**: confirm in phase 1 which connector discovery mechanism is available in the 26.03
+- **Discovery**: confirm in phase 2 which connector discovery mechanism is available in the 26.03
   umbrella (discovery services vs. DID-based discovery).
+- **Schema migrations**: phase 1 creates the database schema at startup; Alembic migrations are
+  introduced before the first deployment that must keep data.
+- **Partner IDs**: Catena-X IDs are compared verbatim (only a missing `urn:uuid:` prefix is
+  added); case differences between publishers would not match.
