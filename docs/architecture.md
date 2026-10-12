@@ -1,6 +1,6 @@
 # Architecture — catena-x-simplified
 
-> Status: initial proposal (v0.1) · Baseline: **Eclipse Tractus-X 26.03** · KIT: **Traceability KIT 8.0.0**
+> Status: phase 1 implemented (v0.1) · Baseline: **Eclipse Tractus-X 26.03** · KIT: **Traceability KIT 8.0.0**
 
 ## 1. Goal
 
@@ -53,7 +53,7 @@ compatible with 26.03.
 | Tractus-X EDC               | 0.12.0                 | DSP 2025-1, Saturn policies                               |
 | Digital Twin Registry       | 0.11.0                 | AAS API v3                                                |
 | Identity Hub                | 0.3.2                  | In dev: the umbrella's `ssi-dim-wallet-stub`              |
-| Tractus-X SDK (Python)      | compatible with 0.12   | EDC/DTR abstraction; see ADR-02                           |
+| Tractus-X SDK (Python)      | 0.8.x                  | EDC/DTR abstraction; see ADR-02                           |
 | Traceability KIT            | 8.0.0                  |                                                           |
 | Notification API            | 2.0.0 **and** 1.2.1    | 1.2.1 is mandatory in the KIT; see section 6.3            |
 | Umbrella (dev/test)         | 26.03.00               |                                                           |
@@ -62,7 +62,7 @@ compatible with 26.03.
 
 - never use Management API endpoints marked as *deprecated* (`/v2/edrs`, `v4alpha/*`, …);
 - all EDC/DTR access goes through the SDK, behind our own interfaces;
-- aspect model URNs live in configuration, never in domain code.
+- aspect model URNs live in one registry (`aspects/registry.py`), never in domain code.
 
 ## 4. Overview
 
@@ -248,9 +248,10 @@ Having one node on v3 ensures the mixed-version scenario is tested from day one.
 
 ## 10. Phases
 
-1. **Core** — `dataspace` and `aspects` modules (v3/v4), reading the own DTR, cache, one-level tree,
-   API and minimal parts UI.
-2. **Notifications** — EDC assets, sending/receiving 1.2.1 and 2.0.0, state machine, alerts and
+1. **Core** ✅ — `dataspace` and `aspects` modules (v3/v4), reading the own DTR via the SDK,
+   local cache, one-level tree, API and minimal parts UI.
+2. **Notifications** — EDC consumption of direct partners (catalog, negotiation, EDR reuse, partner
+   twin cache), EDC assets, sending/receiving 1.2.1 and 2.0.0, state machine, alerts and
    investigations, assisted forwarding.
 3. **Demo** — seeding of the three umbrella participants, automated E2E scenario, complete UI.
 4. **Extensions** — Block Notifications 2.0.0, qualityTask/ZeroKmFailure, migration to 26.09.
@@ -272,6 +273,7 @@ Having one node on v3 ensures the mixed-version scenario is tested from day one.
 - **Wallet**: Tractus-X releases do not include a complete FOSS identity wallet; in production this
   depends on the participant's identity solution (out of scope). In dev the wallet stub is used.
 - **Partners on Jupiter until the end of 2026**: not reachable by the app until they migrate.
-- **Exact Tractus-X SDK version** compatible with EDC 0.12.0 to be confirmed in phase 1.
+- **Tractus-X SDK and EDC 0.12.0**: phase 1 uses the SDK (0.8.x) for the DTR only; its EDC
+  (Saturn) controllers are first exercised in phase 2.
 - **Discovery**: confirm in phase 1 which connector discovery mechanism is available in the 26.03
   umbrella (discovery services vs. DID-based discovery).

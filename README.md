@@ -8,3 +8,9 @@ Traceability KIT (8.0.0) and the Eclipse Tractus-X 26.03 release.
 - Saturn-only (DSP 2025-1); EDC, DTR and identity are participant prerequisites
 
 See [docs/architecture.md](docs/architecture.md).
+
+## Repository layout
+
+- [`backend/`](backend/README.md) — FastAPI application (Python, Tractus-X SDK)
+- [`web/`](web/) — React UI (`npm install && npm run dev`)
+- [`docs/`](docs/architecture.md) — architecture and decisions
