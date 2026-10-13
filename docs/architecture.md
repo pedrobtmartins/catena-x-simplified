@@ -1,6 +1,8 @@
 # Architecture — catena-x-simplified
 
 > Status: phase 1 implemented (v0.1) · Baseline: **Eclipse Tractus-X 26.03** · KIT: **Traceability KIT 8.0.0**
+>
+> Terms: see the [glossary](glossary.md).
 
 ## 1. Goal
 
@@ -258,8 +260,9 @@ Having one node on v3 ensures the mixed-version scenario is tested from day one.
 
 1. **Core** ✅ — `aspects` adapters (v3, v4, industry_core v4), own DTR read via the SDK with
    pagination, value-only submodel reads with href rewriting, local cache, own-twin sync (manual
-   and periodic, with per-submodel issue reporting and stale-part removal), one-level tree, REST
-   API, minimal UI, mock participant, CI.
+   and periodic, with per-submodel issue reporting, stale-part removal and a recorded sync
+   history), one-level tree, REST API, web UI (parts, part detail with tree, sync history), mock
+   participant, CI.
 2. **Notifications** — EDC consumption of direct partners (catalog, negotiation, EDR reuse, partner
    twin cache), EDC assets, sending/receiving 1.2.1 and 2.0.0, state machine, alerts and
    investigations, assisted forwarding.
