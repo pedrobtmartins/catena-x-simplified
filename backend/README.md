@@ -26,8 +26,8 @@ Run against the mock participant (6 battery modules, mixing SerialPart 3.0.0 and
 
 ```bash
 uv run python devtools/mock_participant.py --port 8081 &
-CXS_OWN_BPNL=BPNL000000000T1A CXS_DTR_BASE_URL=http://localhost:8081 \
-  uv run uvicorn catenax_simplified.main:app --reload
+cp .env.example .env          # its defaults point to the mock participant
+uv run uvicorn catenax_simplified.main:app --reload
 curl -X POST localhost:8000/api/sync
 ```
 
@@ -36,7 +36,8 @@ from the backend, set `CXS_WEB_DIST_DIR=../web/dist`.
 
 ## Configuration
 
-All settings are `CXS_*` environment variables (or a `.env` file); see
+All settings are `CXS_*` environment variables, or a `.env` file in the directory the app is
+started from. [`.env.example`](.env.example) lists them all with comments; see also
 [`config.py`](src/catenax_simplified/config.py).
 
 | Variable                        | Purpose                                                              |
