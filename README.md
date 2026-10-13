@@ -14,6 +14,7 @@ See [docs/architecture.md](docs/architecture.md).
 - [`backend/`](backend/README.md) — FastAPI application (Python, Tractus-X SDK)
 - [`web/`](web/README.md) — React UI
 - [`docs/`](docs/architecture.md) — architecture and decisions
+- [`docs/pitch/`](docs/pitch/README.md) — pitch deck (open `docs/pitch/index.html`)
 
 ## Status
 

@@ -1,0 +1,18 @@
+{
+  "v": 4,
+  "createdOnFiles": {"v": 1, "at": "2026-10-13T21:00:00Z"},
+  "lists": "css",
+  "title": "Catena-X Traceability Pitch",
+  "order": ["cover", "problem", "tracex", "status", "why", "hops", "principles", "architecture", "reality", "compare", "today", "roadmap", "ask", "close"],
+  "sections": {
+    "s1": {"description": "Why traceability matters and what the network already tried", "start": "cover"},
+    "s2": {"description": "What happened to Trace-X and why it stalled", "start": "tracex"},
+    "s3": {"description": "Our approach and why it fits the network as it is", "start": "principles"},
+    "s4": {"description": "Where we are, what comes next and what we need", "start": "today"}
+  },
+  "faces": {
+    "libre-franklin": {"family": "Libre Franklin", "href": "https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&display=swap"},
+    "ibm-plex-mono": {"family": "IBM Plex Mono", "href": "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&display=swap"}
+  },
+  "designSystems": []
+}
