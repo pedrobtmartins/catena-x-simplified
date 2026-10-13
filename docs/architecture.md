@@ -101,11 +101,11 @@ flowchart LR
 |-----------------|-----------------------------------------------------------------------------|---------|
 | `dataspace`     | Single gateway to EDC/DTR/submodels. Uses the Tractus-X SDK. Contract and EDR cache. | DTR + own submodels ✅; EDC in phase 2 |
 | `aspects`       | Per-version aspect model adapters → internal model. Registry of `semanticId`s. | ✅ |
-| `storage`       | Local cache of parts and one-level relations (SQLAlchemy).                  | ✅ |
+| `storage`       | Local cache of parts and one-level relations; recorded sync runs (SQLAlchemy). | ✅ |
 | `traceability`  | Own-twin sync, one-level tree, affected-parts calculation, recipient suggestions. | sync + tree ✅ |
 | `notifications` | 1.2.1/2.0.0 payloads, state machine, send/receive, registering the assets in the EDC. | phase 2 |
 | `api`           | REST API for the UI.                                                        | ✅ |
-| `web`           | React UI.                                                                   | parts list + detail ✅ |
+| `web`           | React UI (Tractus-X portal palette).                                        | parts, part detail with tree, sync history ✅ |
 
 ## 5. Performance principles (lessons from Trace-X)
 

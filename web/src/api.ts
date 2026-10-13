@@ -24,8 +24,13 @@ export interface Part {
   synced_at: string;
 }
 
+export interface PartListItem extends Part {
+  parents_count: number;
+  children_count: number;
+}
+
 export interface PartPage {
-  items: Part[];
+  items: PartListItem[];
   total: number;
   limit: number;
   offset: number;
@@ -47,7 +52,14 @@ export interface PartTree {
   children: TreeNode[];
 }
 
+export interface SyncIssue {
+  global_asset_id: string;
+  semantic_id: string | null;
+  message: string;
+}
+
 export interface SyncReport {
+  id: number | null;
   started_at: string;
   finished_at: string | null;
   twins: number;
@@ -56,13 +68,26 @@ export interface SyncReport {
   unsupported_submodels: number;
   removed_parts: number;
   complete: boolean;
-  issues: { global_asset_id: string; semantic_id: string | null; message: string }[];
+  issues: SyncIssue[];
+}
+
+export interface Stats {
+  own_parts: number;
+  own_parts_by_kind: Record<string, number>;
+  own_parts_by_semantic_id: Record<string, number>;
+  supplier_links: number;
+  suppliers: number;
+  customer_links: number;
+  customers: number;
 }
 
 export interface Health {
   status: string;
   own_bpnl: string;
   dtr_configured: boolean;
+  dtr_url: string | null;
+  sync_interval_seconds: number;
+  supported_aspects: string[];
 }
 
 export class ApiError extends Error {
@@ -88,20 +113,57 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return response.json() as Promise<T>;
 }
 
+export interface PartQuery {
+  search?: string;
+  kind?: "serial" | "batch";
+  aspectMajor?: number;
+  limit: number;
+  offset: number;
+}
+
 export const api = {
   health: () => request<Health>("/api/health"),
-  parts: (params: { search?: string; limit: number; offset: number }) => {
-    const query = new URLSearchParams({ limit: String(params.limit), offset: String(params.offset) });
-    if (params.search) query.set("search", params.search);
+  stats: () => request<Stats>("/api/stats"),
+  parts: (q: PartQuery) => {
+    const query = new URLSearchParams({ limit: String(q.limit), offset: String(q.offset) });
+    if (q.search) query.set("search", q.search);
+    if (q.kind) query.set("kind", q.kind);
+    if (q.aspectMajor) query.set("aspect_major", String(q.aspectMajor));
     return request<PartPage>(`/api/parts?${query}`);
   },
   tree: (id: string) => request<PartTree>(`/api/parts/${encodeURIComponent(id)}/tree`),
   sync: () => request<SyncReport>("/api/sync", { method: "POST" }),
   lastSync: () => request<SyncReport>("/api/sync/last"),
+  syncRuns: (limit = 20) => request<{ items: SyncReport[] }>(`/api/sync/runs?limit=${limit}`),
 };
 
-/** "urn:samm:io.catenax.serial_part:3.0.0#SerialPart" → "SerialPart 3.0.0" */
-export function aspectLabel(semanticId: string): string {
-  const match = /:([\d.]+)#(\w+)$/.exec(semanticId);
-  return match ? `${match[2]} ${match[1]}` : semanticId;
+/** "urn:samm:io.catenax.serial_part:3.0.0#SerialPart" → { name: "SerialPart", version: "3.0.0", major: 3 } */
+export function parseSemanticId(semanticId: string): { name: string; version: string; major: number | null } {
+  const match = /:(\d+)\.(\d+)\.(\d+)(?:#(\w+))?$/.exec(semanticId);
+  if (!match) return { name: semanticId, version: "", major: null };
+  const name = match[4] ?? semanticId.split(":").slice(-2, -1)[0] ?? semanticId;
+  return { name, version: `${match[1]}.${match[2]}.${match[3]}`, major: Number(match[1]) };
+}
+
+export function formatTime(iso: string): string {
+  return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+export function formatDateTime(iso: string): string {
+  return new Date(iso).toLocaleString([], { dateStyle: "medium", timeStyle: "medium" });
+}
+
+/** "urn:uuid:aaaaaaaa-0000-4000-8000-000000000002" → "urn:uuid:aaaaaaaa-…-000000000002" */
+export function shortId(id: string): string {
+  const match = /^(urn:uuid:[0-9a-fA-F]{8})-.*-([0-9a-fA-F]{12})$/.exec(id);
+  return match ? `${match[1]}-…-${match[2]}` : id;
+}
+
+export function localIdentifiers(part: Part): string {
+  return Object.values(part.local_identifiers).join(", ");
+}
+
+export function syncState(report: SyncReport): "ok" | "warn" | "error" {
+  if (!report.complete) return "error";
+  return report.issues.length > 0 ? "warn" : "ok";
 }

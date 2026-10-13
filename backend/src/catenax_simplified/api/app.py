@@ -13,22 +13,37 @@ from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session, sessionmaker
 from starlette.concurrency import run_in_threadpool
 
+from ..aspects.registry import SUPPORTED
 from ..config import Settings
 from ..dataspace import SubmodelReader, TwinRegistry
-from ..storage import PartRepository, init_schema, make_engine, make_session_factory
+from ..storage import (
+    PartRepository,
+    SyncRunRepository,
+    init_schema,
+    make_engine,
+    make_session_factory,
+)
 from ..traceability import OwnTwinSync, SyncReport, part_tree
 from ..wiring import build_submodel_reader, build_twin_registry
-from .schemas import HealthOut, PartOut, PartPage, PartTreeOut, SyncReportOut
+from .schemas import (
+    HealthOut,
+    PartListItem,
+    PartOut,
+    PartPage,
+    PartTreeOut,
+    StatsOut,
+    SyncReportOut,
+    SyncRunPage,
+)
 
 log = logging.getLogger(__name__)
 
 
 class SyncRunner:
-    """Runs at most one own-twin sync at a time and keeps the last report."""
+    """Runs at most one own-twin sync at a time (each run records itself)."""
 
     def __init__(self, sync: OwnTwinSync | None):
         self.sync = sync
-        self.last_report: SyncReport | None = None
         self._lock = threading.Lock()
 
     def run(self) -> SyncReport | None:
@@ -38,8 +53,7 @@ class SyncRunner:
         if not self._lock.acquire(blocking=False):
             return None
         try:
-            self.last_report = self.sync.run()
-            return self.last_report
+            return self.sync.run()
         finally:
             self._lock.release()
 
@@ -62,7 +76,15 @@ def health(request: Request) -> HealthOut:
         status="ok",
         own_bpnl=settings.own_bpnl,
         dtr_configured=request.app.state.sync_runner.sync is not None,
+        dtr_url=settings.dtr_base_url,
+        sync_interval_seconds=settings.sync_interval_seconds,
+        supported_aspects=sorted(SUPPORTED),
     )
+
+
+@router.get("/stats", response_model=StatsOut)
+def stats(session: SessionDep) -> StatsOut:
+    return StatsOut(**PartRepository(session).stats())
 
 
 @router.get("/parts", response_model=PartPage)
@@ -70,16 +92,30 @@ def list_parts(
     session: SessionDep,
     search: str | None = None,
     kind: Annotated[str | None, Query(pattern="^(serial|batch)$")] = None,
+    aspect_major: Annotated[int | None, Query(ge=1, le=99)] = None,
     own_only: bool = False,
     limit: Annotated[int, Query(ge=1, le=500)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> PartPage:
-    rows, total = PartRepository(session).list_parts(
-        search=search, kind=kind, own_only=own_only, limit=limit, offset=offset
+    repository = PartRepository(session)
+    rows, total = repository.list_parts(
+        search=search,
+        kind=kind,
+        aspect_major=aspect_major,
+        own_only=own_only,
+        limit=limit,
+        offset=offset,
     )
-    return PartPage(
-        items=[PartOut.model_validate(r) for r in rows], total=total, limit=limit, offset=offset
-    )
+    counts = repository.relation_counts([r.global_asset_id for r in rows])
+    items = [
+        PartListItem(
+            **PartOut.model_validate(r).model_dump(),
+            parents_count=counts[r.global_asset_id][0],
+            children_count=counts[r.global_asset_id][1],
+        )
+        for r in rows
+    ]
+    return PartPage(items=items, total=total, limit=limit, offset=offset)
 
 
 @router.get("/parts/{global_asset_id}", response_model=PartOut)
@@ -110,11 +146,17 @@ async def trigger_sync(request: Request) -> SyncReportOut:
 
 
 @router.get("/sync/last", response_model=SyncReportOut)
-def last_sync(request: Request) -> SyncReportOut:
-    report = request.app.state.sync_runner.last_report
-    if report is None:
+def last_sync(session: SessionDep) -> SyncReportOut:
+    runs = SyncRunRepository(session).recent(limit=1)
+    if not runs:
         raise HTTPException(status_code=404, detail="no sync has run yet")
-    return SyncReportOut.model_validate(report)
+    return SyncReportOut.model_validate(runs[0])
+
+
+@router.get("/sync/runs", response_model=SyncRunPage)
+def sync_runs(session: SessionDep, limit: Annotated[int, Query(ge=1, le=200)] = 20) -> SyncRunPage:
+    runs = SyncRunRepository(session).recent(limit=limit)
+    return SyncRunPage(items=[SyncReportOut.model_validate(r) for r in runs])
 
 
 async def _periodic_sync(runner: SyncRunner, interval: int) -> None:

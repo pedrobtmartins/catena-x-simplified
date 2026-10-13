@@ -47,3 +47,20 @@ class RelationRow(Base):
     quantity: Mapped[float | None] = mapped_column(Float)
     unit: Mapped[str | None] = mapped_column(String(64))
     is_only_potential_parent: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
+class SyncRunRow(Base):
+    """One own-twin sync run and what it reported."""
+
+    __tablename__ = "sync_runs"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    twins: Mapped[int] = mapped_column(default=0)
+    parts: Mapped[int] = mapped_column(default=0)
+    relation_sets: Mapped[int] = mapped_column(default=0)
+    unsupported_submodels: Mapped[int] = mapped_column(default=0)
+    removed_parts: Mapped[int] = mapped_column(default=0)
+    complete: Mapped[bool] = mapped_column(Boolean, default=False)
+    issues: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)

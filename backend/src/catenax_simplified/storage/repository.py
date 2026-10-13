@@ -8,7 +8,7 @@ from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from ..aspects import Part, Relations
-from .tables import PartRow, RelationRow
+from .tables import PartRow, RelationRow, SyncRunRow
 
 
 class PartRepository:
@@ -95,11 +95,15 @@ class PartRepository:
         *,
         search: str | None = None,
         kind: str | None = None,
+        aspect_major: int | None = None,
         own_only: bool = False,
         limit: int = 50,
         offset: int = 0,
     ) -> tuple[Sequence[PartRow], int]:
         query = select(PartRow)
+        if aspect_major is not None:
+            # semantic IDs look like urn:samm:<namespace>:<major>.<minor>.<patch>#<Aspect>
+            query = query.where(PartRow.semantic_id.like(f"%:{aspect_major}.%"))
         if search:
             pattern = f"%{search.lower()}%"
             query = query.where(
@@ -135,4 +139,89 @@ class PartRepository:
             select(RelationRow)
             .where(RelationRow.child_id == global_asset_id)
             .order_by(RelationRow.parent_id)
+        ).all()
+
+    def relation_counts(self, global_asset_ids: Collection[str]) -> dict[str, tuple[int, int]]:
+        """``(parents, children)`` per part, counting each counterpart once."""
+        ids = list(global_asset_ids)
+        counts = {gid: [0, 0] for gid in ids}
+        if not ids:
+            return {}
+        pairs = (
+            select(RelationRow.parent_id, RelationRow.child_id)
+            .where(or_(RelationRow.parent_id.in_(ids), RelationRow.child_id.in_(ids)))
+            .distinct()
+        )
+        for parent_id, child_id in self._session.execute(pairs):
+            if child_id in counts:
+                counts[child_id][0] += 1
+            if parent_id in counts:
+                counts[parent_id][1] += 1
+        return {gid: (p, c) for gid, (p, c) in counts.items()}
+
+    def stats(self) -> dict:
+        own_ids = select(PartRow.global_asset_id).where(PartRow.is_own.is_(True))
+
+        def distinct_count(query) -> int:
+            return self._session.scalar(select(func.count()).select_from(query.subquery())) or 0
+
+        supplier_pairs = (
+            select(RelationRow.parent_id, RelationRow.child_id)
+            .where(RelationRow.parent_id.in_(own_ids))
+            .distinct()
+        )
+        customer_pairs = (
+            select(RelationRow.parent_id, RelationRow.child_id)
+            .where(RelationRow.child_id.in_(own_ids))
+            .distinct()
+        )
+        suppliers = (
+            select(RelationRow.business_partner)
+            .where(RelationRow.parent_id.in_(own_ids), RelationRow.business_partner.is_not(None))
+            .distinct()
+        )
+        customers = (
+            select(RelationRow.business_partner)
+            .where(RelationRow.child_id.in_(own_ids), RelationRow.business_partner.is_not(None))
+            .distinct()
+        )
+        by_kind = dict(
+            self._session.execute(
+                select(PartRow.kind, func.count())
+                .where(PartRow.is_own.is_(True))
+                .group_by(PartRow.kind)
+            ).all()
+        )
+        by_semantic_id = dict(
+            self._session.execute(
+                select(PartRow.semantic_id, func.count())
+                .where(PartRow.is_own.is_(True))
+                .group_by(PartRow.semantic_id)
+            ).all()
+        )
+        return {
+            "own_parts": sum(by_kind.values()),
+            "own_parts_by_kind": by_kind,
+            "own_parts_by_semantic_id": by_semantic_id,
+            "supplier_links": distinct_count(supplier_pairs),
+            "suppliers": distinct_count(suppliers),
+            "customer_links": distinct_count(customer_pairs),
+            "customers": distinct_count(customers),
+        }
+
+
+class SyncRunRepository:
+    def __init__(self, session: Session):
+        self._session = session
+
+    def add(self, run: SyncRunRow) -> SyncRunRow:
+        self._session.add(run)
+        self._session.flush()
+        return run
+
+    def recent(self, limit: int = 20) -> Sequence[SyncRunRow]:
+        return self._session.scalars(
+            select(SyncRunRow)
+            .order_by(SyncRunRow.started_at.desc(), SyncRunRow.id.desc())
+            .limit(limit)
         ).all()
