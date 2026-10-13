@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Catena-X Traceability Pitch</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@400;500;600;700&amp;display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&amp;display=swap">
+<style>
+* { box-sizing: border-box; }
+html, body { margin: 0; background: #1b1d21; font-family: 'Libre Franklin', Arial, sans-serif; }
+header { color: #e6e8eb; padding: 24px 32px; display: flex; gap: 16px; align-items: baseline;
+  flex-wrap: wrap; }
+header h1 { margin: 0; font-size: 22px; }
+header span { color: #9aa3ad; font-size: 15px; }
+header label { margin-left: auto; color: #c9ced4; font-size: 15px; }
+.frame { margin: 0 auto 32px; overflow: hidden; border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.4); }
+.slide { width: 1920px; height: 1080px; transform-origin: top left; }
+section { position: relative; width: 1920px; height: 1080px; overflow: hidden; }
+section h1, section h2, section h3, section p { margin: 0; }
+section ul { margin: 0; padding-left: 1.2em; }
+section table { border-collapse: collapse; width: 100%; overflow: hidden; }
+section th, section td { text-align: left; padding: 18px 28px; border-bottom: 1px solid rgba(0,0,0,.08); }
+section aside { display: none; }
+body.notes section aside { display: block; position: absolute; left: 0; right: 0; bottom: 0;
+  background: rgba(20,24,29,.92); color: #f4f6f8; font-size: 26px; line-height: 1.4; padding: 24px 40px; }
+x-shape { display: block; flex: none; }
+x-shape[kind="ellipse"] { border-radius: 50%; }
+x-shape[kind="arrow-right"] { clip-path: polygon(0 30%, 60% 30%, 60% 0, 100% 50%, 60% 100%, 60% 70%, 0 70%); }
+x-shape[kind="arrow-left"] { clip-path: polygon(100% 30%, 40% 30%, 40% 0, 0 50%, 40% 100%, 40% 70%, 100% 70%); }
+x-shape[kind="arrow-down"] { clip-path: polygon(30% 0, 70% 0, 70% 60%, 100% 60%, 50% 100%, 0 60%, 30% 60%); }
+x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 40%, 50% 0, 0 40%, 30% 40%); }
+</style>
+</head>
+<body>
+<header><h1>Catena-X Traceability Pitch</h1><span>14 slides · generated from docs/pitch/slides by build.py</span>
+<label><input type="checkbox" id="notes"> Speaker notes</label></header>
+<div class="frame"><div class="slide">
+<section id="cover" data-transition="fade" style="background:#10212F;color:#F4F6F8;font-family:'Libre Franklin', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;justify-content:space-between">
+<div style="position:absolute;left:0;top:0;width:1920px;height:12px;background:#FFA600"></div>
+<div style="display:flex;flex-direction:row;gap:16px;align-items:center">
+<x-shape kind="ellipse" style="width:28px;height:28px;background:#0F71CB"></x-shape>
+<x-shape kind="ellipse" style="width:28px;height:28px;background:#FFA600"></x-shape>
+<x-shape kind="ellipse" style="width:28px;height:28px;background:#B3CB2D"></x-shape>
+<p style="font-size:28px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#B9C6D2">Catena-X · Traceability KIT</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:40px">
+<h1 style="font-size:120px;font-weight:700;line-height:1.05;letter-spacing:-2px;color:#F4F6F8">Traceability,<br>simplified.</h1>
+<p style="font-size:44px;line-height:1.3;color:#B9C6D2;max-width:1300px">A lightweight Traceability KIT app — and why it can work where Trace-X stalled.</p>
+</div>
+<p style="font-size:28px;color:#B9C6D2">[Presenter name] · [Company] · October 2026</p>
+<aside>Open with the one-line idea: the Traceability use case is alive and standardized, the reference app that was meant to carry it is not. We built a small app that follows the KIT and avoids the architectural choice that made Trace-X slow.</aside>
+</section>
+</div></div>
+<div class="frame"><div class="slide">
+<section id="problem" data-section="Why traceability matters and what the network already tried" style="background:#F7F7F5;color:#14181D;font-family:'Libre Franklin', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:56px">
+<div style="display:flex;flex-direction:column;gap:20px">
+<p style="font-size:24px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#0F71CB">The problem</p>
+<h2 style="font-size:64px;font-weight:600;line-height:1.15">When a part fails, who else is affected?</h2>
+</div>
+<div style="display:flex;flex-direction:row;gap:32px">
+<div style="flex:1;display:flex;flex-direction:column;gap:20px;background:#FFFFFF;border:1px solid #DCDCDC;border-radius:16px;padding:40px">
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:28px;color:#0F71CB">01</p>
+<h3 style="font-size:40px;font-weight:600;line-height:1.2">Which of my products contain it?</h3>
+<p style="font-size:30px;line-height:1.4;color:#4A5563">Narrow the scope to the exact serial numbers and batches — not a whole model year.</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px;background:#FFFFFF;border:1px solid #DCDCDC;border-radius:16px;padding:40px">
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:28px;color:#0F71CB">02</p>
+<h3 style="font-size:40px;font-weight:600;line-height:1.2">Which customers must I warn?</h3>
+<p style="font-size:30px;line-height:1.4;color:#4A5563">A quality alert goes downstream, to the direct customers that received the parts.</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px;background:#FFFFFF;border:1px solid #DCDCDC;border-radius:16px;padding:40px">
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:28px;color:#0F71CB">03</p>
+<h3 style="font-size:40px;font-weight:600;line-height:1.2">Which supplier must investigate?</h3>
+<p style="font-size:30px;line-height:1.4;color:#4A5563">A quality investigation goes upstream, to the direct supplier of the suspect component.</p>
+</div>
+</div>
+<p style="font-size:32px;line-height:1.4;color:#14181D">Catena-X answers this across companies — <b>without anyone handing over their full bill of materials.</b></p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6A7480">Catena-X Traceability · 2</p>
+<aside>This is the business question behind the Traceability KIT: precise recall scope instead of broad recalls. The answer is spread over many companies; each knows only its own level. Alerts go to customers, investigations to suppliers — that is the KIT's notification model.</aside>
+</section>
+</div></div>
+<div class="frame"><div class="slide">
+<section id="tracex" data-section="What happened to Trace-X and why it stalled" style="background:#F7F7F5;color:#14181D;font-family:'Libre Franklin', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:56px">
+<div style="display:flex;flex-direction:column;gap:20px">
+<p style="font-size:24px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#0F71CB">What the network tried</p>
+<h2 style="font-size:64px;font-weight:600;line-height:1.15">Trace-X was the open-source reference app</h2>
+</div>
+<div style="display:flex;flex-direction:row;gap:64px;align-items:start">
+<div style="flex:1;display:flex;flex-direction:column;gap:28px">
+<p style="font-size:32px;line-height:1.4;color:#4A5563">Built in Eclipse Tractus-X (<span style="font-family:'IBM Plex Mono', 'Courier New', monospace">traceability-foss</span>, Apache-2.0) to show the use case end to end:</p>
+<ul style="font-size:32px;line-height:1.5;color:#14181D">
+<li>Quality alerts and investigations between partners</li>
+<li>The as-built tree of a part, across companies</li>
+<li>The tree built by the Item Relationship Service (IRS)</li>
+</ul>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px;background:#FFFFFF;border:1px solid #DCDCDC;border-radius:16px;padding:40px">
+<h3 style="font-size:32px;font-weight:600">What it needed to run</h3>
+<div style="display:flex;flex-direction:row;flex-wrap:wrap;gap:16px">
+<p style="font-size:26px;background:#EAF1FE;color:#0D55AF;padding:10px 20px;border-radius:999px">Trace-X backend</p>
+<p style="font-size:26px;background:#EAF1FE;color:#0D55AF;padding:10px 20px;border-radius:999px">Trace-X frontend</p>
+<p style="font-size:26px;background:#FFECBD;color:#7A4A12;padding:10px 20px;border-radius:999px">IRS</p>
+<p style="font-size:26px;background:#F0F1F3;color:#14181D;padding:10px 20px;border-radius:999px">EDC</p>
+<p style="font-size:26px;background:#F0F1F3;color:#14181D;padding:10px 20px;border-radius:999px">Digital Twin Registry</p>
+<p style="font-size:26px;background:#F0F1F3;color:#14181D;padding:10px 20px;border-radius:999px">Submodel server</p>
+<p style="font-size:26px;background:#F0F1F3;color:#14181D;padding:10px 20px;border-radius:999px">Keycloak</p>
+<p style="font-size:26px;background:#F0F1F3;color:#14181D;padding:10px 20px;border-radius:999px">PostgreSQL</p>
+</div>
+<p style="font-size:26px;line-height:1.4;color:#4A5563">A full stack to install before the first alert could be sent.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6A7480">Catena-X Traceability · 3</p>
+<aside>Be fair to Trace-X: it proved the use case and its notification model became the KIT standard. The point is the architecture: the app shipped together with IRS and expected the whole stack around it.</aside>
+</section>
+</div></div>
+<div class="frame"><div class="slide">
+<section id="status" data-transition="fade" style="background:#10212F;color:#F4F6F8;font-family:'Libre Franklin', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:72px">
+<div style="display:flex;flex-direction:column;gap:20px">
+<p style="font-size:24px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#FFA600">Trace-X today</p>
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#F4F6F8">The reference app has stopped moving</h2>
+</div>
+<div style="display:flex;flex-direction:row;gap:48px">
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;border-top:4px solid #FFA600;padding:32px 0 0 0">
+<p style="font-size:72px;font-weight:700;line-height:1.1;color:#F4F6F8">Jun 2025</p>
+<p style="font-size:30px;line-height:1.4;color:#B9C6D2">Last commit on main (10 June 2025)</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;border-top:4px solid #FFA600;padding:32px 0 0 0">
+<p style="font-size:72px;font-weight:700;line-height:1.1;color:#F4F6F8">15.0.1</p>
+<p style="font-size:30px;line-height:1.4;color:#B9C6D2">Last release, May 2025</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;border-top:4px solid #FFA600;padding:32px 0 0 0">
+<p style="font-size:72px;font-weight:700;line-height:1.1;color:#F4F6F8">5 releases</p>
+<p style="font-size:30px;line-height:1.4;color:#B9C6D2">Tractus-X releases without it: 25.09 to 26.09. Last included in 25.06.</p>
+</div>
+</div>
+<p style="font-size:32px;line-height:1.4;color:#F4F6F8">The <b>use case is alive</b> — Traceability KIT 8.0.0 shipped with 26.03. The <b>app that was meant to carry it is not.</b></p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#8FA1B3">Sources: github.com/eclipse-tractusx/traceability-foss · tractus-x-release CHANGELOG · Catena-X Traceability · 4</p>
+<aside>All three numbers are from public sources: the repository history and the Tractus-X release changelog. The repo is not archived and there was no formal deprecation notice; it simply dropped out of the release package after 25.06. Meanwhile the Traceability KIT kept evolving (7.0.0 in 25.09, 8.0.0 in 26.03).</aside>
+</section>
+</div></div>
+<div class="frame"><div class="slide">
+<section id="why" style="background:#F7F7F5;color:#14181D;font-family:'Libre Franklin', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:56px">
+<div style="display:flex;flex-direction:column;gap:20px">
+<p style="font-size:24px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#0F71CB">Diagnosis</p>
+<h2 style="font-size:64px;font-weight:600;line-height:1.15">Why it stalled: the design, not the idea</h2>
+</div>
+<div style="display:flex;flex-direction:row;gap:32px">
+<div style="flex:1;display:flex;flex-direction:column;gap:20px;background:#FFFFFF;border:1px solid #DCDCDC;border-top:6px solid #FFA600;border-radius:16px;padding:40px">
+<h3 style="font-size:36px;font-weight:600;line-height:1.2">A tree walk at every hop</h3>
+<p style="font-size:28px;line-height:1.45;color:#4A5563">IRS walked the whole supply chain for each question. Every hop meant discovery, a contract negotiation, a registry lookup and a submodel read — in asynchronous jobs.</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px;background:#FFFFFF;border:1px solid #DCDCDC;border-top:6px solid #FFA600;border-radius:16px;padding:40px">
+<h3 style="font-size:36px;font-weight:600;line-height:1.2">A heavy, bundled stack</h3>
+<p style="font-size:28px;line-height:1.45;color:#4A5563">The app came with its own IRS and the full infrastructure around it. Hard to run, hard to adopt next to what a company already operates.</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:20px;background:#FFFFFF;border:1px solid #DCDCDC;border-top:6px solid #FFA600;border-radius:16px;padding:40px">
+<h3 style="font-size:36px;font-weight:600;line-height:1.2">Brittle to protocol change</h3>
+<p style="font-size:28px;line-height:1.45;color:#4A5563">The 26.09 release notes list IRS as not compatible with Saturn connector policies, tested only on EDC 0.12.2 with Jupiter policies.</p>
+</div>
+</div>
+<p style="font-size:28px;line-height:1.4;color:#4A5563">Tractus-X 24.03, 24.05 and 24.08 release notes: <i>“No execution of Load-, Performance- or Penetration Tests.”</i></p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6A7480">Source: tractus-x-release CHANGELOG · Catena-X Traceability · 5</p>
+<aside>Field feedback we heard: performance was the blocker in daily use. We cannot point to a public benchmark, so the slide shows the architectural reason instead — a recursive walk that pays a full dataspace round trip per hop — and the public facts: no load tests in the release notes, and IRS left behind by the move to Saturn policies. [Add your own field evidence here if you have it.]</aside>
+</section>
+</div></div>
+<div class="frame"><div class="slide">
+<section id="hops" style="background:#F7F7F5;color:#14181D;font-family:'Libre Franklin', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
+<div style="display:flex;flex-direction:column;gap:20px">
+<p style="font-size:24px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#0F71CB">The key difference</p>
+<h2 style="font-size:64px;font-weight:600;line-height:1.15">One long walk vs. one hop at a time</h2>
+</div>
+<div style="display:flex;flex-direction:row;gap:48px">
+<div style="flex:1;display:flex;flex-direction:column;gap:12px;background:#FFFFFF;border:1px solid #DCDCDC;border-radius:16px;padding:32px 40px">
+<h3 style="font-size:32px;font-weight:600;color:#7A4A12">Trace-X with IRS</h3>
+<p style="font-size:28px;font-weight:600;background:#10212F;color:#F4F6F8;padding:12px 24px;border-radius:10px">OEM app asks for the tree</p>
+<div style="display:flex;flex-direction:row;gap:24px;align-items:center;padding:0 0 0 24px">
+<x-shape kind="arrow-down" style="width:28px;height:48px;background:#FFA600"></x-shape>
+<p style="font-size:24px;color:#4A5563">discover · negotiate · DTR · submodel</p>
+</div>
+<p style="font-size:28px;background:#F0F1F3;padding:12px 24px;border-radius:10px">Tier-1</p>
+<div style="display:flex;flex-direction:row;gap:24px;align-items:center;padding:0 0 0 24px">
+<x-shape kind="arrow-down" style="width:28px;height:48px;background:#FFA600"></x-shape>
+<p style="font-size:24px;color:#4A5563">discover · negotiate · DTR · submodel</p>
+</div>
+<p style="font-size:28px;background:#F0F1F3;padding:12px 24px;border-radius:10px">Tier-2 … Tier-n</p>
+<p style="font-size:28px;line-height:1.4;color:#4A5563">One question waits for the whole chain to answer.</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:12px;background:#FFFFFF;border:1px solid #DCDCDC;border-radius:16px;padding:32px 40px">
+<h3 style="font-size:32px;font-weight:600;color:#0D55AF">This app</h3>
+<p style="font-size:28px;font-weight:600;background:#0F71CB;color:#FFFFFF;padding:12px 24px;border-radius:10px">OEM: finds affected vehicles locally</p>
+<div style="display:flex;flex-direction:row;gap:24px;align-items:center;padding:0 0 0 24px">
+<x-shape kind="arrow-up" style="width:28px;height:48px;background:#0F71CB"></x-shape>
+<p style="font-size:24px;color:#4A5563">quality alert, forwarded by Tier-1</p>
+</div>
+<p style="font-size:28px;background:#EAF1FE;color:#0D55AF;padding:12px 24px;border-radius:10px">Tier-1: finds affected modules locally</p>
+<div style="display:flex;flex-direction:row;gap:24px;align-items:center;padding:0 0 0 24px">
+<x-shape kind="arrow-up" style="width:28px;height:48px;background:#0F71CB"></x-shape>
+<p style="font-size:24px;color:#4A5563">quality alert (KIT notification)</p>
+</div>
+<p style="font-size:28px;background:#EAF1FE;color:#0D55AF;padding:12px 24px;border-radius:10px">Tier-2: detects a defective batch</p>
+<p style="font-size:28px;line-height:1.4;color:#4A5563">Each company answers one level, from its own data.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6A7480">Catena-X Traceability · 6</p>
+<aside>This is the slide to slow down on. Left: one question triggers a recursive walk; the cost grows with the depth of the chain and every hop is a full dataspace round trip. Right: nobody walks the chain. Each company answers its own level from a local cache and decides to forward — exactly the hop-by-hop model the Traceability KIT describes for alerts and investigations.</aside>
+</section>
+</div></div>
+<div class="frame"><div class="slide">
+<section id="principles" data-section="Our approach and why it fits the network as it is" style="background:#F7F7F5;color:#14181D;font-family:'Libre Franklin', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:56px">
+<div style="display:flex;flex-direction:column;gap:20px">
+<p style="font-size:24px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#0F71CB">Our approach</p>
+<h2 style="font-size:64px;font-weight:600;line-height:1.15">Four design choices</h2>
+</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:32px">
+<div style="display:flex;flex-direction:column;gap:16px;background:#FFFFFF;border:1px solid #DCDCDC;border-left:6px solid #0F71CB;border-radius:16px;padding:36px 40px">
+<h3 style="font-size:36px;font-weight:600;line-height:1.2">Infrastructure is a prerequisite</h3>
+<p style="font-size:28px;line-height:1.45;color:#4A5563">Every participant already runs an EDC, a Digital Twin Registry and a wallet. The app uses them; it does not ship them.</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:16px;background:#FFFFFF;border:1px solid #DCDCDC;border-left:6px solid #0F71CB;border-radius:16px;padding:36px 40px">
+<h3 style="font-size:36px;font-weight:600;line-height:1.2">One level across companies</h3>
+<p style="font-size:28px;line-height:1.45;color:#4A5563">Only direct partners are read. Deeper levels travel through notifications, hop by hop. No IRS.</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:16px;background:#FFFFFF;border:1px solid #DCDCDC;border-left:6px solid #0F71CB;border-radius:16px;padding:36px 40px">
+<h3 style="font-size:36px;font-weight:600;line-height:1.2">Negotiate once, reuse</h3>
+<p style="font-size:28px;line-height:1.45;color:#4A5563">Contract agreements and access tokens are kept per partner; partner twins live in a local cache.</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:16px;background:#FFFFFF;border:1px solid #DCDCDC;border-left:6px solid #0F71CB;border-radius:16px;padding:36px 40px">
+<h3 style="font-size:36px;font-weight:600;line-height:1.2">Read every version in use</h3>
+<p style="font-size:28px;line-height:1.45;color:#4A5563">SerialPart, Batch, BoM and Usage in v3 and v4 map to one internal model. Partners upgrade at their own pace.</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6A7480">Catena-X Traceability · 7</p>
+<aside>Each choice answers one of the reasons Trace-X stalled. Prerequisite infrastructure answers the heavy bundled stack. One level answers the recursive walk. Negotiate-once answers the per-request round trips. Tolerant reading answers version churn: the network does not upgrade in lockstep.</aside>
+</section>
+</div></div>
+<div class="frame"><div class="slide">
+<section id="architecture" style="background:#F7F7F5;color:#14181D;font-family:'Libre Franklin', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
+<div style="display:flex;flex-direction:column;gap:20px">
+<p style="font-size:24px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#0F71CB">Architecture</p>
+<h2 style="font-size:64px;font-weight:600;line-height:1.15">A small app on top of what you already run</h2>
+</div>
+<div style="display:flex;flex-direction:row;gap:24px;align-items:center">
+<div style="flex:1.5;display:flex;flex-direction:column;gap:14px;background:#0F71CB;color:#FFFFFF;border-radius:16px;padding:32px 36px">
+<h3 style="font-size:32px;font-weight:600;color:#FFFFFF">Traceability app</h3>
+<p style="font-size:26px;background:#0D55AF;padding:10px 18px;border-radius:8px">Core: sync, one-level tree, affected parts</p>
+<p style="font-size:26px;background:#0D55AF;padding:10px 18px;border-radius:8px">Aspect adapters: v3 · v4 · industry_core</p>
+<p style="font-size:26px;background:#0D55AF;padding:10px 18px;border-radius:8px">Notifications: KIT API 1.2.1 + 2.0.0</p>
+<p style="font-size:26px;background:#0D55AF;padding:10px 18px;border-radius:8px">Dataspace client: Tractus-X SDK</p>
+<p style="font-size:26px;background:#0D55AF;padding:10px 18px;border-radius:8px">Local cache · web UI</p>
+</div>
+<div style="width:96px;display:flex;flex-direction:column;align-items:center;gap:8px">
+<x-shape kind="arrow-right" style="width:88px;height:44px;background:#B6B6B6"></x-shape>
+<x-shape kind="arrow-left" style="width:88px;height:44px;background:#B6B6B6"></x-shape>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:14px;background:#FFFFFF;border:1px solid #DCDCDC;border-radius:16px;padding:32px 36px">
+<h3 style="font-size:32px;font-weight:600">Your infrastructure</h3>
+<p style="font-size:26px;background:#F0F1F3;padding:10px 18px;border-radius:8px">EDC connector</p>
+<p style="font-size:26px;background:#F0F1F3;padding:10px 18px;border-radius:8px">Digital Twin Registry</p>
+<p style="font-size:26px;background:#F0F1F3;padding:10px 18px;border-radius:8px">Submodel server</p>
+<p style="font-size:26px;background:#F0F1F3;padding:10px 18px;border-radius:8px">Identity · BPNL</p>
+</div>
+<div style="width:120px;display:flex;flex-direction:column;align-items:center;gap:8px">
+<x-shape kind="arrow-right" style="width:88px;height:44px;background:#FFA600"></x-shape>
+<x-shape kind="arrow-left" style="width:88px;height:44px;background:#FFA600"></x-shape>
+<p style="font-size:24px;color:#4A5563;text-align:center">DSP</p>
+</div>
+<div style="flex:0.9;display:flex;flex-direction:column;gap:14px;background:#FFFFFF;border:1px dashed #B6B6B6;border-radius:16px;padding:32px 36px">
+<h3 style="font-size:32px;font-weight:600">Direct partners</h3>
+<p style="font-size:26px;line-height:1.4;color:#4A5563">Customers and suppliers, through their own connectors</p>
+</div>
+</div>
+<p style="font-size:28px;color:#4A5563">Python · FastAPI · Tractus-X SDK · PostgreSQL · React — configured by environment variables.</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6A7480">Catena-X Traceability · 8</p>
+<aside>The app is the only new component. The EDC, the registry, the submodel server and the identity are what every participant runs anyway. All dataspace access goes through the official Tractus-X SDK behind our own interfaces, so moving to the next release (26.09: EDC 0.13) is a configuration and adapter change, not a rewrite.</aside>
+</section>
+</div></div>
+<div class="frame"><div class="slide">
+<section id="reality" style="background:#F7F7F5;color:#14181D;font-family:'Libre Franklin', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
+<div style="display:flex;flex-direction:column;gap:20px">
+<p style="font-size:24px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#0F71CB">Fit with the network</p>
+<h2 style="font-size:64px;font-weight:600;line-height:1.15">Built for the network as it is</h2>
+</div>
+<table style="font-size:28px;color:#14181D;background:#FFFFFF;border:1px solid #DCDCDC;border-radius:16px">
+<tr style="background:#10212F"><th style="width:50%;color:#F4F6F8;padding:18px 28px">What we see</th><th style="width:50%;color:#F4F6F8">How the app handles it</th></tr>
+<tr><td>Most partners still publish SerialPart 3</td><td>Reads v3 and v4 into one internal model</td></tr>
+<tr style="background:#F9F9F9"><td>Jupiter policies end with 2026</td><td>Saturn-only (DSP 2025-1) from day one</td></tr>
+<tr><td>The KIT mandates Notification API 1.2.1; 2.0.0 is newer</td><td>Receives both; sends the highest version the partner offers</td></tr>
+<tr style="background:#F9F9F9"><td>26.09 moves models to <span style="color:#0D55AF">industry_core</span></td><td>Already reads them; model IDs live in one registry</td></tr>
+<tr><td>IRS is not compatible with Saturn policies</td><td>No IRS dependency</td></tr>
+</table>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6A7480">Sources: Traceability KIT 8.0.0 · sldt-semantic-models · tractus-x-release CHANGELOG · Catena-X Traceability · 9</p>
+<aside>The network does not upgrade in lockstep. SerialPart 3.0.x is still in release status in the official models repository, so tolerating it is correct, not a workaround. The end of Jupiter support at the end of 2026 is why we start Saturn-only. The KIT itself says 1.2.1 is mandatory and 2.0.0 optional; 2.0.0 is a superset, so we receive both.</aside>
+</section>
+</div></div>
+<div class="frame"><div class="slide">
+<section id="compare" data-transition="fade" style="background:#10212F;color:#F4F6F8;font-family:'Libre Franklin', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
+<div style="display:flex;flex-direction:column;gap:20px">
+<p style="font-size:24px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#FFA600">Side by side</p>
+<h2 style="font-size:64px;font-weight:600;line-height:1.15;color:#F4F6F8">Trace-X and this app</h2>
+</div>
+<table style="font-size:28px;color:#F4F6F8">
+<tr style="background:#1B3245"><th style="width:28%;color:#B9C6D2;padding:18px 28px"></th><th style="width:36%;color:#FFA600">Trace-X</th><th style="width:36%;color:#7DB8F0">This app</th></tr>
+<tr><td style="color:#B9C6D2">Cross-company tree</td><td>Recursive walk through IRS</td><td>One level; notifications hop by hop</td></tr>
+<tr style="background:#152A3B"><td style="color:#B9C6D2">Infrastructure</td><td>Bundled stack, IRS included</td><td>Uses the EDC and DTR you already run</td></tr>
+<tr><td style="color:#B9C6D2">Answers from</td><td>Asynchronous jobs per request</td><td>Local cache, refreshed by sync</td></tr>
+<tr style="background:#152A3B"><td style="color:#B9C6D2">Connector policies</td><td>IRS not ready for Saturn</td><td>Saturn-only</td></tr>
+<tr><td style="color:#B9C6D2">Aspect versions</td><td>Tied to its release</td><td>v3 and v4 side by side</td></tr>
+<tr style="background:#152A3B"><td style="color:#B9C6D2">Status</td><td>Not in Tractus-X since 25.09</td><td>Phase 1 delivered, October 2026</td></tr>
+</table>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#8FA1B3">Catena-X Traceability · 10</p>
+<aside>Keep this factual, not a takedown. The notification model is the same — it is the KIT standard and Trace-X helped define it. What differs is where the work happens: in a recursive walk through the network, or locally at each company. [Check the "Aspect versions" row against your own experience with Trace-X before presenting.]</aside>
+</section>
+</div></div>
+<div class="frame"><div class="slide">
+<section id="today" data-section="Where we are, what comes next and what we need" style="background:#F7F7F5;color:#14181D;font-family:'Libre Franklin', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
+<div style="display:flex;flex-direction:column;gap:20px">
+<p style="font-size:24px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#0F71CB">Where we are</p>
+<h2 style="font-size:64px;font-weight:600;line-height:1.15">Phase 1 is built and running</h2>
+</div>
+<div style="display:flex;flex-direction:row;gap:56px;align-items:start">
+<div style="width:640px;display:flex;flex-direction:column;gap:28px">
+<div style="display:flex;flex-direction:column;gap:4px;border-left:6px solid #B3CB2D;padding:0 0 0 24px">
+<p style="font-size:56px;font-weight:700;line-height:1.1">14</p>
+<p style="font-size:28px;line-height:1.35;color:#4A5563">official aspect payload versions read, v3 to industry_core v4</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px;border-left:6px solid #B3CB2D;padding:0 0 0 24px">
+<p style="font-size:56px;font-weight:700;line-height:1.1">55</p>
+<p style="font-size:28px;line-height:1.35;color:#4A5563">automated tests, run on every change</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px;border-left:6px solid #B3CB2D;padding:0 0 0 24px">
+<p style="font-size:36px;font-weight:600;line-height:1.2">Own registry sync</p>
+<p style="font-size:28px;line-height:1.35;color:#4A5563">through the Tractus-X SDK, with a sync history</p>
+</div>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:12px">
+<img src="part-detail.png" alt="The app's part detail: a battery module with its customer vehicle on the left and three supplier cells on the right" style="width:960px;height:560px;object-fit:contain;background:#E9ECEF;border:1px solid #DCDCDC;border-radius:16px">
+<p style="font-size:24px;color:#6A7480">Part detail with the one-level tree — running against a mock participant</p>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6A7480">Catena-X Traceability · 11</p>
+<aside>Be precise about what is proven: the app reads every official example payload, syncs from a registry through the SDK and runs end to end against a mock participant. It has not yet run against a real EDC and DTR — that is phase 2 and 3, on the Tractus-X umbrella environment.</aside>
+</section>
+</div></div>
+<div class="frame"><div class="slide">
+<section id="roadmap" style="background:#F7F7F5;color:#14181D;font-family:'Libre Franklin', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:56px">
+<div style="display:flex;flex-direction:column;gap:20px">
+<p style="font-size:24px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#0F71CB">Roadmap</p>
+<h2 style="font-size:64px;font-weight:600;line-height:1.15">From core to a three-company demo</h2>
+</div>
+<div style="display:flex;flex-direction:row;gap:24px">
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#F0F5D5;border:1px solid #B3CB2D;border-radius:16px;padding:36px">
+<p style="font-size:24px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#4F5A12">Phase 1 · done</p>
+<h3 style="font-size:36px;font-weight:600;line-height:1.2">Core</h3>
+<p style="font-size:28px;line-height:1.4;color:#3F4A10">Aspect adapters, registry sync, local cache, tree, UI</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#FFFFFF;border:2px solid #0F71CB;border-radius:16px;padding:36px">
+<p style="font-size:24px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#0D55AF">Phase 2 · next</p>
+<h3 style="font-size:36px;font-weight:600;line-height:1.2">Partners and notifications</h3>
+<p style="font-size:28px;line-height:1.4;color:#4A5563">EDC consumption of direct partners; alerts and investigations</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#FFFFFF;border:1px solid #DCDCDC;border-radius:16px;padding:36px">
+<p style="font-size:24px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#6A7480">Phase 3</p>
+<h3 style="font-size:36px;font-weight:600;line-height:1.2">Demo</h3>
+<p style="font-size:28px;line-height:1.4;color:#4A5563">Tier-2 on v3, Tier-1 and OEM on the Tractus-X umbrella</p>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#FFFFFF;border:1px solid #DCDCDC;border-radius:16px;padding:36px">
+<p style="font-size:24px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#6A7480">Phase 4</p>
+<h3 style="font-size:36px;font-weight:600;line-height:1.2">Extensions</h3>
+<p style="font-size:28px;line-height:1.4;color:#4A5563">Block notifications, ZeroKmFailure, release 26.09</p>
+</div>
+</div>
+<p style="font-size:28px;line-height:1.4;color:#4A5563">Timeline: [weeks per phase] · Team: [people]</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6A7480">Catena-X Traceability · 12</p>
+<aside>Phase 3 is the proof point: three participants in the reference environment, one of them deliberately still on SerialPart 3, and an alert that travels Tier-2 to Tier-1 to OEM while each company only looks at its own level. Fill in the timeline and team before presenting.</aside>
+</section>
+</div></div>
+<div class="frame"><div class="slide">
+<section id="ask" style="background:#F7F7F5;color:#14181D;font-family:'Libre Franklin', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:56px">
+<div style="display:flex;flex-direction:column;gap:20px">
+<p style="font-size:24px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#0F71CB">The ask</p>
+<h2 style="font-size:64px;font-weight:600;line-height:1.15">What we need to prove it in the network</h2>
+</div>
+<div style="display:flex;flex-direction:column;gap:24px">
+<div style="display:flex;flex-direction:row;gap:32px;align-items:center;background:#FFFFFF;border:1px solid #DCDCDC;border-radius:16px;padding:32px 40px">
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:44px;color:#0F71CB">01</p>
+<div style="flex:1;display:flex;flex-direction:column;gap:8px">
+<h3 style="font-size:36px;font-weight:600">Pilot partners</h3>
+<p style="font-size:28px;color:#4A5563">[2–3 direct partners] willing to exchange alerts in a test setup</p>
+</div>
+</div>
+<div style="display:flex;flex-direction:row;gap:32px;align-items:center;background:#FFFFFF;border:1px solid #DCDCDC;border-radius:16px;padding:32px 40px">
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:44px;color:#0F71CB">02</p>
+<div style="flex:1;display:flex;flex-direction:column;gap:8px">
+<h3 style="font-size:36px;font-weight:600">A test environment</h3>
+<p style="font-size:28px;color:#4A5563">[Access to a Catena-X test or integration environment with EDC and DTR]</p>
+</div>
+</div>
+<div style="display:flex;flex-direction:row;gap:32px;align-items:center;background:#FFFFFF;border:1px solid #DCDCDC;border-radius:16px;padding:32px 40px">
+<p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:44px;color:#0F71CB">03</p>
+<div style="flex:1;display:flex;flex-direction:column;gap:8px">
+<h3 style="font-size:36px;font-weight:600">A decision</h3>
+<p style="font-size:28px;color:#4A5563">[Sponsor and budget] to run phases 2 and 3</p>
+</div>
+</div>
+</div>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6A7480">Catena-X Traceability · 13</p>
+<aside>Replace the bracketed items with the concrete ask for this audience. Pilot partners matter most: the whole point is that the app works with partners as they are today, including those still on SerialPart 3.</aside>
+</section>
+</div></div>
+<div class="frame"><div class="slide">
+<section id="close" data-transition="fade" style="background:#FFA600;color:#14181D;font-family:'Libre Franklin', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;justify-content:space-between">
+<div style="display:flex;flex-direction:row;gap:16px;align-items:center">
+<x-shape kind="ellipse" style="width:28px;height:28px;background:#0F71CB"></x-shape>
+<x-shape kind="ellipse" style="width:28px;height:28px;background:#14181D"></x-shape>
+<x-shape kind="ellipse" style="width:28px;height:28px;background:#FFFFFF"></x-shape>
+</div>
+<div style="display:flex;flex-direction:column;gap:32px">
+<h1 style="font-size:112px;font-weight:700;line-height:1.05;letter-spacing:-2px">The standard is ready.<br>The app can be small.</h1>
+<p style="font-size:44px;line-height:1.3;color:#3A2A00">Same Traceability KIT. One hop at a time.</p>
+</div>
+<p style="font-size:28px;color:#3A2A00">[Presenter name] · [email] · github.com/pedrobtmartins/catena-x-simplified</p>
+<aside>Close on the two-sentence summary and open for questions. Likely questions: How do you handle partners without notifications? (Phase 2: assets and policies as in the KIT.) What about IRS for deep trees? (Not needed: each hop is answered by the company that owns that level.) Why not fix Trace-X? (Its design depends on IRS; we would be fighting the architecture.)</aside>
+</section>
+</div></div>
+<script>
+function fit() {
+  const width = Math.min(window.innerWidth - 64, 1600);
+  const scale = width / 1920;
+  document.querySelectorAll('.frame').forEach((f) => {
+    f.style.width = width + 'px';
+    f.style.height = 1080 * scale + 'px';
+    f.firstElementChild.style.transform = 'scale(' + scale + ')';
+  });
+}
+window.addEventListener('resize', fit);
+fit();
+document.getElementById('notes').addEventListener('change', (e) => {
+  document.body.classList.toggle('notes', e.target.checked);
+});
+</script>
+</body>
+</html>

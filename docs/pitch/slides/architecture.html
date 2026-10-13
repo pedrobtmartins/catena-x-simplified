@@ -1,0 +1,39 @@
+<section id="architecture" style="background:#F7F7F5;color:#14181D;font-family:'Libre Franklin', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
+<div style="display:flex;flex-direction:column;gap:20px">
+<p style="font-size:24px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#0F71CB">Architecture</p>
+<h2 style="font-size:64px;font-weight:600;line-height:1.15">A small app on top of what you already run</h2>
+</div>
+<div style="display:flex;flex-direction:row;gap:24px;align-items:center">
+<div style="flex:1.5;display:flex;flex-direction:column;gap:14px;background:#0F71CB;color:#FFFFFF;border-radius:16px;padding:32px 36px">
+<h3 style="font-size:32px;font-weight:600;color:#FFFFFF">Traceability app</h3>
+<p style="font-size:26px;background:#0D55AF;padding:10px 18px;border-radius:8px">Core: sync, one-level tree, affected parts</p>
+<p style="font-size:26px;background:#0D55AF;padding:10px 18px;border-radius:8px">Aspect adapters: v3 · v4 · industry_core</p>
+<p style="font-size:26px;background:#0D55AF;padding:10px 18px;border-radius:8px">Notifications: KIT API 1.2.1 + 2.0.0</p>
+<p style="font-size:26px;background:#0D55AF;padding:10px 18px;border-radius:8px">Dataspace client: Tractus-X SDK</p>
+<p style="font-size:26px;background:#0D55AF;padding:10px 18px;border-radius:8px">Local cache · web UI</p>
+</div>
+<div style="width:96px;display:flex;flex-direction:column;align-items:center;gap:8px">
+<x-shape kind="arrow-right" style="width:88px;height:44px;background:#B6B6B6"></x-shape>
+<x-shape kind="arrow-left" style="width:88px;height:44px;background:#B6B6B6"></x-shape>
+</div>
+<div style="flex:1;display:flex;flex-direction:column;gap:14px;background:#FFFFFF;border:1px solid #DCDCDC;border-radius:16px;padding:32px 36px">
+<h3 style="font-size:32px;font-weight:600">Your infrastructure</h3>
+<p style="font-size:26px;background:#F0F1F3;padding:10px 18px;border-radius:8px">EDC connector</p>
+<p style="font-size:26px;background:#F0F1F3;padding:10px 18px;border-radius:8px">Digital Twin Registry</p>
+<p style="font-size:26px;background:#F0F1F3;padding:10px 18px;border-radius:8px">Submodel server</p>
+<p style="font-size:26px;background:#F0F1F3;padding:10px 18px;border-radius:8px">Identity · BPNL</p>
+</div>
+<div style="width:120px;display:flex;flex-direction:column;align-items:center;gap:8px">
+<x-shape kind="arrow-right" style="width:88px;height:44px;background:#FFA600"></x-shape>
+<x-shape kind="arrow-left" style="width:88px;height:44px;background:#FFA600"></x-shape>
+<p style="font-size:24px;color:#4A5563;text-align:center">DSP</p>
+</div>
+<div style="flex:0.9;display:flex;flex-direction:column;gap:14px;background:#FFFFFF;border:1px dashed #B6B6B6;border-radius:16px;padding:32px 36px">
+<h3 style="font-size:32px;font-weight:600">Direct partners</h3>
+<p style="font-size:26px;line-height:1.4;color:#4A5563">Customers and suppliers, through their own connectors</p>
+</div>
+</div>
+<p style="font-size:28px;color:#4A5563">Python · FastAPI · Tractus-X SDK · PostgreSQL · React — configured by environment variables.</p>
+<p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6A7480">Catena-X Traceability · 8</p>
+<aside>The app is the only new component. The EDC, the registry, the submodel server and the identity are what every participant runs anyway. All dataspace access goes through the official Tractus-X SDK behind our own interfaces, so moving to the next release (26.09: EDC 0.13) is a configuration and adapter change, not a rewrite.</aside>
+</section>
