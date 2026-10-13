@@ -1,45 +1,52 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, ApiError, type Health, type SyncReport } from "./api";
+import { api, ApiError, formatTime, syncState, type Health, type SyncReport } from "./api";
+import { BellIcon, ClockIcon, LogoMark, PartsIcon, SyncIcon } from "./icons";
 import { PartDetail } from "./PartDetail";
 import { PartList } from "./PartList";
+import { SyncHistory } from "./SyncHistory";
 
-// Minimal hash routing: "#/" (list) and "#/parts/<globalAssetId>" (detail).
-function useRoute(): [string | null, (id: string | null) => void] {
-  const read = () => {
-    const match = /^#\/parts\/(.+)$/.exec(window.location.hash);
-    return match ? decodeURIComponent(match[1]) : null;
-  };
-  const [partId, setPartId] = useState(read);
+type Route = { page: "parts" } | { page: "part"; id: string } | { page: "sync" };
+
+function parseRoute(hash: string): Route {
+  const part = /^#\/parts\/(.+)$/.exec(hash);
+  if (part) return { page: "part", id: decodeURIComponent(part[1]) };
+  if (hash === "#/sync") return { page: "sync" };
+  return { page: "parts" };
+}
+
+function useRoute(): Route {
+  const [route, setRoute] = useState(() => parseRoute(window.location.hash));
   useEffect(() => {
-    const onChange = () => setPartId(read());
+    const onChange = () => {
+      setRoute(parseRoute(window.location.hash));
+      window.scrollTo(0, 0);
+    };
     window.addEventListener("hashchange", onChange);
     return () => window.removeEventListener("hashchange", onChange);
   }, []);
-  const navigate = (id: string | null) => {
-    window.location.hash = id ? `#/parts/${encodeURIComponent(id)}` : "#/";
-  };
-  return [partId, navigate];
+  return route;
 }
 
 export function App() {
-  const [partId, navigate] = useRoute();
+  const route = useRoute();
   const [health, setHealth] = useState<Health | null>(null);
-  const [report, setReport] = useState<SyncReport | null>(null);
+  const [lastRun, setLastRun] = useState<SyncReport | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [refreshKey, setRefreshKey] = useState(0);
+  // Bumped after every sync so pages reload their data.
+  const [dataVersion, setDataVersion] = useState(0);
 
   useEffect(() => {
     api.health().then(setHealth, (e: Error) => setError(e.message));
-    api.lastSync().then(setReport, () => setReport(null));
+    api.lastSync().then(setLastRun, () => setLastRun(null));
   }, []);
 
   const sync = useCallback(async () => {
     setSyncing(true);
     setError(null);
     try {
-      setReport(await api.sync());
-      setRefreshKey((k) => k + 1);
+      setLastRun(await api.sync());
+      setDataVersion((v) => v + 1);
     } catch (e) {
       setError(e instanceof ApiError ? `Sync failed: ${e.message}` : String(e));
     } finally {
@@ -49,43 +56,70 @@ export function App() {
 
   return (
     <div className="app">
-      <header>
+      <header className="topbar">
         <a className="brand" href="#/">
-          Catena-X Traceability
-        </a>
-        <span className="bpnl">{health?.own_bpnl}</span>
-        <div className="spacer" />
-        {report && (
-          <span className={report.complete && report.issues.length === 0 ? "sync ok" : "sync warn"}>
-            Last sync {new Date(report.finished_at ?? report.started_at).toLocaleString()} ·{" "}
-            {report.parts} parts · {report.issues.length} issues
+          <LogoMark />
+          <span className="brand-text">
+            <span className="brand-name">Traceability</span>
+            <span className="brand-sub">Catena-X · Tractus-X 26.03</span>
           </span>
-        )}
-        <button onClick={sync} disabled={syncing || !health?.dtr_configured}>
+        </a>
+        {health && <span className="bpnl-chip">{health.own_bpnl}</span>}
+        <div className="spacer" />
+        <span className="sync-status" aria-live="polite">
+          {lastRun ? (
+            <>
+              <span className={`dot ${syncState(lastRun)}`} />
+              Synced {formatTime(lastRun.finished_at ?? lastRun.started_at)} · {lastRun.twins} twins ·{" "}
+              {lastRun.issues.length} issues
+            </>
+          ) : (
+            <>
+              <span className="dot" />
+              Not synced yet
+            </>
+          )}
+        </span>
+        <button
+          type="button"
+          className="btn btn-primary"
+          onClick={sync}
+          disabled={syncing || !health?.dtr_configured}
+          title={health && !health.dtr_configured ? "No Digital Twin Registry configured" : undefined}
+        >
+          <SyncIcon className={syncing ? "spin" : undefined} />
           {syncing ? "Syncing…" : "Sync own twins"}
         </button>
       </header>
-      {error && <div className="error">{error}</div>}
-      {report && report.issues.length > 0 && (
-        <details className="issues">
-          <summary>{report.issues.length} sync issue(s)</summary>
-          <ul>
-            {report.issues.map((issue, i) => (
-              <li key={i}>
-                <code>{issue.global_asset_id || "registry"}</code> {issue.semantic_id && <em>{issue.semantic_id}</em>}:{" "}
-                {issue.message}
-              </li>
-            ))}
-          </ul>
-        </details>
-      )}
-      <main>
-        {partId ? (
-          <PartDetail id={partId} onNavigate={navigate} />
-        ) : (
-          <PartList key={refreshKey} onOpen={navigate} />
-        )}
-      </main>
+
+      <div className="layout">
+        <nav className="sidenav" aria-label="Main">
+          <a className="nav-item" href="#/" aria-current={route.page !== "sync" ? "page" : undefined}>
+            <PartsIcon />
+            Parts
+          </a>
+          <a className="nav-item" href="#/sync" aria-current={route.page === "sync" ? "page" : undefined}>
+            <ClockIcon />
+            Sync history
+          </a>
+          <span className="nav-item" aria-disabled="true">
+            <BellIcon />
+            Notifications
+            <span className="badge badge-phase">Phase 2</span>
+          </span>
+        </nav>
+
+        <main className="content">
+          {error && (
+            <div className="alert alert-error" role="alert">
+              {error}
+            </div>
+          )}
+          {route.page === "parts" && <PartList dataVersion={dataVersion} />}
+          {route.page === "part" && <PartDetail id={route.id} dataVersion={dataVersion} />}
+          {route.page === "sync" && <SyncHistory health={health} dataVersion={dataVersion} />}
+        </main>
+      </div>
     </div>
   );
 }

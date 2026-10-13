@@ -54,11 +54,16 @@ All settings are `CXS_*` environment variables (or a `.env` file); see
 
 | Method | Path                         | Description                                   |
 |--------|------------------------------|-----------------------------------------------|
-| GET    | `/api/health`                | Status, own BPNL, whether a DTR is configured |
-| GET    | `/api/parts`                 | Cached parts (`search`, `kind`, `own_only`, `limit`, `offset`) |
+| GET    | `/api/health`                | Status, own BPNL, DTR URL, sync schedule, supported aspect versions |
+| GET    | `/api/stats`                 | Own parts by kind and aspect version; supplier/customer links |
+| GET    | `/api/parts`                 | Cached parts with parent/child counts (`search`, `kind`, `aspect_major`, `own_only`, `limit`, `offset`) |
 | GET    | `/api/parts/{id}`            | One part                                      |
 | GET    | `/api/parts/{id}/tree`       | Part with its direct parents and children     |
 | POST   | `/api/sync`                  | Sync own twins from the DTR now               |
 | GET    | `/api/sync/last`             | Report of the last sync                       |
+| GET    | `/api/sync/runs`             | Recorded sync runs, newest first (`limit`)    |
+
+Every sync run is stored (`sync_runs` table) with its counters and issues. Timestamps are returned
+in UTC.
 
 Interactive documentation: `/docs`.

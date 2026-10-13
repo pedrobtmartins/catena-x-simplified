@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable
-from dataclasses import dataclass, field
+from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session, sessionmaker
@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from .. import aspects
 from ..aspects.ids import normalize_global_asset_id
 from ..dataspace import DataspaceError, SubmodelReader, TwinRef, TwinRegistry
-from ..storage import PartRepository
+from ..storage import PartRepository, SyncRunRepository, SyncRunRow
 
 log = logging.getLogger(__name__)
 
@@ -35,6 +35,7 @@ class SyncReport:
     removed_parts: int = 0
     complete: bool = False
     issues: list[SyncIssue] = field(default_factory=list)
+    id: int | None = None  # set once the run is recorded
 
 
 class OwnTwinSync:
@@ -69,7 +70,25 @@ class OwnTwinSync:
                 report.removed_parts = PartRepository(session).delete_own_parts_except(seen)
             report.complete = True
         report.finished_at = self._clock()
+        self._record(report)
         return report
+
+    def _record(self, report: SyncReport) -> None:
+        with self._session_factory.begin() as session:
+            row = SyncRunRepository(session).add(
+                SyncRunRow(
+                    started_at=report.started_at,
+                    finished_at=report.finished_at,
+                    twins=report.twins,
+                    parts=report.parts,
+                    relation_sets=report.relation_sets,
+                    unsupported_submodels=report.unsupported_submodels,
+                    removed_parts=report.removed_parts,
+                    complete=report.complete,
+                    issues=[asdict(issue) for issue in report.issues],
+                )
+            )
+            report.id = row.id
 
     def _sync_twin(self, twin: TwinRef, report: SyncReport) -> None:
         twin_id = normalize_global_asset_id(twin.global_asset_id)

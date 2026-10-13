@@ -1,7 +1,18 @@
 # Web UI
 
-React + TypeScript (Vite). Lists the cached parts and shows a part with its direct parents and
-children; the header triggers a sync of the participant's own twins.
+React + TypeScript (Vite). Three screens:
+
+- **Parts** — summary (own parts, supplier/customer links, aspect version mix), search, filters by
+  kind and aspect version (v3/v4), and the parts table;
+- **Part detail** — attributes, source aspects and the one-level as-built tree (customers ← part →
+  suppliers); partner twins not yet cached are drawn dashed;
+- **Sync history** — latest run, timeline of recorded runs with their issues, and the sync source.
+
+The palette follows the open-source Eclipse Tractus-X portal theme
+([portal-shared-components](https://github.com/eclipse-tractusx/portal-shared-components),
+Apache-2.0): primary blue `#0F71CB`, orange `#FFA600`, lime `#B3CB2D`; typeface Libre Franklin
+(with IBM Plex Mono for identifiers), bundled via `@fontsource` so the UI needs no external fonts.
+Colors are CSS custom properties at the top of [`src/styles.css`](src/styles.css).
 
 ```bash
 npm install

@@ -1,8 +1,19 @@
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
+from typing import Annotated
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import AfterValidator, BaseModel, ConfigDict
+
+
+def _as_utc(value: datetime | None) -> datetime | None:
+    # Timestamps are stored in UTC; SQLite returns them without a timezone.
+    if value is not None and value.tzinfo is None:
+        return value.replace(tzinfo=UTC)
+    return value
+
+
+UtcDatetime = Annotated[datetime, AfterValidator(_as_utc)]
 
 
 class ClassificationOut(BaseModel):
@@ -28,11 +39,16 @@ class PartOut(BaseModel):
     country: str | None
     site_ids: list[str]
     classifications: list[ClassificationOut]
-    synced_at: datetime
+    synced_at: UtcDatetime
+
+
+class PartListItem(PartOut):
+    parents_count: int
+    children_count: int
 
 
 class PartPage(BaseModel):
-    items: list[PartOut]
+    items: list[PartListItem]
     total: int
     limit: int
     offset: int
@@ -69,8 +85,9 @@ class SyncIssueOut(BaseModel):
 class SyncReportOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    started_at: datetime
-    finished_at: datetime | None
+    id: int | None
+    started_at: UtcDatetime
+    finished_at: UtcDatetime | None
     twins: int
     parts: int
     relation_sets: int
@@ -80,7 +97,24 @@ class SyncReportOut(BaseModel):
     issues: list[SyncIssueOut]
 
 
+class SyncRunPage(BaseModel):
+    items: list[SyncReportOut]
+
+
+class StatsOut(BaseModel):
+    own_parts: int
+    own_parts_by_kind: dict[str, int]
+    own_parts_by_semantic_id: dict[str, int]
+    supplier_links: int
+    suppliers: int
+    customer_links: int
+    customers: int
+
+
 class HealthOut(BaseModel):
     status: str
     own_bpnl: str
     dtr_configured: bool
+    dtr_url: str | None
+    sync_interval_seconds: int
+    supported_aspects: list[str]
