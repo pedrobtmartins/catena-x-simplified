@@ -44,6 +44,19 @@ class Settings(BaseSettings):
     # Partners' DSP endpoints by BPNL (JSON object); addresses set through the API win.
     partner_connectors: dict[str, str] = {}
 
+    # Quality notifications. Where our EDC's data plane reaches this app (e.g. http://app:8000);
+    # when set with an EDC, the notification assets are published in our EDC at startup.
+    notification_base_url: str | None = None
+    # Required as X-Api-Key on the receiving endpoints; also put in the assets' data address so
+    # our data plane sends it. Leave unset only if the endpoints are not reachable otherwise.
+    notification_api_key: str | None = None
+    notification_asset_prefix: str = "cxs-qualitynotification"
+    # ODRL permissions (JSON) of the notification assets' access and usage policies; empty uses
+    # the defaults (access: active membership; usage: DataExchangeGovernance:1.0 +
+    # cx.core.qualityNotifications:1).
+    notification_access_policy: list[dict] = []
+    notification_usage_policy: list[dict] = []
+
     # Periodic sync of own twins (and partners, when an EDC is configured); 0 disables it
     # (both can still be triggered through the API).
     sync_interval_seconds: int = 0

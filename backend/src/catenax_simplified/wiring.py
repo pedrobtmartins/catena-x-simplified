@@ -11,6 +11,8 @@ from tractusx_sdk.industry.services import AasService
 
 from .config import Settings
 from .dataspace.dtr import SdkTwinRegistry
+from .dataspace.notification_assets import NotificationAssetPublisher
+from .dataspace.notifications import EdcNotificationSender
 from .dataspace.partners import EdcPartnerClient
 from .dataspace.submodels import HttpSubmodelReader
 
@@ -41,17 +43,61 @@ def build_submodel_reader(settings: Settings) -> HttpSubmodelReader:
     )
 
 
-def build_partner_client(settings: Settings) -> EdcPartnerClient | None:
+def _edc_headers(settings: Settings) -> dict[str, str] | None:
+    return {"X-Api-Key": settings.edc_api_key} if settings.edc_api_key else None
+
+
+def _accepted_policies(settings: Settings) -> list[dict] | None:
+    return None if settings.accept_any_policy else settings.accepted_policies
+
+
+def build_edc_consumer(settings: Settings):
+    """The Saturn consumer service of our EDC; ``None`` if no EDC is configured. One instance
+    is shared by partner reads and notification sending."""
     if not settings.edc_management_url:
         return None
-    consumer = ServiceFactory.get_connector_consumer_service(
+    return ServiceFactory.get_connector_consumer_service(
         dataspace_version="saturn",
         base_url=settings.edc_management_url,
         dma_path=settings.edc_management_path,
-        headers={"X-Api-Key": settings.edc_api_key} if settings.edc_api_key else None,
+        headers=_edc_headers(settings),
         # Negotiated contracts and EDRs are reused for the lifetime of the process.
         connection_manager=MemoryConnectionManager(),
         verbose=False,
     )
-    policies = None if settings.accept_any_policy else settings.accepted_policies
-    return EdcPartnerClient(consumer, accepted_policies=policies)
+
+
+def build_partner_client(settings: Settings, consumer=None) -> EdcPartnerClient | None:
+    consumer = consumer or build_edc_consumer(settings)
+    if consumer is None:
+        return None
+    return EdcPartnerClient(consumer, accepted_policies=_accepted_policies(settings))
+
+
+def build_notification_sender(settings: Settings, consumer=None) -> EdcNotificationSender | None:
+    consumer = consumer or build_edc_consumer(settings)
+    if consumer is None:
+        return None
+    return EdcNotificationSender(consumer, accepted_policies=_accepted_policies(settings))
+
+
+def build_asset_publisher(settings: Settings) -> NotificationAssetPublisher | None:
+    if not (settings.edc_management_url and settings.notification_base_url):
+        return None
+    provider = ServiceFactory.get_connector_provider_service(
+        dataspace_version="saturn",
+        base_url=settings.edc_management_url,
+        dma_path=settings.edc_management_path,
+        headers=_edc_headers(settings),
+        verbose=False,
+    )
+    return NotificationAssetPublisher(
+        provider,
+        settings.notification_base_url,
+        prefix=settings.notification_asset_prefix,
+        headers={"X-Api-Key": settings.notification_api_key}
+        if settings.notification_api_key
+        else None,
+        access_permissions=settings.notification_access_policy or None,
+        usage_permissions=settings.notification_usage_policy or None,
+    )

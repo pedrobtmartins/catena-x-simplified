@@ -5,6 +5,8 @@ from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 
+from ..notifications import NotificationType, Severity, Status
+
 
 def _as_utc(value: datetime | None) -> datetime | None:
     # Timestamps are stored in UTC; SQLite returns them without a timezone.
@@ -111,11 +113,20 @@ class StatsOut(BaseModel):
     customers: int
 
 
+class NotificationAssetsOut(BaseModel):
+    # not_configured | publishing | published | failed
+    state: str
+    message: str | None = None
+    at: UtcDatetime | None = None
+    asset_ids: list[str] = []
+
+
 class HealthOut(BaseModel):
     status: str
     own_bpnl: str
     dtr_configured: bool
     edc_configured: bool
+    notification_assets: NotificationAssetsOut
     dtr_url: str | None
     sync_interval_seconds: int
     supported_aspects: list[str]
@@ -160,3 +171,98 @@ class PartnerSyncReportOut(BaseModel):
     started_at: UtcDatetime
     finished_at: UtcDatetime | None
     partners: list[PartnerSyncResultOut]
+
+
+# -- notifications -----------------------------------------------------------------------------
+
+
+class NotificationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    notification_id: str
+    type: NotificationType
+    direction: str  # outbound | inbound
+    partner_bpnl: str
+    status: Status
+    severity: Severity
+    description: str | None
+    affected_items: list[str]
+    expected_response_by: str | None
+    related_message_id: str | None
+    forwarded_from_id: int | None
+    api_version: str | None
+    last_error: str | None
+    created_at: UtcDatetime
+    updated_at: UtcDatetime
+
+
+class NotificationPage(BaseModel):
+    items: list[NotificationOut]
+    total: int
+    limit: int
+    offset: int
+
+
+class NotificationSummaryOut(BaseModel):
+    inbound_open: int
+    inbound_new: int  # received, not yet acknowledged
+    outbound_open: int
+
+
+class NotificationMessageOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    direction: str
+    operation: str  # receive | update
+    message_id: str
+    status: str | None
+    information: str | None
+    at: UtcDatetime
+
+
+class AffectedItemOut(BaseModel):
+    global_asset_id: str
+    part: PartOut | None  # None if the part is not in the local cache
+
+
+class NotificationDetailOut(NotificationOut):
+    items: list[AffectedItemOut]
+    messages: list[NotificationMessageOut]
+    forwarded_from: NotificationOut | None
+    forwarded_to: list[NotificationOut]
+    # What this side can do next: "send" for drafts, else target statuses.
+    actions: list[str]
+
+
+class PlanRequest(BaseModel):
+    type: NotificationType
+    affected_items: list[str] = Field(min_length=1, max_length=1000)
+
+
+class PlanOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    type: NotificationType
+    recipients: dict[str, list[str]]
+    unmatched: list[str]
+
+
+class ForwardPlanOut(PlanOut):
+    source_id: int
+    own_parts: list[str]
+
+
+class NotificationCreate(BaseModel):
+    type: NotificationType
+    affected_items: list[str] = Field(min_length=1, max_length=1000)
+    severity: Severity
+    description: str = Field(min_length=1, max_length=1000)
+    expected_response_by: datetime | None = None
+    forwarded_from: int | None = None
+    send: bool = False  # send the drafts right away
+
+
+class StatusChange(BaseModel):
+    status: Status
+    information: str | None = Field(default=None, max_length=1000)
