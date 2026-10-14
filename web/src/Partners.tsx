@@ -1,0 +1,232 @@
+import { useEffect, useState } from "react";
+import { api, ApiError, formatDateTime, type Health, type Partner } from "./api";
+import { CheckIcon, SyncIcon } from "./icons";
+import { ErrorAlert } from "./ui";
+
+const STATUS: Record<NonNullable<Partner["last_status"]>, { label: string; badge: string }> = {
+  ok: { label: "Synced", badge: "badge-ok" },
+  partial: { label: "Partial", badge: "badge-warn" },
+  failed: { label: "Failed", badge: "badge-error" },
+  no_connector: { label: "No connector", badge: "badge-outline" },
+};
+
+function PartnerRow({
+  partner,
+  canSync,
+  busy,
+  onSync,
+  onSaved,
+}: {
+  partner: Partner;
+  canSync: boolean;
+  busy: boolean;
+  onSync: () => void;
+  onSaved: (p: Partner) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(partner.name ?? "");
+  const [address, setAddress] = useState(partner.connector_address ?? "");
+  const [error, setError] = useState<string | null>(null);
+  const status = partner.last_status ? STATUS[partner.last_status] : null;
+
+  const save = async () => {
+    setError(null);
+    try {
+      onSaved(
+        await api.updatePartner(partner.bpnl, {
+          name: name.trim() || null,
+          connector_address: address.trim() || null,
+        }),
+      );
+      setEditing(false);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : String(e));
+    }
+  };
+
+  return (
+    <tr>
+      <td>
+        <div className="part-link">
+          <strong>{partner.name ?? "Unnamed partner"}</strong>
+          <span className="cell-id">{partner.bpnl}</span>
+        </div>
+      </td>
+      <td>
+        <div className="badges">
+          {partner.roles.map((role) => (
+            <span key={role} className={`badge ${role === "supplier" ? "badge-v3" : "badge-v4"}`}>
+              {role === "supplier" ? "Supplier" : "Customer"}
+            </span>
+          ))}
+        </div>
+      </td>
+      <td>
+        {partner.linked_twins} linked · {partner.cached_parts} cached
+      </td>
+      <td>
+        {editing ? (
+          <div className="edit-row">
+            <input className="input" aria-label="Name" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
+            <input
+              className="input mono"
+              aria-label="DSP endpoint"
+              placeholder="https://edc.partner/api/v1/dsp"
+              value={address}
+              onChange={(e) => setAddress(e.target.value)}
+            />
+            <ErrorAlert error={error} />
+          </div>
+        ) : partner.connector_address ? (
+          <div className="part-link">
+            <span className="cell-id">{partner.connector_address}</span>
+            <span className="sub">{partner.connector_source === "api" ? "set here" : "from settings"}</span>
+          </div>
+        ) : (
+          <span className="muted">Not set</span>
+        )}
+      </td>
+      <td>
+        {status ? (
+          <div className="part-link">
+            <span className={`badge ${status.badge}`}>
+              {partner.last_status === "ok" && <CheckIcon />}
+              {status.label}
+            </span>
+            <span className="sub" title={partner.last_message ?? undefined}>
+              {partner.last_sync_at && formatDateTime(partner.last_sync_at)}
+              {partner.twins_missing > 0 && ` · ${partner.twins_missing} not found`}
+            </span>
+          </div>
+        ) : (
+          <span className="muted">Never</span>
+        )}
+      </td>
+      <td>
+        <div className="actions" style={{ flexWrap: "nowrap" }}>
+          {editing ? (
+            <>
+              <button type="button" className="btn btn-primary" onClick={save}>
+                Save
+              </button>
+              <button type="button" className="btn btn-secondary" onClick={() => setEditing(false)}>
+                Cancel
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" className="btn btn-secondary" onClick={() => setEditing(true)}>
+                Edit
+              </button>
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label={`Sync ${partner.bpnl}`}
+                title={canSync ? "Sync this partner" : "No EDC configured"}
+                disabled={!canSync || busy || !partner.connector_address}
+                onClick={onSync}
+              >
+                <SyncIcon className={busy ? "spin" : undefined} />
+              </button>
+            </>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+export function Partners({ health, dataVersion }: { health: Health | null; dataVersion: number }) {
+  const [partners, setPartners] = useState<Partner[] | null>(null);
+  const [syncing, setSyncing] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [version, setVersion] = useState(0);
+  const canSync = Boolean(health?.edc_configured);
+
+  useEffect(() => {
+    api.partners().then(setPartners, (e: Error) => setError(e.message));
+  }, [dataVersion, version]);
+
+  const sync = async (bpnl?: string) => {
+    setSyncing(bpnl ?? "*");
+    setError(null);
+    try {
+      const report = await api.syncPartners(bpnl);
+      const failed = report.partners.filter((p) => p.status === "failed");
+      if (failed.length) setError(failed.map((p) => `${p.bpnl}: ${p.issues[0] ?? "failed"}`).join(" · "));
+      setVersion((v) => v + 1);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : String(e));
+    } finally {
+      setSyncing(null);
+    }
+  };
+
+  return (
+    <>
+      <div className="page-head-row">
+        <div className="page-head">
+          <h1>Partners</h1>
+          <p>
+            Direct suppliers and customers, found in your own BoM and usage data. Their linked twins are read through your
+            EDC — one level only — so their parts show up in your trees.
+          </p>
+        </div>
+        <button
+          type="button"
+          className="btn btn-primary"
+          disabled={!canSync || syncing !== null}
+          title={canSync ? undefined : "No EDC configured"}
+          onClick={() => sync()}
+        >
+          <SyncIcon className={syncing === "*" ? "spin" : undefined} />
+          {syncing === "*" ? "Syncing…" : "Sync all partners"}
+        </button>
+      </div>
+
+      {!canSync && (
+        <div className="alert alert-info">
+          No EDC is configured (CXS_EDC_MANAGEMENT_URL): partners are listed from your own data, but their twins cannot
+          be read{health?.can_send_notifications ? "." : " and notifications cannot be sent."}
+        </div>
+      )}
+      <ErrorAlert error={error} />
+
+      <div className="table-box">
+        <table>
+          <thead>
+            <tr>
+              <th scope="col">Partner</th>
+              <th scope="col">Role</th>
+              <th scope="col">Twins</th>
+              <th scope="col">Connector (DSP)</th>
+              <th scope="col">Last sync</th>
+              <th scope="col">
+                <span className="sr-only">Actions</span>
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {partners?.map((partner) => (
+              <PartnerRow
+                key={partner.bpnl}
+                partner={partner}
+                canSync={canSync}
+                busy={syncing === partner.bpnl}
+                onSync={() => sync(partner.bpnl)}
+                onSaved={() => setVersion((v) => v + 1)}
+              />
+            ))}
+            {partners && partners.length === 0 && (
+              <tr>
+                <td colSpan={6} className="muted">
+                  No partners yet. Sync your own twins: partners come from your BoM and usage aspects.
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </>
+  );
+}

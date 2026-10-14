@@ -126,6 +126,7 @@ class HealthOut(BaseModel):
     own_bpnl: str
     dtr_configured: bool
     edc_configured: bool
+    can_send_notifications: bool
     notification_assets: NotificationAssetsOut
     dtr_url: str | None
     sync_interval_seconds: int

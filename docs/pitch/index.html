@@ -317,7 +317,7 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 <section id="today" data-section="Where we are, what comes next and what we need" style="background:#F7F7F5;color:#14181D;font-family:'Libre Franklin', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
 <div style="display:flex;flex-direction:column;gap:20px">
 <p style="font-size:24px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#0F71CB">Where we are</p>
-<h2 style="font-size:64px;font-weight:600;line-height:1.15">Phase 1 is built and running</h2>
+<h2 style="font-size:64px;font-weight:600;line-height:1.15">Phases 1 and 2 are built</h2>
 </div>
 <div style="display:flex;flex-direction:row;gap:56px;align-items:start">
 <div style="width:640px;display:flex;flex-direction:column;gap:28px">
@@ -326,28 +326,28 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 <p style="font-size:28px;line-height:1.35;color:#4A5563">official aspect payload versions read, v3 to industry_core v4</p>
 </div>
 <div style="display:flex;flex-direction:column;gap:4px;border-left:6px solid #B3CB2D;padding:0 0 0 24px">
-<p style="font-size:56px;font-weight:700;line-height:1.1">55</p>
+<p style="font-size:56px;font-weight:700;line-height:1.1">135</p>
 <p style="font-size:28px;line-height:1.35;color:#4A5563">automated tests, run on every change</p>
 </div>
 <div style="display:flex;flex-direction:column;gap:4px;border-left:6px solid #B3CB2D;padding:0 0 0 24px">
-<p style="font-size:36px;font-weight:600;line-height:1.2">Own registry sync</p>
-<p style="font-size:28px;line-height:1.35;color:#4A5563">through the Tractus-X SDK, with a sync history</p>
+<p style="font-size:36px;font-weight:600;line-height:1.2">Alerts and investigations</p>
+<p style="font-size:28px;line-height:1.35;color:#4A5563">Notification API 1.2.1 + 2.0.0, forwarded hop by hop</p>
 </div>
 </div>
 <div style="flex:1;display:flex;flex-direction:column;gap:12px">
-<img src="part-detail.png" alt="The app's part detail: a battery module with its customer vehicle on the left and three supplier cells on the right" style="width:960px;height:560px;object-fit:contain;background:#E9ECEF;border:1px solid #DCDCDC;border-radius:16px">
-<p style="font-size:24px;color:#6A7480">Part detail with the one-level tree — running against a mock participant</p>
+<img src="notification-detail.png" alt="A received quality alert in the app: status path with accept and decline, and the next hop computed from the local tree" style="width:960px;height:560px;object-fit:contain;background:#E9ECEF;border:1px solid #DCDCDC;border-radius:16px">
+<p style="font-size:24px;color:#6A7480">A received alert and its next hop — running against a mock participant</p>
 </div>
 </div>
 <p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6A7480">Catena-X Traceability · 11</p>
-<aside>Be precise about what is proven: the app reads every official example payload, syncs from a registry through the SDK and runs end to end against a mock participant. It has not yet run against a real EDC and DTR — that is phase 2 and 3, on the Tractus-X umbrella environment.</aside>
+<aside>Be precise about what is proven: the app reads every official example payload, syncs its own registry through the SDK, reads direct partners' twins and sends and receives alerts and investigations in both Notification API versions, following the KIT state model. A test runs an alert through three companies, each with its own database, and back. All of this runs against mocks; it has not yet run against real EDCs — that is phase 3, on the Tractus-X umbrella environment.</aside>
 </section>
 </div></div>
 <div class="frame"><div class="slide">
 <section id="roadmap" style="background:#F7F7F5;color:#14181D;font-family:'Libre Franklin', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:56px">
 <div style="display:flex;flex-direction:column;gap:20px">
 <p style="font-size:24px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#0F71CB">Roadmap</p>
-<h2 style="font-size:64px;font-weight:600;line-height:1.15">From core to a three-company demo</h2>
+<h2 style="font-size:64px;font-weight:600;line-height:1.15">Next: a three-company demo on real connectors</h2>
 </div>
 <div style="display:flex;flex-direction:row;gap:24px">
 <div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#F0F5D5;border:1px solid #B3CB2D;border-radius:16px;padding:36px">
@@ -355,13 +355,13 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 <h3 style="font-size:36px;font-weight:600;line-height:1.2">Core</h3>
 <p style="font-size:28px;line-height:1.4;color:#3F4A10">Aspect adapters, registry sync, local cache, tree, UI</p>
 </div>
-<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#FFFFFF;border:2px solid #0F71CB;border-radius:16px;padding:36px">
-<p style="font-size:24px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#0D55AF">Phase 2 · next</p>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#F0F5D5;border:1px solid #B3CB2D;border-radius:16px;padding:36px">
+<p style="font-size:24px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#4F5A12">Phase 2 · done</p>
 <h3 style="font-size:36px;font-weight:600;line-height:1.2">Partners and notifications</h3>
-<p style="font-size:28px;line-height:1.4;color:#4A5563">EDC consumption of direct partners; alerts and investigations</p>
+<p style="font-size:28px;line-height:1.4;color:#3F4A10">Direct partners via EDC; alerts, investigations, forwarding</p>
 </div>
-<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#FFFFFF;border:1px solid #DCDCDC;border-radius:16px;padding:36px">
-<p style="font-size:24px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#6A7480">Phase 3</p>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#FFFFFF;border:2px solid #0F71CB;border-radius:16px;padding:36px">
+<p style="font-size:24px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#0D55AF">Phase 3 · next</p>
 <h3 style="font-size:36px;font-weight:600;line-height:1.2">Demo</h3>
 <p style="font-size:28px;line-height:1.4;color:#4A5563">Tier-2 on v3, Tier-1 and OEM on the Tractus-X umbrella</p>
 </div>
@@ -401,7 +401,7 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 <p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:44px;color:#0F71CB">03</p>
 <div style="flex:1;display:flex;flex-direction:column;gap:8px">
 <h3 style="font-size:36px;font-weight:600">A decision</h3>
-<p style="font-size:28px;color:#4A5563">[Sponsor and budget] to run phases 2 and 3</p>
+<p style="font-size:28px;color:#4A5563">[Sponsor and budget] to run phase 3 and the pilot</p>
 </div>
 </div>
 </div>
@@ -421,7 +421,7 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 <p style="font-size:44px;line-height:1.3;color:#3A2A00">Same Traceability KIT. One hop at a time.</p>
 </div>
 <p style="font-size:28px;color:#3A2A00">[Presenter name] · [email] · github.com/pedrobtmartins/catena-x-simplified</p>
-<aside>Close on the two-sentence summary and open for questions. Likely questions: How do you handle partners without notifications? (Phase 2: assets and policies as in the KIT.) What about IRS for deep trees? (Not needed: each hop is answered by the company that owns that level.) Why not fix Trace-X? (Its design depends on IRS; we would be fighting the architecture.)</aside>
+<aside>Close on the two-sentence summary and open for questions. Likely questions: How do you handle partners without notifications? (The app publishes the KIT notification assets and policies in its own EDC, in both API versions.) What about IRS for deep trees? (Not needed: each hop is answered by the company that owns that level.) Why not fix Trace-X? (Its design depends on IRS; we would be fighting the architecture.)</aside>
 </section>
 </div></div>
 <script>

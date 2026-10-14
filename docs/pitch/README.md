@@ -7,7 +7,7 @@ Trace-X stalled, with speaker notes on every slide.
   *Speaker notes* to show them).
 - **Sources**: [`deck.json`](deck.json) (title, slide order, sections, typefaces) and one file per
   slide in [`slides/`](slides/), in the 1920×1080 slide format of the Slides artifact the deck was
-  made in. [`part-detail.png`](part-detail.png) is the app screenshot used on slide 11.
+  made in. [`notification-detail.png`](notification-detail.png) is the app screenshot used on slide 11.
 - **Rebuild** the viewer after editing a slide: `python3 docs/pitch/build.py`.
 
 Before presenting, fill in the bracketed placeholders (presenter, contact, timeline, team and the

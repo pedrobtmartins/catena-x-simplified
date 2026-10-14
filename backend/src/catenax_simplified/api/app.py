@@ -99,6 +99,7 @@ def health(request: Request) -> HealthOut:
         own_bpnl=settings.own_bpnl,
         dtr_configured=request.app.state.sync_runner.configured,
         edc_configured=request.app.state.partner_runner.configured,
+        can_send_notifications=request.app.state.notifications.can_send,
         notification_assets=request.app.state.asset_publishing.status,
         dtr_url=settings.dtr_base_url,
         sync_interval_seconds=settings.sync_interval_seconds,

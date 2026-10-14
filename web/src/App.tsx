@@ -1,18 +1,44 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, ApiError, formatTime, syncState, type Health, type SyncReport } from "./api";
-import { BellIcon, ClockIcon, LogoMark, PartsIcon, SyncIcon } from "./icons";
+import { api, ApiError, formatTime, syncState, type Health, type NotificationSummary, type SyncReport } from "./api";
+import { Compose } from "./Compose";
+import { BellIcon, ClockIcon, LogoMark, PartnersIcon, PartsIcon, SyncIcon } from "./icons";
+import { NotificationDetail } from "./NotificationDetail";
+import { Notifications } from "./Notifications";
 import { PartDetail } from "./PartDetail";
 import { PartList } from "./PartList";
+import { Partners } from "./Partners";
 import { SyncHistory } from "./SyncHistory";
 
-type Route = { page: "parts" } | { page: "part"; id: string } | { page: "sync" };
+type Route =
+  | { page: "parts" }
+  | { page: "part"; id: string }
+  | { page: "sync" }
+  | { page: "partners" }
+  | { page: "notifications" }
+  | { page: "notification"; id: number }
+  | { page: "compose"; query: string };
 
 function parseRoute(hash: string): Route {
   const part = /^#\/parts\/(.+)$/.exec(hash);
   if (part) return { page: "part", id: decodeURIComponent(part[1]) };
+  const notification = /^#\/notifications\/(\d+)$/.exec(hash);
+  if (notification) return { page: "notification", id: Number(notification[1]) };
+  if (hash.startsWith("#/notifications")) return { page: "notifications" };
+  if (hash.startsWith("#/compose?")) return { page: "compose", query: hash.slice("#/compose?".length) };
   if (hash === "#/sync") return { page: "sync" };
+  if (hash === "#/partners") return { page: "partners" };
   return { page: "parts" };
 }
+
+const SECTION: Record<Route["page"], "parts" | "sync" | "partners" | "notifications"> = {
+  parts: "parts",
+  part: "parts",
+  sync: "sync",
+  partners: "partners",
+  notifications: "notifications",
+  notification: "notifications",
+  compose: "notifications",
+};
 
 function useRoute(): Route {
   const [route, setRoute] = useState(() => parseRoute(window.location.hash));
@@ -36,10 +62,20 @@ export function App() {
   // Bumped after every sync so pages reload their data.
   const [dataVersion, setDataVersion] = useState(0);
 
+  const [summary, setSummary] = useState<NotificationSummary | null>(null);
+
   useEffect(() => {
     api.health().then(setHealth, (e: Error) => setError(e.message));
     api.lastSync().then(setLastRun, () => setLastRun(null));
   }, []);
+
+  // New notifications arrive from partners at any time: refresh the inbox counter.
+  useEffect(() => {
+    const load = () => api.notificationSummary().then(setSummary, () => undefined);
+    load();
+    const timer = setInterval(load, 30_000);
+    return () => clearInterval(timer);
+  }, [route, dataVersion]);
 
   const sync = useCallback(async () => {
     setSyncing(true);
@@ -94,19 +130,29 @@ export function App() {
 
       <div className="layout">
         <nav className="sidenav" aria-label="Main">
-          <a className="nav-item" href="#/" aria-current={route.page !== "sync" ? "page" : undefined}>
-            <PartsIcon />
-            Parts
-          </a>
-          <a className="nav-item" href="#/sync" aria-current={route.page === "sync" ? "page" : undefined}>
-            <ClockIcon />
-            Sync history
-          </a>
-          <span className="nav-item" aria-disabled="true">
-            <BellIcon />
-            Notifications
-            <span className="badge badge-phase">Phase 2</span>
-          </span>
+          {(
+            [
+              ["parts", "#/", <PartsIcon key="i" />, "Parts"],
+              ["notifications", "#/notifications", <BellIcon key="i" />, "Notifications"],
+              ["partners", "#/partners", <PartnersIcon key="i" />, "Partners"],
+              ["sync", "#/sync", <ClockIcon key="i" />, "Sync history"],
+            ] as const
+          ).map(([section, href, icon, label]) => (
+            <a
+              key={section}
+              className="nav-item"
+              href={href}
+              aria-current={SECTION[route.page] === section ? "page" : undefined}
+            >
+              {icon}
+              {label}
+              {section === "notifications" && summary && summary.inbound_new > 0 && (
+                <span className="badge badge-count" aria-label={`${summary.inbound_new} new`}>
+                  {summary.inbound_new}
+                </span>
+              )}
+            </a>
+          ))}
         </nav>
 
         <main className="content">
@@ -118,6 +164,10 @@ export function App() {
           {route.page === "parts" && <PartList dataVersion={dataVersion} />}
           {route.page === "part" && <PartDetail id={route.id} dataVersion={dataVersion} />}
           {route.page === "sync" && <SyncHistory health={health} dataVersion={dataVersion} />}
+          {route.page === "partners" && <Partners health={health} dataVersion={dataVersion} />}
+          {route.page === "notifications" && <Notifications key={window.location.hash} dataVersion={dataVersion} />}
+          {route.page === "notification" && <NotificationDetail id={route.id} health={health} />}
+          {route.page === "compose" && <Compose key={route.query} query={route.query} health={health} />}
         </main>
       </div>
     </div>
