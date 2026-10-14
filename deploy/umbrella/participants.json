@@ -1,0 +1,29 @@
+{
+  "tier2": {
+    "bpnl": "BPNL00000003AYRE",
+    "management": "http://umbrella-dataprovider-edc-controlplane:8081/management",
+    "api_key": "TEST2",
+    "dsp": "http://dataprovider-controlplane.tx.test/api/v1/dsp",
+    "dataplane_public": "http://dataprovider-dataplane.tx.test/api/public",
+    "dtr": "http://umbrella-dataprovider-dtr:8080",
+    "submodel_backend": "http://umbrella-dataprovider-submodelserver:8080"
+  },
+  "tier1": {
+    "bpnl": "BPNL00000003AZQP",
+    "management": "http://umbrella-dataconsumer-1-edc-controlplane:8081/management",
+    "api_key": "TEST1",
+    "dsp": "http://dataconsumer-1-controlplane.tx.test/api/v1/dsp",
+    "dataplane_public": "http://dataconsumer-1-dataplane.tx.test/api/public",
+    "dtr": "http://umbrella-dataconsumer-1-dtr:8080",
+    "submodel_backend": "http://umbrella-dataconsumer-1-submodelserver:8080"
+  },
+  "oem": {
+    "bpnl": "BPNL00000003AVTH",
+    "management": "http://umbrella-dataconsumer-2-edc-controlplane:8081/management",
+    "api_key": "TEST3",
+    "dsp": "http://dataconsumer-2-controlplane.tx.test/api/v1/dsp",
+    "dataplane_public": "http://dataconsumer-2-dataplane.tx.test/api/public",
+    "dtr": "http://umbrella-dataconsumer-2-dtr:8080",
+    "submodel_backend": "http://umbrella-dataconsumer-2-submodelserver:8080"
+  }
+}

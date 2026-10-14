@@ -1,0 +1,61 @@
+# Trimmed umbrella 26.03 for the traceability demo (see deploy/umbrella/README.md)
+identity-and-trust-bundle:
+  ssi-dim-wallet-stub:
+    wallet:
+      seeding:
+        bpnList: BPNL00000003AZQP,BPNL00000003AYRE,BPNL00000003AVTH
+pgadmin4:
+  enabled: false
+tx-data-provider:
+  seedTestdata: false
+dataconsumerOne:
+  data-persistence-layer-bundle:
+    enabled: true
+    simple-data-backend:
+      nameOverride: dataconsumer-1-submodelserver
+      ingress:
+        enabled: false
+  digital-twin-bundle:
+    enabled: true
+    digital-twin-registry:
+      nameOverride: dataconsumer-1-dtr
+      registry:
+        authentication: false
+        host: dataconsumer-1-dtr.tx.test
+        dataSource:
+          url: jdbc:postgresql://dataconsumer-1-digital-twin-db:5432/dtr
+        ingress:
+          enabled: false
+      keycloak:
+        fullnameOverride: dataconsumer-1-registry-keycloak
+    postgresql:
+      fullnameOverride: dataconsumer-1-digital-twin-db
+      primary:
+        persistence:
+          size: 1Gi
+dataconsumerTwo:
+  enabled: true
+  data-persistence-layer-bundle:
+    enabled: true
+    simple-data-backend:
+      nameOverride: dataconsumer-2-submodelserver
+      ingress:
+        enabled: false
+  digital-twin-bundle:
+    enabled: true
+    digital-twin-registry:
+      nameOverride: dataconsumer-2-dtr
+      registry:
+        authentication: false
+        host: dataconsumer-2-dtr.tx.test
+        dataSource:
+          url: jdbc:postgresql://dataconsumer-2-digital-twin-db:5432/dtr
+        ingress:
+          enabled: false
+      keycloak:
+        fullnameOverride: dataconsumer-2-registry-keycloak
+    postgresql:
+      fullnameOverride: dataconsumer-2-digital-twin-db
+      primary:
+        persistence:
+          size: 1Gi
