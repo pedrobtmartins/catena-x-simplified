@@ -127,6 +127,7 @@ class HealthOut(BaseModel):
     dtr_configured: bool
     edc_configured: bool
     can_send_notifications: bool
+    dev_direct: bool  # development mode: partners reached without EDCs
     notification_assets: NotificationAssetsOut
     dtr_url: str | None
     sync_interval_seconds: int

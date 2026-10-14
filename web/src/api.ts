@@ -94,6 +94,7 @@ export interface Health {
   dtr_configured: boolean;
   edc_configured: boolean;
   can_send_notifications: boolean;
+  dev_direct: boolean;
   notification_assets: NotificationAssets;
   dtr_url: string | null;
   sync_interval_seconds: number;

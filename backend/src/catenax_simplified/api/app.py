@@ -100,6 +100,7 @@ def health(request: Request) -> HealthOut:
         dtr_configured=request.app.state.sync_runner.configured,
         edc_configured=request.app.state.partner_runner.configured,
         can_send_notifications=request.app.state.notifications.can_send,
+        dev_direct=settings.dev_direct,
         notification_assets=request.app.state.asset_publishing.status,
         dtr_url=settings.dtr_base_url,
         sync_interval_seconds=settings.sync_interval_seconds,
@@ -313,6 +314,8 @@ def create_app(
         else None
     )
     runner = ExclusiveRunner(sync.run if sync is not None else None)
+    if settings.dev_direct:
+        log.warning("CXS_DEV_DIRECT is on: partners are reached without EDCs (development only)")
     consumer = (
         build_edc_consumer(settings)
         if partner_client is None or notification_sender is None
