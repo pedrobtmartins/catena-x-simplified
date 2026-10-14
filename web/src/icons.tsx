@@ -76,6 +76,12 @@ export const CopyIcon = ({ size = 16 }: IconProps) => (
   </svg>
 );
 
+export const ChevronIcon = ({ size = 16, className }: IconProps) => (
+  <svg {...base(size)} strokeWidth={2.2} className={className}>
+    <path d="m6 9 6 6 6-6" />
+  </svg>
+);
+
 export const CheckIcon = ({ size = 14 }: IconProps) => (
   <svg {...base(size)} strokeWidth={2.5}>
     <path d="m5 12 5 5 9-10" />

@@ -1430,3 +1430,137 @@ a.btn-secondary:hover {
   font-weight: 600;
   padding: 8px 28px;
 }
+
+/* ---------- partner health ---------- */
+.health-toggle {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  width: calc(100% + 12px);
+  padding: 4px 6px;
+  margin: -4px -6px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.health-toggle:hover {
+  background: var(--surface-subtle);
+}
+
+.health-toggle .chevron {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 14px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.health-toggle .chevron svg {
+  transform: rotate(-90deg);
+  transition: transform 0.15s ease;
+}
+
+.health-toggle[aria-expanded="true"] .chevron svg {
+  transform: none;
+}
+
+.health-toggle:hover .chevron,
+.health-toggle[aria-expanded="true"] .chevron {
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.row-expanded td {
+  border-bottom-color: transparent;
+}
+
+.health-row td {
+  background: var(--surface-subtle);
+  padding-top: 0;
+}
+
+/* The panel spans the whole row; width 0 keeps its content (long URLs, error details) out of the
+   table's column sizing, so opening it doesn't make the columns jump. */
+.health-panel {
+  box-sizing: border-box;
+  width: 0;
+  min-width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.health-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.health-head .overline {
+  margin: 0 0 4px;
+}
+
+.check-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.check-steps li {
+  display: grid;
+  grid-template-columns: 84px minmax(160px, 260px) 1fr;
+  align-items: baseline;
+  gap: 12px;
+}
+
+.check-steps .badge {
+  justify-self: start;
+}
+
+.check-detail {
+  color: var(--text-2);
+  font-size: 13px;
+  word-break: break-word;
+}
+
+.check-history summary {
+  cursor: pointer;
+  color: var(--primary);
+  font-size: 14px;
+}
+
+.check-history-item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 0 0;
+  margin-top: 12px;
+  border-top: 1px solid var(--divider);
+}
+
+@media (max-width: 720px) {
+  .check-steps li {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}

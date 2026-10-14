@@ -17,8 +17,10 @@ with a recorded sync history, local cache, one-level as-built tree, REST API and
 (parts, part detail with tree, sync history). Phase 2 (partners and notifications) is implemented:
 direct partners' twins read through the EDC, quality alerts and investigations (Notification API
 1.2.1 and 2.0.0, KIT state model, assisted hop-by-hop forwarding) and their UI (inbox/outbox,
-notification detail, composer, partners). It is tested against mocks; the run against real EDCs on
-the umbrella environment is phase 3. See [the phases](docs/architecture.md#10-phases).
+notification detail, composer, partners). Partner health checks each partner's connector at
+three levels (discovery, catalog offers, full DTR access through an EDR) and show the result per
+partner in the UI. It is tested against mocks; the run against real EDCs on the umbrella
+environment is phase 3. See [the phases](docs/architecture.md#10-phases).
 
 ## Quick start
 

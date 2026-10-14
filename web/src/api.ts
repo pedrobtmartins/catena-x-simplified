@@ -94,6 +94,7 @@ export interface Health {
   dtr_configured: boolean;
   edc_configured: boolean;
   can_send_notifications: boolean;
+  can_check_partners: boolean;
   dev_direct: boolean;
   notification_assets: NotificationAssets;
   dtr_url: string | null;
@@ -114,6 +115,28 @@ export interface Partner {
   last_message: string | null;
   twins_found: number;
   twins_missing: number;
+  last_check: PartnerCheck | null;
+}
+
+export type CheckLevel = "discovery" | "catalog" | "full";
+export type CheckStatus = "healthy" | "degraded" | "failed";
+
+export interface PartnerCheckStep {
+  key: string;
+  name: string;
+  status: "ok" | "warn" | "failed" | "skipped";
+  detail: string;
+}
+
+export interface PartnerCheck {
+  id: number;
+  bpnl: string;
+  level: CheckLevel;
+  status: CheckStatus;
+  connector_address: string | null;
+  started_at: string;
+  finished_at: string;
+  steps: PartnerCheckStep[];
 }
 
 export interface PartnerSyncResult {
@@ -269,6 +292,20 @@ export const api = {
     request<PartnerSyncReport>(`/api/partners/sync${bpnl ? `?bpnl=${encodeURIComponent(bpnl)}` : ""}`, {
       method: "POST",
     }),
+  partnerChecks: (bpnl?: string, limit = 10) =>
+    request<{ items: PartnerCheck[] }>(
+      `/api/partners/checks?limit=${limit}${bpnl ? `&bpnl=${encodeURIComponent(bpnl)}` : ""}`,
+    ),
+  checkPartner: (bpnl: string, level: CheckLevel) =>
+    request<PartnerCheck>(
+      `/api/partners/${encodeURIComponent(bpnl)}/checks`,
+      json("POST", { level, confirm_state_change: level === "full" }),
+    ),
+  checkPartners: (level: CheckLevel, onlyUnhealthy = true) =>
+    request<{ items: PartnerCheck[] }>(
+      "/api/partners/checks",
+      json("POST", { level, only_unhealthy: onlyUnhealthy, confirm_state_change: level === "full" }),
+    ),
 
   notifications: (q: NotificationQuery) => {
     const query = new URLSearchParams({ limit: String(q.limit), offset: String(q.offset) });
