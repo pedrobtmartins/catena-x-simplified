@@ -148,7 +148,7 @@ class PartnerCheckOut(BaseModel):
     id: int
     bpnl: str
     level: str  # discovery | catalog | full
-    status: str  # healthy | degraded | failed
+    status: str  # healthy | degraded | skipped (development mode) | failed
     connector_address: str | None
     started_at: UtcDatetime
     finished_at: UtcDatetime

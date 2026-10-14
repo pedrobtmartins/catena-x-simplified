@@ -119,7 +119,8 @@ export interface Partner {
 }
 
 export type CheckLevel = "discovery" | "catalog" | "full";
-export type CheckStatus = "healthy" | "degraded" | "failed";
+// "skipped": nothing failed, but the dataspace part was not checked (development mode, no EDC).
+export type CheckStatus = "healthy" | "degraded" | "skipped" | "failed";
 
 export interface PartnerCheckStep {
   key: string;

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
-import { api, ApiError, formatDateTime, type CheckLevel, type Health, type Partner } from "./api";
+import { api, ApiError, formatDateTime, type CheckLevel, type CheckStatus, type Health, type Partner } from "./api";
 import { CheckIcon, ChevronIcon, SyncIcon } from "./icons";
-import { HealthBadge, HealthPanel } from "./PartnerHealth";
+import { HealthBadge, HealthPanel, STATUS as CHECK_STATUS } from "./PartnerHealth";
 import { ErrorAlert } from "./ui";
 
 const STATUS: Record<NonNullable<Partner["last_status"]>, { label: string; badge: string }> = {
@@ -210,10 +210,13 @@ export function Partners({ health, dataVersion }: { health: Health | null; dataV
     setCheckSummary(null);
     try {
       const { items } = await api.checkPartners("catalog");
-      const healthy = items.filter((c) => c.status === "healthy").length;
+      const counts = (Object.keys(CHECK_STATUS) as CheckStatus[])
+        .map((status) => [items.filter((c) => c.status === status).length, CHECK_STATUS[status].label] as const)
+        .filter(([n]) => n > 0)
+        .map(([n, label]) => `${n} ${label.toLowerCase()}`);
       setCheckSummary(
         items.length
-          ? `Checked ${items.length} partner${items.length === 1 ? "" : "s"}: ${healthy} healthy, ${items.length - healthy} not.`
+          ? `Checked ${items.length} partner${items.length === 1 ? "" : "s"}: ${counts.join(", ")}.`
           : "Every partner was healthy at its last check.",
       );
       setVersion((v) => v + 1);

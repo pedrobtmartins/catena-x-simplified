@@ -13,9 +13,14 @@ import {
 import { CheckIcon } from "./icons";
 import { ErrorAlert } from "./ui";
 
-const STATUS: Record<CheckStatus, { label: string; badge: string }> = {
+export const STATUS: Record<CheckStatus, { label: string; badge: string; title?: string }> = {
   healthy: { label: "Healthy", badge: "badge-ok" },
   degraded: { label: "Degraded", badge: "badge-warn" },
+  skipped: {
+    label: "Skipped",
+    badge: "badge-outline",
+    title: "The partner answered, but nothing was checked through an EDC (development mode)",
+  },
   failed: { label: "Failed", badge: "badge-error" },
 };
 
@@ -44,7 +49,7 @@ export function HealthBadge({ check }: { check: PartnerCheck | null }) {
   const status = STATUS[check.status];
   return (
     <div className="part-link">
-      <span className={`badge ${status.badge}`}>
+      <span className={`badge ${status.badge}`} title={status.title}>
         {check.status === "healthy" && <CheckIcon />}
         {status.label}
       </span>

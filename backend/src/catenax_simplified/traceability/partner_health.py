@@ -24,6 +24,10 @@ def overall_status(steps: list[CheckStep]) -> str:
         return "failed"
     if any(step.status == "warn" for step in steps):
         return "degraded"
+    # Through the EDC a step is only skipped after an earlier one failed; without failures this
+    # means development mode, where the dataspace part was not checked at all.
+    if any(step.status == "skipped" for step in steps):
+        return "skipped"
     return "healthy"
 
 
