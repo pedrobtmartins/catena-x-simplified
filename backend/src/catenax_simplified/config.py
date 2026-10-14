@@ -57,6 +57,12 @@ class Settings(BaseSettings):
     notification_access_policy: list[dict] = []
     notification_usage_policy: list[dict] = []
 
+    # Development only: reach partners without EDCs (local multi-participant demos). Partner
+    # connector addresses are then the partner apps' base URLs; their twins are read from
+    # CXS_DEV_PARTNER_DTRS (BPNL → DTR URL with API path). Never in a dataspace.
+    dev_direct: bool = False
+    dev_partner_dtrs: dict[str, str] = {}
+
     # Periodic sync of own twins (and partners, when an EDC is configured); 0 disables it
     # (both can still be triggered through the API).
     sync_interval_seconds: int = 0

@@ -53,6 +53,23 @@ To serve the built UI from the backend instead: `npm run build` in `web/`, then 
 Against a real participant, set the DTR, OAuth and submodel settings in `backend/.env`
 (see [backend/README.md](backend/README.md#configuration)).
 
+### Three-company demo (no EDCs)
+
+Tier-2 (cell maker, still on SerialPart 3) → Tier-1 (module maker) → OEM, each with its own app,
+database and mock registry, on one machine:
+
+```bash
+cd web && npm install && npm run build && cd ../backend
+uv sync
+uv run python devtools/demo_network.py
+```
+
+Open http://127.0.0.1:8002 (Tier-2), http://127.0.0.1:8001 (Tier-1) and http://127.0.0.1:8003
+(OEM). Send a quality alert from a Tier-2 cell, forward it from Tier-1's inbox to the OEM, and
+answer it back. The apps run in **development mode** (`CXS_DEV_DIRECT`): partners are reached
+directly instead of through EDCs — the UI says so on every page. It shows how the app behaves; it
+is not a dataspace test.
+
 ## Repository layout
 
 - [`backend/`](backend/README.md) — FastAPI application (Python, Tractus-X SDK)

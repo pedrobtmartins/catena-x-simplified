@@ -1421,3 +1421,12 @@ a.btn-secondary:hover {
   color: var(--text-3);
   border-color: var(--border);
 }
+
+.dev-banner {
+  background: var(--orange-soft);
+  color: var(--orange-soft-text);
+  border-bottom: 1px solid var(--orange-tint);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 28px;
+}

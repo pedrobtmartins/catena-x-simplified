@@ -128,6 +128,12 @@ export function App() {
         </button>
       </header>
 
+      {health?.dev_direct && (
+        <div className="dev-banner" role="note">
+          Development mode — partners are reached directly, without EDCs. Not for use in a dataspace.
+        </div>
+      )}
+
       <div className="layout">
         <nav className="sidenav" aria-label="Main">
           {(

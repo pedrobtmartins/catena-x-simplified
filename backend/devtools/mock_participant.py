@@ -1,10 +1,19 @@
 """A minimal stand-in for a participant's DTR and submodel server, for local UI/API development.
 
-It serves the AAS v3 ``/api/v3/shell-descriptors`` endpoint (with cursor pagination) and the
-submodels of a small Tier-1 data set that mixes v3 and v4 aspect models. It is not a test of
-Catena-X conformance; integration tests use the Tractus-X umbrella environment.
+It serves the AAS v3 ``/api/v3/shell-descriptors`` endpoint (with cursor pagination), the
+lookup endpoints (``/api/v3/lookup/shells``, ``/api/v3/shell-descriptors/{id}``) and the
+submodels of one of three companies of a small battery supply chain:
 
-    python devtools/mock_participant.py --port 8081
+- ``tier1`` (default): six battery modules, mixing v3 and v4 aspect models; cells from Tier-2,
+  even modules installed in the OEM's vehicles;
+- ``tier2``: the cells of those modules, published with SerialPart 3.0.0 and
+  SingleLevelUsageAsBuilt 3.0.0 (a supplier that has not migrated yet);
+- ``oem``: three vehicles built from the even modules (v4).
+
+It is not a test of Catena-X conformance; integration tests use the Tractus-X umbrella
+environment.
+
+    python devtools/mock_participant.py --port 8081 [--participant tier1]
 
     CXS_OWN_BPNL=BPNL000000000T1A \
     CXS_DTR_BASE_URL=http://localhost:8081 \
@@ -14,6 +23,7 @@ Catena-X conformance; integration tests use the Tractus-X umbrella environment.
 from __future__ import annotations
 
 import argparse
+import base64
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
@@ -27,6 +37,7 @@ SERIAL_PART_V3 = "urn:samm:io.catenax.serial_part:3.0.0#SerialPart"
 SERIAL_PART_V4 = "urn:samm:io.catenax.serial_part:4.0.0#SerialPart"
 BOM_V3 = "urn:samm:io.catenax.single_level_bom_as_built:3.0.0#SingleLevelBomAsBuilt"
 BOM_V4 = "urn:samm:io.catenax.single_level_bom_as_built:4.0.0#SingleLevelBomAsBuilt"
+USAGE_V3 = "urn:samm:io.catenax.single_level_usage_as_built:3.0.0#SingleLevelUsageAsBuilt"
 USAGE_V4 = "urn:samm:io.catenax.single_level_usage_as_built:4.0.0#SingleLevelUsageAsBuilt"
 
 
@@ -52,12 +63,24 @@ def _items(ids: list[str], key: str, bpnl: str, potential: bool | None = None) -
     return items
 
 
-def build_dataset() -> tuple[list[dict], dict[str, dict]]:
-    """Return (shell descriptors, submodel payloads by path)."""
+PARTICIPANTS = {"tier1": TIER1, "tier2": TIER2, "oem": OEM}
+VEHICLES = [_uuid("eeeeeeee", n) for n in range(1, 4)]
+
+
+def _module(n: int) -> str:
+    return _uuid("aaaaaaaa", n)
+
+
+def _cells(n: int) -> list[str]:
+    return [_uuid("cccccccc", n * 10 + c) for c in range(1, 4)]
+
+
+def build_dataset(participant: str = "tier1") -> tuple[list[dict], dict[str, dict]]:
+    """Return (shell descriptors, submodel payloads by path) of one company."""
     shells: list[dict] = []
     submodels: dict[str, dict] = {}
 
-    def add_twin(gid: str, aspects: dict[str, dict]) -> None:
+    def add_twin(gid: str, aspects: dict[str, dict], id_short: str = "batteryModule") -> None:
         descriptors = []
         for index, (semantic_id, payload) in enumerate(aspects.items()):
             path = f"/data/{gid}/{index}/submodel"
@@ -95,17 +118,86 @@ def build_dataset() -> tuple[list[dict], dict[str, dict]]:
         shells.append(
             {
                 "id": gid.replace("urn:uuid:", "urn:uuid:aa5"),
-                "idShort": "batteryModule",
+                "idShort": id_short,
                 "globalAssetId": gid,
-                "specificAssetIds": [{"name": "manufacturerId", "value": TIER1}],
+                "specificAssetIds": [
+                    {"name": "manufacturerId", "value": PARTICIPANTS[participant]}
+                ],
                 "submodelDescriptors": descriptors,
             }
         )
 
-    vehicles = [_uuid("eeeeeeee", n) for n in range(1, 4)]
+    if participant == "tier2":
+        for n in range(1, 7):
+            lot = "L-2026-17" if n % 2 == 0 else "L-2026-12"
+            for c, cell in enumerate(_cells(n), start=1):
+                add_twin(
+                    cell,
+                    {
+                        SERIAL_PART_V3: {
+                            "catenaXId": cell,
+                            "localIdentifiers": [
+                                {"key": "partInstanceId", "value": f"C-2617-{n:02d}{c}"},
+                                {"key": "batchId", "value": lot},
+                            ],
+                            "manufacturingInformation": {
+                                "date": f"2026-0{n}-02T06:00:00",
+                                "country": "POL",
+                                "sites": [
+                                    {"catenaXsiteId": "BPNS00000000T2S1", "function": "production"}
+                                ],
+                            },
+                            "partTypeInformation": {
+                                "manufacturerPartId": "CELL-21700-5A",
+                                "nameAtManufacturer": "Li-ion cell 21700",
+                                "customerPartId": "T1-CELL-0042",
+                                "nameAtCustomer": "Battery cell",
+                            },
+                        },
+                        USAGE_V3: {
+                            "catenaXId": cell,
+                            "parentItems": _items([_module(n)], "catenaXId", TIER1, False),
+                            "customers": [TIER1],
+                        },
+                    },
+                    id_short="batteryCell",
+                )
+        return shells, submodels
+
+    if participant == "oem":
+        for k, vehicle in enumerate(VEHICLES, start=1):
+            add_twin(
+                vehicle,
+                {
+                    SERIAL_PART_V4: {
+                        "globalAssetId": vehicle,
+                        "localIdentifiers": [
+                            {"key": "van", "value": f"OEM-VAN-{k:06d}"},
+                            {"key": "partInstanceId", "value": f"VIN-WCX0000000000{k:02d}"},
+                        ],
+                        "manufacturingInformation": {
+                            "productionDate": f"2026-0{2 * k + 1}-20",
+                            "country": "DEU",
+                            "sites": [{"siteId": "BPNS0000000OEMS1", "function": "production"}],
+                        },
+                        "partTypeInformation": {
+                            "manufacturerPartId": "EVC-2026",
+                            "nameAtManufacturer": "EV Compact",
+                        },
+                    },
+                    BOM_V4: {
+                        "globalAssetId": vehicle,
+                        "childItems": _items([_module(2 * k)], "globalAssetId", TIER1),
+                    },
+                },
+                id_short="vehicle",
+            )
+        return shells, submodels
+
+    vehicles = VEHICLES
     for n in range(1, 7):
-        module = _uuid("aaaaaaaa", n)
-        cells = [_uuid("cccccccc", n * 10 + c) for c in range(1, 4)]
+        module = _module(n)
+        cells = _cells(n)
         serial = f"MOD-2026-{n:04d}"
         if n % 2:  # odd modules are still published with v3 models
             add_twin(
@@ -185,29 +277,61 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:  # noqa: N802 (http.server API)
         url = urlparse(self.path)
         base = f"http://{self.headers['Host']}"
+        query = parse_qs(url.query)
+
+        def resolve(value: Any) -> Any:
+            return json.loads(json.dumps(value).replace("{base}", base))
+
         if url.path == "/api/v3/shell-descriptors":
-            query = parse_qs(url.query)
             limit = int(query.get("limit", ["100"])[0])
             start = int(query.get("cursor", ["0"])[0])
-            page = json.loads(
-                json.dumps(self.shells[start : start + limit]).replace("{base}", base)
-            )
+            page = resolve(self.shells[start : start + limit])
             nxt = start + limit
             metadata = {"cursor": str(nxt)} if nxt < len(self.shells) else {}
             self._send(200, {"paging_metadata": metadata, "result": page})
+        elif url.path == "/api/v3/lookup/shells":
+            wanted = {
+                (a["name"], a["value"])
+                for encoded in query.get("assetIds", [])
+                for a in [json.loads(_b64decode(encoded))]
+            }
+            found = [
+                shell["id"]
+                for shell in self.shells
+                if ("globalAssetId", shell["globalAssetId"]) in wanted
+            ]
+            self._send(200, {"paging_metadata": {}, "result": found})
+        elif url.path.startswith("/api/v3/shell-descriptors/"):
+            aas_id = _b64decode(url.path.rsplit("/", 1)[1])
+            shell = next((s for s in self.shells if s["id"] == aas_id), None)
+            if shell is None:
+                self._send(404, {"messages": [{"text": f"{aas_id} not found"}]})
+            else:
+                self._send(200, resolve(shell))
         elif url.path in self.submodels:
             self._send(200, self.submodels[url.path])
         else:
             self._send(404, {"messages": [{"text": f"{url.path} not found"}]})
 
+    def log_message(self, format: str, *args: Any) -> None:  # noqa: A002
+        pass  # quiet; the app logs what it reads
+
+
+def _b64decode(value: str) -> str:
+    return base64.urlsafe_b64decode(value + "=" * (-len(value) % 4)).decode()
+
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--port", type=int, default=8081)
+    parser.add_argument("--participant", choices=sorted(PARTICIPANTS), default="tier1")
     args = parser.parse_args()
-    Handler.shells, Handler.submodels = build_dataset()
+    Handler.shells, Handler.submodels = build_dataset(args.participant)
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
-    print(f"mock participant on http://127.0.0.1:{args.port} ({len(Handler.shells)} twins)")
+    print(
+        f"mock {args.participant} ({PARTICIPANTS[args.participant]}) on "
+        f"http://127.0.0.1:{args.port} ({len(Handler.shells)} twins)"
+    )
     server.serve_forever()
 
 

@@ -33,6 +33,9 @@ uv run uvicorn catenax_simplified.main:app --reload
 curl -X POST localhost:8000/api/sync
 ```
 
+`devtools/demo_network.py` runs three companies (Tier-2 → Tier-1 → OEM) side by side in
+development mode — see the [root README](../README.md#three-company-demo-no-edcs).
+
 The UI (`../web`) runs with `npm run dev` and proxies `/api` to port 8000. To serve the built UI
 from the backend, set `CXS_WEB_DIST_DIR=../web/dist`.
 
@@ -58,6 +61,7 @@ started from. [`.env.example`](.env.example) lists them all with comments; see a
 | `CXS_NOTIFICATION_API_KEY`      | Required as `X-Api-Key` on `/api/qualitynotifications/*`; also put in the assets' data address |
 | `CXS_NOTIFICATION_ACCESS_POLICY`, `CXS_NOTIFICATION_USAGE_POLICY` | JSON ODRL permissions of the notification assets; defaults: active membership / `DataExchangeGovernance:1.0` + `cx.core.qualityNotifications:1` |
 | `CXS_NOTIFICATION_ASSET_PREFIX` | Prefix of the asset, policy and contract IDs (default `cxs-qualitynotification`) |
+| `CXS_DEV_DIRECT`                | **Development only.** Reach partners without EDCs: notifications are posted to the partner apps (`CXS_PARTNER_CONNECTORS` = their base URLs), partner twins read from `CXS_DEV_PARTNER_DTRS` (BPNL → DTR URL with API path). Never in a dataspace |
 | `CXS_SYNC_INTERVAL_SECONDS`     | Periodic sync (own twins, then partners); `0` (default) disables it   |
 | `CXS_WEB_DIST_DIR`              | Directory of the built UI, served at `/`                             |
 

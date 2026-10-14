@@ -10,6 +10,7 @@ from tractusx_sdk.dataspace.services.connector.service_factory import ServiceFac
 from tractusx_sdk.industry.services import AasService
 
 from .config import Settings
+from .dataspace.direct import DirectNotificationSender, DirectPartnerClient
 from .dataspace.dtr import SdkTwinRegistry
 from .dataspace.notification_assets import NotificationAssetPublisher
 from .dataspace.notifications import EdcNotificationSender
@@ -54,7 +55,7 @@ def _accepted_policies(settings: Settings) -> list[dict] | None:
 def build_edc_consumer(settings: Settings):
     """The Saturn consumer service of our EDC; ``None`` if no EDC is configured. One instance
     is shared by partner reads and notification sending."""
-    if not settings.edc_management_url:
+    if not settings.edc_management_url or settings.dev_direct:
         return None
     return ServiceFactory.get_connector_consumer_service(
         dataspace_version="saturn",
@@ -67,14 +68,18 @@ def build_edc_consumer(settings: Settings):
     )
 
 
-def build_partner_client(settings: Settings, consumer=None) -> EdcPartnerClient | None:
+def build_partner_client(settings: Settings, consumer=None):
+    if settings.dev_direct:
+        return DirectPartnerClient(settings.dev_partner_dtrs) if settings.dev_partner_dtrs else None
     consumer = consumer or build_edc_consumer(settings)
     if consumer is None:
         return None
     return EdcPartnerClient(consumer, accepted_policies=_accepted_policies(settings))
 
 
-def build_notification_sender(settings: Settings, consumer=None) -> EdcNotificationSender | None:
+def build_notification_sender(settings: Settings, consumer=None):
+    if settings.dev_direct:
+        return DirectNotificationSender(settings.notification_api_key)
     consumer = consumer or build_edc_consumer(settings)
     if consumer is None:
         return None
@@ -82,7 +87,7 @@ def build_notification_sender(settings: Settings, consumer=None) -> EdcNotificat
 
 
 def build_asset_publisher(settings: Settings) -> NotificationAssetPublisher | None:
-    if not (settings.edc_management_url and settings.notification_base_url):
+    if settings.dev_direct or not (settings.edc_management_url and settings.notification_base_url):
         return None
     provider = ServiceFactory.get_connector_provider_service(
         dataspace_version="saturn",

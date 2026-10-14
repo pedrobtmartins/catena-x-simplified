@@ -254,6 +254,11 @@ an investigation with Tier-2.
 - **Local development**: `backend/devtools/mock_participant.py` serves a small DTR + submodel
   server (battery modules mixing SerialPart 3.0.0 and 4.0.0), enough to run the API and UI without
   a dataspace. It is not a conformance test.
+- **Three-company demo**: `backend/devtools/demo_network.py` runs Tier-2 (SerialPart/Usage 3.0.0),
+  Tier-1 and the OEM, each with its own app, database and mock registry. In this development mode
+  (`CXS_DEV_DIRECT`) partner twins are read straight from the partners' registries and
+  notifications are posted straight to the partners' apps — the whole hop-by-hop flow, without
+  EDCs, contracts or policies. It is flagged in the UI and the logs and never meant for a dataspace.
 - **Integration/E2E**: umbrella chart `26.03.00` (local Kubernetes, e.g. kind/minikube), which already
   ships three participants with EDC + DTR + submodel server (`tx-data-provider`, `dataconsumerOne`,
   `dataconsumerTwo`) and the wallet stub. Mapping to the demo scenario:
