@@ -5,6 +5,7 @@ import contextlib
 import logging
 import threading
 from collections.abc import AsyncIterator, Callable, Iterator
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Annotated, Any
 
@@ -16,7 +17,10 @@ from starlette.concurrency import run_in_threadpool
 from ..aspects.registry import SUPPORTED
 from ..config import Settings
 from ..dataspace import SubmodelReader, TwinRegistry
+from ..dataspace.notification_assets import NotificationAssetPublisher
+from ..dataspace.notifications import NotificationSender
 from ..dataspace.partners import PartnerDataClient
+from ..notifications import NotificationService
 from ..storage import (
     PartnerRepository,
     PartRepository,
@@ -26,9 +30,18 @@ from ..storage import (
     make_session_factory,
 )
 from ..traceability import OwnTwinSync, PartnerSync, part_tree
-from ..wiring import build_partner_client, build_submodel_reader, build_twin_registry
+from ..wiring import (
+    build_asset_publisher,
+    build_edc_consumer,
+    build_notification_sender,
+    build_partner_client,
+    build_submodel_reader,
+    build_twin_registry,
+)
+from . import notifications
 from .schemas import (
     HealthOut,
+    NotificationAssetsOut,
     PartListItem,
     PartnerOut,
     PartnerSyncReportOut,
@@ -86,6 +99,7 @@ def health(request: Request) -> HealthOut:
         own_bpnl=settings.own_bpnl,
         dtr_configured=request.app.state.sync_runner.configured,
         edc_configured=request.app.state.partner_runner.configured,
+        notification_assets=request.app.state.asset_publishing.status,
         dtr_url=settings.dtr_base_url,
         sync_interval_seconds=settings.sync_interval_seconds,
         supported_aspects=sorted(SUPPORTED),
@@ -227,6 +241,45 @@ async def sync_partners(request: Request, bpnl: str | None = None) -> PartnerSyn
     return PartnerSyncReportOut.model_validate(report)
 
 
+class AssetPublishing:
+    """Publishes the notification assets in our EDC and remembers how it went."""
+
+    def __init__(self, publisher: NotificationAssetPublisher | None):
+        self.publisher = publisher
+        self.status = NotificationAssetsOut(
+            state="not_configured" if publisher is None else "publishing"
+        )
+        self._lock = threading.Lock()
+
+    def run(self) -> NotificationAssetsOut:
+        if self.publisher is None:
+            return self.status
+        with self._lock:
+            self.status = NotificationAssetsOut(state="publishing")
+            try:
+                ids = self.publisher.publish()
+                self.status = NotificationAssetsOut(
+                    state="published", at=datetime.now(UTC), asset_ids=ids
+                )
+            except Exception as exc:
+                log.exception("publishing the notification assets failed")
+                self.status = NotificationAssetsOut(
+                    state="failed", message=str(exc)[:500], at=datetime.now(UTC)
+                )
+        return self.status
+
+
+@router.post("/notifications/assets", response_model=NotificationAssetsOut)
+async def publish_assets(request: Request) -> NotificationAssetsOut:
+    publishing: AssetPublishing = request.app.state.asset_publishing
+    if publishing.publisher is None:
+        raise HTTPException(
+            status_code=503,
+            detail="needs an EDC and CXS_NOTIFICATION_BASE_URL",
+        )
+    return await run_in_threadpool(publishing.run)
+
+
 async def _periodic_sync(runners: list[ExclusiveRunner], interval: int) -> None:
     while True:
         for runner in runners:
@@ -243,6 +296,8 @@ def create_app(
     registry: TwinRegistry | None = None,
     reader: SubmodelReader | None = None,
     partner_client: PartnerDataClient | None = None,
+    notification_sender: NotificationSender | None = None,
+    asset_publisher: NotificationAssetPublisher | None = None,
 ) -> FastAPI:
     """Create the application. The keyword arguments override the configured adapters (tests)."""
     engine = make_engine(settings.database_url)
@@ -257,7 +312,20 @@ def create_app(
         else None
     )
     runner = ExclusiveRunner(sync.run if sync is not None else None)
-    partner_client = partner_client or build_partner_client(settings)
+    consumer = (
+        build_edc_consumer(settings)
+        if partner_client is None or notification_sender is None
+        else None
+    )
+    partner_client = partner_client or build_partner_client(settings, consumer)
+    notification_sender = notification_sender or build_notification_sender(settings, consumer)
+    notification_service = NotificationService(
+        session_factory,
+        settings.own_bpnl,
+        notification_sender,
+        configured_connectors=settings.partner_connectors,
+    )
+    asset_publishing = AssetPublishing(asset_publisher or build_asset_publisher(settings))
     partner_sync = (
         PartnerSync(
             partner_client,
@@ -273,14 +341,19 @@ def create_app(
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         task = None
+        publish = None
+        if asset_publishing.publisher is not None:
+            # In the background: the app serves while the EDC is still unreachable.
+            publish = asyncio.create_task(run_in_threadpool(asset_publishing.run))
         periodic = [r for r in (runner, partner_runner) if r.configured]
         if periodic and settings.sync_interval_seconds > 0:
             task = asyncio.create_task(_periodic_sync(periodic, settings.sync_interval_seconds))
         yield
-        if task is not None:
-            task.cancel()
-            with contextlib.suppress(asyncio.CancelledError):
-                await task
+        for background in (task, publish):
+            if background is not None:
+                background.cancel()
+                with contextlib.suppress(asyncio.CancelledError):
+                    await background
         engine.dispose()
 
     app = FastAPI(title="catena-x-simplified", version="0.1.0", lifespan=lifespan)
@@ -288,7 +361,11 @@ def create_app(
     app.state.session_factory = session_factory
     app.state.sync_runner = runner
     app.state.partner_runner = partner_runner
+    app.state.notifications = notification_service
+    app.state.asset_publishing = asset_publishing
     app.include_router(router)
+    app.include_router(notifications.router)
+    app.include_router(notifications.kit_router)
 
     if settings.web_dist_dir:
         app.mount("/", StaticFiles(directory=Path(settings.web_dist_dir), html=True), name="web")

@@ -101,11 +101,11 @@ flowchart LR
 
 | Module          | Responsibility                                                              | Status  |
 |-----------------|-----------------------------------------------------------------------------|---------|
-| `dataspace`     | Single gateway to EDC/DTR/submodels. Uses the Tractus-X SDK. Contract and EDR cache. | DTR + own submodels ✅; partner consumption via EDC ✅ (mock-tested) |
+| `dataspace`     | Single gateway to EDC/DTR/submodels. Uses the Tractus-X SDK. Contract and EDR cache. | DTR + own submodels ✅; partner consumption, notification sending and asset publishing via EDC ✅ (mock-tested) |
 | `aspects`       | Per-version aspect model adapters → internal model. Registry of `semanticId`s. | ✅ |
 | `storage`       | Local cache of parts and one-level relations; recorded sync runs (SQLAlchemy). | ✅ |
-| `traceability`  | Own-twin and partner sync, one-level tree, affected-parts calculation, recipient suggestions. | syncs + tree ✅ |
-| `notifications` | 1.2.1/2.0.0 payloads, state machine, send/receive, registering the assets in the EDC. | phase 2 |
+| `traceability`  | Own-twin and partner sync, one-level tree. | ✅ |
+| `notifications` | 1.2.1/2.0.0 payloads, state machine, send/receive, recipients and affected parts from the local tree, assisted forwarding. | ✅ (UI follows) |
 | `api`           | REST API for the UI.                                                        | ✅ |
 | `web`           | React UI (Tractus-X portal palette).                                        | parts, part detail with tree, sync history ✅ |
 
@@ -193,7 +193,10 @@ longer required). Therefore:
 ### 6.4 Policies
 
 - **Saturn** policies only (CX-0152, ODRL context `https://w3id.org/dspace/2025/1/odrl-profile.jsonld`).
-- Access policy of the notification assets restricted by BPNL (known direct partners).
+- Notification assets: access policy *active membership* by default (configurable, e.g. a
+  `BusinessPartnerNumber` list of known direct partners); usage policy
+  `FrameworkAgreement = DataExchangeGovernance:1.0` + `UsagePurpose = cx.core.qualityNotifications:1`
+  as the KIT requires.
 - Before negotiating, the app validates the offered usage policies against configurable company
   rules; if no offer is compliant, it does not negotiate (KIT requirement).
 
@@ -211,19 +214,36 @@ sequenceDiagram
     T2->>T1: Alert (listOfAffectedItems = cells) via EDC
     T1->>T1: RECEIVED → ACKNOWLEDGED
     T1->>T1: local BoM: which modules contain these cells?
-    T1->>OEM: new Alert (affected modules), relatedMessageId = Tier-2 alert
+    T1->>OEM: new Alert (affected modules), linked locally to the Tier-2 alert
     OEM->>OEM: local BoM: which vehicles contain these modules?
     OEM-->>T1: update ACCEPTED
     T1-->>T2: update ACCEPTED
 ```
 
-Each hop is an independent notification between direct partners, linked to the previous one via
-`relatedMessageId`. No node needs to see the full chain.
+Each hop is an independent notification between direct partners. The app links it to the previous
+hop locally (`forwarded_from`); `relatedMessageId` is only set when the recipient knows the
+referenced notification (same partner), as the message header model prescribes. No node needs to
+see the full chain.
 
 ### 7.2 Investigation
 
 Symmetric: the OEM investigates a module with Tier-1, which identifies the cells in its BoM and opens
 an investigation with Tier-2.
+
+### 7.3 Identifiers and delivery
+
+- `notificationId` identifies the notification and is shared by both sides for its whole life;
+  every message (send or update) gets a new `header.messageId`.
+- Updates reference the notification by `notificationId`; for implementations that reference it by
+  its first message instead, an update whose `relatedMessageId` matches that message is accepted
+  too.
+- Sending: `CREATED → SENT`, then `RECEIVED` when the partner answers with success (HTTP 201). A
+  failed delivery returns the draft to `CREATED` with the error, so it can be retried.
+- Status changes (acknowledge, accept, decline, close) are applied locally only once the partner
+  accepted the update. Partners may skip intermediate states, but never move a notification
+  backwards or change a final decision.
+- Received notifications with affected items unknown locally are accepted (and shown as unknown)
+  rather than rejected with `422`: a stale cache must not drop a quality notification.
 
 ## 8. Development and test environment
 
@@ -268,8 +288,10 @@ Having one node on v3 ensures the mixed-version scenario is tested from day one.
       address from settings or the API; DTR negotiation (`dct:type` DigitalTwinRegistry), lookup by
       Catena-X ID, per-asset negotiation from the descriptor's `subprotocolBody`, SerialPart/Batch
       cached as partner parts; usage-policy allow-list; EDR reuse through the SDK connection manager.
-   2. *Notifications* — EDC assets, receiving/sending 1.2.1 and 2.0.0, state machine, alerts and
-      investigations, assisted forwarding.
+   2. *Notifications* ✅ — 8 EDC assets (receive/update × alert/investigation × 1.2.1/2.0.0) with
+      KIT policies, published at startup; one parser for both versions; sending picks the highest
+      compatible version in the partner's catalog; KIT state model; recipients and affected parts
+      from the local tree; assisted forwarding; message log; REST API.
    3. *UI* — partners, notification inbox/outbox, alert and investigation actions.
 3. **Demo** — seeding of the three umbrella participants, automated E2E scenario, complete UI.
 4. **Extensions** — Block Notifications 2.0.0, qualityTask/ZeroKmFailure, migration to 26.09.
@@ -295,6 +317,10 @@ Having one node on v3 ensures the mixed-version scenario is tested from day one.
   (`/v3/catalog`, `/v3/contractnegotiations`, `/v3/edrs`, `/v4alpha/connectordiscovery`). It is
   tested against a mocked SDK and mocked data planes, not yet against a real EDC; that happens on
   the umbrella environment. EDC 0.13 (26.09) moves connector discovery to `/v3`.
+- **Notification sender identity**: the receiving endpoints trust `senderBpn` in the payload. They
+  must only be reachable through our EDC's data plane (which enforces the contract) and are
+  protected by `CXS_NOTIFICATION_API_KEY`; matching the BPNL of the contract agreement is a later
+  hardening step.
 - **Connector addresses**: partners' DSP endpoints come from `CXS_PARTNER_CONNECTORS` or the API.
   Automatic lookup through the Catena-X discovery services is not implemented yet.
 - **EDR cache**: negotiated contracts and tokens are reused per process (SDK in-memory connection

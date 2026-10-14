@@ -8,7 +8,14 @@ from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from ..aspects import Part, Relations
-from .tables import PartnerRow, PartRow, RelationRow, SyncRunRow
+from .tables import (
+    NotificationMessageRow,
+    NotificationRow,
+    PartnerRow,
+    PartRow,
+    RelationRow,
+    SyncRunRow,
+)
 
 
 class PartRepository:
@@ -295,3 +302,109 @@ class SyncRunRepository:
             .order_by(SyncRunRow.started_at.desc(), SyncRunRow.id.desc())
             .limit(limit)
         ).all()
+
+
+class NotificationRepository:
+    def __init__(self, session: Session):
+        self._session = session
+
+    def add(self, row: NotificationRow) -> NotificationRow:
+        self._session.add(row)
+        self._session.flush()
+        return row
+
+    def get(self, pk: int) -> NotificationRow | None:
+        return self._session.get(NotificationRow, pk)
+
+    def find(self, partner_bpnl: str, notification_id: str) -> NotificationRow | None:
+        return self._session.scalar(
+            select(NotificationRow).where(
+                NotificationRow.partner_bpnl == partner_bpnl,
+                NotificationRow.notification_id == notification_id,
+            )
+        )
+
+    def find_by_message(self, partner_bpnl: str, message_id: str) -> NotificationRow | None:
+        """The partner's notification that a message ID refers to (its first message or any
+        message logged for it)."""
+        row = self._session.scalar(
+            select(NotificationRow).where(
+                NotificationRow.partner_bpnl == partner_bpnl,
+                NotificationRow.initial_message_id == message_id,
+            )
+        )
+        if row is not None:
+            return row
+        return self._session.scalar(
+            select(NotificationRow)
+            .join(
+                NotificationMessageRow,
+                NotificationMessageRow.notification_pk == NotificationRow.id,
+            )
+            .where(
+                NotificationRow.partner_bpnl == partner_bpnl,
+                NotificationMessageRow.message_id == message_id,
+            )
+            .limit(1)
+        )
+
+    def list(
+        self,
+        *,
+        direction: str | None = None,
+        type: str | None = None,
+        status: str | None = None,
+        partner_bpnl: str | None = None,
+        open_only: bool = False,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> tuple[Sequence[NotificationRow], int]:
+        query = select(NotificationRow)
+        if direction:
+            query = query.where(NotificationRow.direction == direction)
+        if type:
+            query = query.where(NotificationRow.type == type)
+        if status:
+            query = query.where(NotificationRow.status == status)
+        if partner_bpnl:
+            query = query.where(NotificationRow.partner_bpnl == partner_bpnl)
+        if open_only:
+            query = query.where(NotificationRow.status != "CLOSED")
+        total = self._session.scalar(select(func.count()).select_from(query.subquery())) or 0
+        rows = self._session.scalars(
+            query.order_by(NotificationRow.updated_at.desc(), NotificationRow.id.desc())
+            .limit(limit)
+            .offset(offset)
+        ).all()
+        return rows, total
+
+    def forwarded_to(self, pk: int) -> Sequence[NotificationRow]:
+        return self._session.scalars(
+            select(NotificationRow)
+            .where(NotificationRow.forwarded_from_id == pk)
+            .order_by(NotificationRow.id)
+        ).all()
+
+    def log(self, message: NotificationMessageRow) -> None:
+        self._session.add(message)
+
+    def messages(self, pk: int) -> Sequence[NotificationMessageRow]:
+        return self._session.scalars(
+            select(NotificationMessageRow)
+            .where(NotificationMessageRow.notification_pk == pk)
+            .order_by(NotificationMessageRow.at, NotificationMessageRow.id)
+        ).all()
+
+    def counts(self) -> dict[str, int]:
+        """Open notifications per direction, and inbound ones still waiting for us."""
+        rows = self._session.execute(
+            select(NotificationRow.direction, NotificationRow.status, func.count())
+            .where(NotificationRow.status != "CLOSED")
+            .group_by(NotificationRow.direction, NotificationRow.status)
+        ).all()
+        result = {"inbound_open": 0, "outbound_open": 0, "inbound_new": 0}
+        for direction, status, count in rows:
+            result[f"{direction}_open"] += count
+            if direction == "inbound" and status == "RECEIVED":
+                result["inbound_new"] += count
+        return result
