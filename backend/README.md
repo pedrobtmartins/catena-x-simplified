@@ -80,6 +80,9 @@ started from. [`.env.example`](.env.example) lists them all with comments; see a
 | GET    | `/api/partners`              | Direct partners (from own BoM/usage relations): roles, linked twins, cached parts, connector, last sync |
 | PUT    | `/api/partners/{bpnl}`       | Set a partner's name and DSP connector address |
 | POST   | `/api/partners/sync`         | Cache direct partners' twins through the EDC (`bpnl` for one partner) |
+| GET    | `/api/partners/checks`       | Recorded partner health checks, newest first (`bpnl`, `limit`) |
+| POST   | `/api/partners/checks`       | Check all partners (`level`; `only_unhealthy` defaults to true) |
+| POST   | `/api/partners/{bpnl}/checks` | Check one partner (`level`: `discovery`, `catalog` or `full`) |
 | GET    | `/api/notifications`         | Inbox/outbox (`direction`, `type`, `status`, `partner`, `open_only`, `limit`, `offset`) |
 | GET    | `/api/notifications/summary` | Open notifications per direction; received ones not yet acknowledged |
 | POST   | `/api/notifications/plan`    | Recipients of an alert/investigation about the given parts, from the local tree |
@@ -111,6 +114,14 @@ received notification can be forwarded one hop: its forward plan derives the nex
 (alert: own parts containing the affected supplier parts; investigation: supplier parts in the
 affected own parts) and the new notification is linked to it locally. We publish 8 assets
 (receive/update × alert/investigation × 1.2.1/2.0.0), all served by the same two endpoints.
+
+Partner health checks are cumulative: `discovery` resolves the partner's connector, `catalog`
+also looks for the DTR offer and the notification offers we need for the partner's roles, and
+`full` also negotiates the DTR and reads one shell descriptor through the EDR. `full` creates
+negotiation and transfer state in both connectors, so it needs `confirm_state_change: true`
+(else `409`). Only one check runs at a time (`409` while busy); `503` when no checker is
+configured. Each check is stored (`partner_checks` table) with its steps; error details are
+scrubbed of credentials.
 
 Every sync run is stored (`sync_runs` table) with its counters and issues. Timestamps are returned
 in UTC.

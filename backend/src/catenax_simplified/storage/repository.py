@@ -11,6 +11,7 @@ from ..aspects import Part, Relations
 from .tables import (
     NotificationMessageRow,
     NotificationRow,
+    PartnerCheckRow,
     PartnerRow,
     PartRow,
     RelationRow,
@@ -285,6 +286,33 @@ class PartnerRepository:
 
     def all(self) -> Sequence[PartnerRow]:
         return self._session.scalars(select(PartnerRow).order_by(PartnerRow.bpnl)).all()
+
+
+class PartnerCheckRepository:
+    def __init__(self, session: Session):
+        self._session = session
+
+    def add(self, row: PartnerCheckRow) -> PartnerCheckRow:
+        self._session.add(row)
+        self._session.flush()
+        return row
+
+    def recent(self, bpnl: str | None = None, limit: int = 50) -> Sequence[PartnerCheckRow]:
+        query = select(PartnerCheckRow)
+        if bpnl:
+            query = query.where(PartnerCheckRow.bpnl == bpnl)
+        return self._session.scalars(
+            query.order_by(PartnerCheckRow.started_at.desc(), PartnerCheckRow.id.desc()).limit(
+                limit
+            )
+        ).all()
+
+    def latest_by_partner(self) -> dict[str, PartnerCheckRow]:
+        latest = (
+            select(func.max(PartnerCheckRow.id)).group_by(PartnerCheckRow.bpnl).scalar_subquery()
+        )
+        rows = self._session.scalars(select(PartnerCheckRow).where(PartnerCheckRow.id.in_(latest)))
+        return {row.bpnl: row for row in rows}
 
 
 class SyncRunRepository:

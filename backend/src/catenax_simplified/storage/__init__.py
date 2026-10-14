@@ -4,6 +4,7 @@ SQLite in tests)."""
 from .db import init_schema, make_engine, make_session_factory
 from .repository import (
     NotificationRepository,
+    PartnerCheckRepository,
     PartnerRepository,
     PartRepository,
     SyncRunRepository,
@@ -12,6 +13,7 @@ from .tables import (
     Base,
     NotificationMessageRow,
     NotificationRow,
+    PartnerCheckRow,
     PartnerRow,
     PartRow,
     RelationRow,
@@ -25,6 +27,8 @@ __all__ = [
     "NotificationRow",
     "PartRepository",
     "PartRow",
+    "PartnerCheckRepository",
+    "PartnerCheckRow",
     "PartnerRepository",
     "PartnerRow",
     "RelationRow",

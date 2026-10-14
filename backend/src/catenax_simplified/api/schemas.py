@@ -128,10 +128,46 @@ class HealthOut(BaseModel):
     edc_configured: bool
     can_send_notifications: bool
     dev_direct: bool  # development mode: partners reached without EDCs
+    can_check_partners: bool
     notification_assets: NotificationAssetsOut
     dtr_url: str | None
     sync_interval_seconds: int
     supported_aspects: list[str]
+
+
+class PartnerCheckStepOut(BaseModel):
+    key: str
+    name: str
+    status: str  # ok | warn | failed | skipped
+    detail: str
+
+
+class PartnerCheckOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    bpnl: str
+    level: str  # discovery | catalog | full
+    status: str  # healthy | degraded | failed
+    connector_address: str | None
+    started_at: UtcDatetime
+    finished_at: UtcDatetime
+    steps: list[PartnerCheckStepOut]
+
+
+class PartnerCheckPage(BaseModel):
+    items: list[PartnerCheckOut]
+
+
+class PartnerCheckRequest(BaseModel):
+    level: str = Field(pattern="^(discovery|catalog|full)$")
+    # A full check negotiates a contract and opens a transfer in both connectors.
+    confirm_state_change: bool = False
+
+
+class PartnerBatchCheckRequest(PartnerCheckRequest):
+    # Only partners that were never checked or whose last check was not healthy.
+    only_unhealthy: bool = True
 
 
 class PartnerOut(BaseModel):
@@ -147,6 +183,7 @@ class PartnerOut(BaseModel):
     last_message: str | None
     twins_found: int
     twins_missing: int
+    last_check: PartnerCheckOut | None = None
 
 
 class PartnerUpdate(BaseModel):

@@ -17,11 +17,13 @@ from starlette.concurrency import run_in_threadpool
 from ..aspects.registry import SUPPORTED
 from ..config import Settings
 from ..dataspace import SubmodelReader, TwinRegistry
+from ..dataspace.health import PartnerHealthChecker
 from ..dataspace.notification_assets import NotificationAssetPublisher
 from ..dataspace.notifications import NotificationSender
 from ..dataspace.partners import PartnerDataClient
 from ..notifications import NotificationService
 from ..storage import (
+    PartnerCheckRepository,
     PartnerRepository,
     PartRepository,
     SyncRunRepository,
@@ -29,10 +31,11 @@ from ..storage import (
     make_engine,
     make_session_factory,
 )
-from ..traceability import OwnTwinSync, PartnerSync, part_tree
+from ..traceability import OwnTwinSync, PartnerHealth, PartnerSync, part_tree
 from ..wiring import (
     build_asset_publisher,
     build_edc_consumer,
+    build_health_checker,
     build_notification_sender,
     build_partner_client,
     build_submodel_reader,
@@ -43,6 +46,10 @@ from .schemas import (
     HealthOut,
     NotificationAssetsOut,
     PartListItem,
+    PartnerBatchCheckRequest,
+    PartnerCheckOut,
+    PartnerCheckPage,
+    PartnerCheckRequest,
     PartnerOut,
     PartnerSyncReportOut,
     PartnerUpdate,
@@ -101,6 +108,7 @@ def health(request: Request) -> HealthOut:
         edc_configured=request.app.state.partner_runner.configured,
         can_send_notifications=request.app.state.notifications.can_send,
         dev_direct=settings.dev_direct,
+        can_check_partners=request.app.state.health_runner.configured,
         notification_assets=request.app.state.asset_publishing.status,
         dtr_url=settings.dtr_base_url,
         sync_interval_seconds=settings.sync_interval_seconds,
@@ -191,6 +199,7 @@ def list_partners(session: SessionDep, request: Request) -> list[PartnerOut]:
     counterparts = PartRepository(session).partner_counterparts()
     rows = {row.bpnl: row for row in PartnerRepository(session).all()}
     cached = PartRepository(session).partner_part_counts()
+    checks = PartnerCheckRepository(session).latest_by_partner()
     partners = []
     for bpnl in sorted((set(counterparts) | set(rows)) - {settings.own_bpnl}):
         roles = counterparts.get(bpnl, {"supplier": set(), "customer": set()})
@@ -211,6 +220,7 @@ def list_partners(session: SessionDep, request: Request) -> list[PartnerOut]:
                 last_message=row.last_message if row else None,
                 twins_found=row.twins_found if row else 0,
                 twins_missing=row.twins_missing if row else 0,
+                last_check=PartnerCheckOut.model_validate(checks[bpnl]) if bpnl in checks else None,
             )
         )
     return partners
@@ -241,6 +251,49 @@ async def sync_partners(request: Request, bpnl: str | None = None) -> PartnerSyn
     if report is None:
         raise HTTPException(status_code=409, detail="a partner sync is already running")
     return PartnerSyncReportOut.model_validate(report)
+
+
+def _health_runner(request: Request, body: PartnerCheckRequest) -> ExclusiveRunner:
+    runner: ExclusiveRunner = request.app.state.health_runner
+    if not runner.configured:
+        raise HTTPException(status_code=503, detail="no EDC configured")
+    if body.level == "full" and not body.confirm_state_change:
+        raise HTTPException(
+            status_code=409,
+            detail="a full check negotiates a contract and opens a transfer in both connectors: "
+            "set confirm_state_change",
+        )
+    return runner
+
+
+@router.get("/partners/checks", response_model=PartnerCheckPage)
+def partner_checks(
+    session: SessionDep,
+    bpnl: str | None = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> PartnerCheckPage:
+    rows = PartnerCheckRepository(session).recent(bpnl=bpnl, limit=limit)
+    return PartnerCheckPage(items=[PartnerCheckOut.model_validate(r) for r in rows])
+
+
+@router.post("/partners/checks", response_model=PartnerCheckPage)
+async def check_partners(request: Request, body: PartnerBatchCheckRequest) -> PartnerCheckPage:
+    runner = _health_runner(request, body)
+    rows = await run_in_threadpool(runner.run, body.level, only_unhealthy=body.only_unhealthy)
+    if rows is None:
+        raise HTTPException(status_code=409, detail="a partner check is already running")
+    return PartnerCheckPage(items=[PartnerCheckOut.model_validate(r) for r in rows])
+
+
+@router.post("/partners/{bpnl}/checks", response_model=PartnerCheckOut)
+async def check_partner(bpnl: str, request: Request, body: PartnerCheckRequest) -> PartnerCheckOut:
+    runner = _health_runner(request, body)
+    rows = await run_in_threadpool(runner.run, body.level, bpnl)
+    if rows is None:
+        raise HTTPException(status_code=409, detail="a partner check is already running")
+    if not rows:
+        raise HTTPException(status_code=404, detail="partner not found")
+    return PartnerCheckOut.model_validate(rows[0])
 
 
 class AssetPublishing:
@@ -300,6 +353,7 @@ def create_app(
     partner_client: PartnerDataClient | None = None,
     notification_sender: NotificationSender | None = None,
     asset_publisher: NotificationAssetPublisher | None = None,
+    health_checker: PartnerHealthChecker | None = None,
 ) -> FastAPI:
     """Create the application. The keyword arguments override the configured adapters (tests)."""
     engine = make_engine(settings.database_url)
@@ -318,7 +372,7 @@ def create_app(
         log.warning("CXS_DEV_DIRECT is on: partners are reached without EDCs (development only)")
     consumer = (
         build_edc_consumer(settings)
-        if partner_client is None or notification_sender is None
+        if partner_client is None or notification_sender is None or health_checker is None
         else None
     )
     partner_client = partner_client or build_partner_client(settings, consumer)
@@ -341,6 +395,19 @@ def create_app(
         else None
     )
     partner_runner = ExclusiveRunner(partner_sync.run if partner_sync is not None else None)
+    health_checker = health_checker or build_health_checker(settings, consumer)
+    partner_health = (
+        PartnerHealth(
+            health_checker,
+            session_factory,
+            settings.own_bpnl,
+            configured_connectors=settings.partner_connectors,
+        )
+        if health_checker is not None
+        else None
+    )
+    # One check at a time, so a batch does not flood our own connector.
+    health_runner = ExclusiveRunner(partner_health.run if partner_health is not None else None)
 
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -365,6 +432,7 @@ def create_app(
     app.state.session_factory = session_factory
     app.state.sync_runner = runner
     app.state.partner_runner = partner_runner
+    app.state.health_runner = health_runner
     app.state.notifications = notification_service
     app.state.asset_publishing = asset_publishing
     app.include_router(router)

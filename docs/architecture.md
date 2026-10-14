@@ -101,13 +101,13 @@ flowchart LR
 
 | Module          | Responsibility                                                              | Status  |
 |-----------------|-----------------------------------------------------------------------------|---------|
-| `dataspace`     | Single gateway to EDC/DTR/submodels. Uses the Tractus-X SDK. Contract and EDR cache. | DTR + own submodels ✅; partner consumption, notification sending and asset publishing via EDC ✅ (mock-tested) |
+| `dataspace`     | Single gateway to EDC/DTR/submodels. Uses the Tractus-X SDK. Contract and EDR cache. | DTR + own submodels ✅; partner consumption, notification sending and asset publishing via EDC ✅ (mock-tested); partner connector health checks ✅ |
 | `aspects`       | Per-version aspect model adapters → internal model. Registry of `semanticId`s. | ✅ |
 | `storage`       | Local cache of parts and one-level relations; recorded sync runs (SQLAlchemy). | ✅ |
-| `traceability`  | Own-twin and partner sync, one-level tree. | ✅ |
+| `traceability`  | Own-twin and partner sync, one-level tree, partner health runs. | ✅ |
 | `notifications` | 1.2.1/2.0.0 payloads, state machine, send/receive, recipients and affected parts from the local tree, assisted forwarding. | ✅ (UI follows) |
 | `api`           | REST API for the UI.                                                        | ✅ |
-| `web`           | React UI (Tractus-X portal palette).                                        | parts, part detail with tree, sync history, partners, notifications (inbox/outbox, detail, composer, forwarding) ✅ |
+| `web`           | React UI (Tractus-X portal palette).                                        | parts, part detail with tree, sync history, partners, notifications (inbox/outbox, detail, composer, forwarding), partner health ✅ |
 
 ## 5. Performance principles (lessons from Trace-X)
 
@@ -300,6 +300,14 @@ Having one node on v3 ensures the mixed-version scenario is tested from day one.
    3. *UI* ✅ — partners (connector editing, partner sync), notification inbox/outbox, notification
       detail with the state path and actions, composer for alerts and investigations with
       recipients from the local tree, next-hop forwarding.
+   4. *Partner health* ✅ — preparation for phase 3: checks a partner's connector with the same
+      SDK path the app uses, at three cumulative levels — *discovery* (counter-party address),
+      *catalog* (DTR offer and the notification offers for the partner's roles, with a warning on
+      an incompatible version) and *full* (negotiates the DTR and reads one shell descriptor
+      through the EDR). The full level creates negotiation and transfer state in both connectors,
+      so it requires explicit confirmation. Checks run one at a time, are stored per partner
+      (`partner_checks`) with their steps, and error details are scrubbed of credentials. In dev
+      direct mode the partner's app and DTR are probed instead.
 3. **Demo** — seeding of the three umbrella participants, automated E2E scenario, complete UI.
 4. **Extensions** — Block Notifications 2.0.0, qualityTask/ZeroKmFailure, migration to 26.09.
 

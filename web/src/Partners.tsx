@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { api, ApiError, formatDateTime, type Health, type Partner } from "./api";
+import { api, ApiError, formatDateTime, type CheckLevel, type Health, type Partner } from "./api";
 import { CheckIcon, SyncIcon } from "./icons";
+import { HealthBadge, HealthPanel } from "./PartnerHealth";
 import { ErrorAlert } from "./ui";
 
 const STATUS: Record<NonNullable<Partner["last_status"]>, { label: string; badge: string }> = {
@@ -16,13 +17,22 @@ function PartnerRow({
   busy,
   onSync,
   onSaved,
+  canCheck,
+  checking,
+  onChecking,
+  onChecked,
 }: {
   partner: Partner;
   canSync: boolean;
   busy: boolean;
   onSync: () => void;
   onSaved: (p: Partner) => void;
+  canCheck: boolean;
+  checking: CheckLevel | null;
+  onChecking: (level: CheckLevel | null) => void;
+  onChecked: () => void;
 }) {
+  const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(partner.name ?? "");
   const [address, setAddress] = useState(partner.connector_address ?? "");
@@ -45,94 +55,123 @@ function PartnerRow({
   };
 
   return (
-    <tr>
-      <td>
-        <div className="part-link">
-          <strong>{partner.name ?? "Unnamed partner"}</strong>
-          <span className="cell-id">{partner.bpnl}</span>
-        </div>
-      </td>
-      <td>
-        <div className="badges">
-          {partner.roles.map((role) => (
-            <span key={role} className={`badge ${role === "supplier" ? "badge-v3" : "badge-v4"}`}>
-              {role === "supplier" ? "Supplier" : "Customer"}
-            </span>
-          ))}
-        </div>
-      </td>
-      <td>
-        {partner.linked_twins} linked · {partner.cached_parts} cached
-      </td>
-      <td>
-        {editing ? (
-          <div className="edit-row">
-            <input className="input" aria-label="Name" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
-            <input
-              className="input mono"
-              aria-label="DSP endpoint"
-              placeholder="https://edc.partner/api/v1/dsp"
-              value={address}
-              onChange={(e) => setAddress(e.target.value)}
-            />
-            <ErrorAlert error={error} />
-          </div>
-        ) : partner.connector_address ? (
+    <>
+      <tr className={expanded ? "row-expanded" : undefined}>
+        <td>
           <div className="part-link">
-            <span className="cell-id">{partner.connector_address}</span>
-            <span className="sub">{partner.connector_source === "api" ? "set here" : "from settings"}</span>
+            <strong>{partner.name ?? "Unnamed partner"}</strong>
+            <span className="cell-id">{partner.bpnl}</span>
           </div>
-        ) : (
-          <span className="muted">Not set</span>
-        )}
-      </td>
-      <td>
-        {status ? (
-          <div className="part-link">
-            <span className={`badge ${status.badge}`}>
-              {partner.last_status === "ok" && <CheckIcon />}
-              {status.label}
-            </span>
-            <span className="sub" title={partner.last_message ?? undefined}>
-              {partner.last_sync_at && formatDateTime(partner.last_sync_at)}
-              {partner.twins_missing > 0 && ` · ${partner.twins_missing} not found`}
-            </span>
+        </td>
+        <td>
+          <div className="badges">
+            {partner.roles.map((role) => (
+              <span key={role} className={`badge ${role === "supplier" ? "badge-v3" : "badge-v4"}`}>
+                {role === "supplier" ? "Supplier" : "Customer"}
+              </span>
+            ))}
           </div>
-        ) : (
-          <span className="muted">Never</span>
-        )}
-      </td>
-      <td>
-        <div className="actions" style={{ flexWrap: "nowrap" }}>
+        </td>
+        <td>
+          {partner.linked_twins} linked · {partner.cached_parts} cached
+        </td>
+        <td>
           {editing ? (
-            <>
-              <button type="button" className="btn btn-primary" onClick={save}>
-                Save
-              </button>
-              <button type="button" className="btn btn-secondary" onClick={() => setEditing(false)}>
-                Cancel
-              </button>
-            </>
+            <div className="edit-row">
+              <input className="input" aria-label="Name" placeholder="Name" value={name} onChange={(e) => setName(e.target.value)} />
+              <input
+                className="input mono"
+                aria-label="DSP endpoint"
+                placeholder="https://edc.partner/api/v1/dsp"
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+              />
+              <ErrorAlert error={error} />
+            </div>
+          ) : partner.connector_address ? (
+            <div className="part-link">
+              <span className="cell-id">{partner.connector_address}</span>
+              <span className="sub">{partner.connector_source === "api" ? "set here" : "from settings"}</span>
+            </div>
           ) : (
-            <>
-              <button type="button" className="btn btn-secondary" onClick={() => setEditing(true)}>
-                Edit
-              </button>
-              <button
-                type="button"
-                className="icon-btn"
-                aria-label={`Sync ${partner.bpnl}`}
-                title={canSync ? "Sync this partner" : "No EDC configured"}
-                disabled={!canSync || busy || !partner.connector_address}
-                onClick={onSync}
-              >
-                <SyncIcon className={busy ? "spin" : undefined} />
-              </button>
-            </>
+            <span className="muted">Not set</span>
           )}
-        </div>
-      </td>
-    </tr>
+        </td>
+        <td>
+          {status ? (
+            <div className="part-link">
+              <span className={`badge ${status.badge}`}>
+                {partner.last_status === "ok" && <CheckIcon />}
+                {status.label}
+              </span>
+              <span className="sub" title={partner.last_message ?? undefined}>
+                {partner.last_sync_at && formatDateTime(partner.last_sync_at)}
+                {partner.twins_missing > 0 && ` · ${partner.twins_missing} not found`}
+              </span>
+            </div>
+          ) : (
+            <span className="muted">Never</span>
+          )}
+        </td>
+        <td>
+          <button
+            type="button"
+            className="health-toggle"
+            aria-expanded={expanded}
+            aria-label={`Connector health of ${partner.bpnl}`}
+            onClick={() => setExpanded((v) => !v)}
+          >
+            <HealthBadge check={partner.last_check} />
+            <span className="chevron" aria-hidden="true">
+              {expanded ? "▾" : "▸"}
+            </span>
+          </button>
+        </td>
+        <td>
+          <div className="actions" style={{ flexWrap: "nowrap" }}>
+            {editing ? (
+              <>
+                <button type="button" className="btn btn-primary" onClick={save}>
+                  Save
+                </button>
+                <button type="button" className="btn btn-secondary" onClick={() => setEditing(false)}>
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                <button type="button" className="btn btn-secondary" onClick={() => setEditing(true)}>
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  className="icon-btn"
+                  aria-label={`Sync ${partner.bpnl}`}
+                  title={canSync ? "Sync this partner" : "No EDC configured"}
+                  disabled={!canSync || busy || !partner.connector_address}
+                  onClick={onSync}
+                >
+                  <SyncIcon className={busy ? "spin" : undefined} />
+                </button>
+              </>
+            )}
+          </div>
+        </td>
+      </tr>
+      {expanded && (
+        <tr className="health-row">
+          <td colSpan={7}>
+            <HealthPanel
+              partner={partner}
+              canCheck={canCheck}
+              busy={checking}
+              onBusy={onChecking}
+              onChecked={onChecked}
+            />
+          </td>
+        </tr>
+      )}
+    </>
   );
 }
 
@@ -141,7 +180,10 @@ export function Partners({ health, dataVersion }: { health: Health | null; dataV
   const [syncing, setSyncing] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
+  const [checking, setChecking] = useState<CheckLevel | null>(null);
+  const [checkSummary, setCheckSummary] = useState<string | null>(null);
   const canSync = Boolean(health?.edc_configured);
+  const canCheck = Boolean(health?.can_check_partners);
 
   useEffect(() => {
     api.partners().then(setPartners, (e: Error) => setError(e.message));
@@ -162,6 +204,26 @@ export function Partners({ health, dataVersion }: { health: Health | null; dataV
     }
   };
 
+  const checkUnhealthy = async () => {
+    setChecking("catalog");
+    setError(null);
+    setCheckSummary(null);
+    try {
+      const { items } = await api.checkPartners("catalog");
+      const healthy = items.filter((c) => c.status === "healthy").length;
+      setCheckSummary(
+        items.length
+          ? `Checked ${items.length} partner${items.length === 1 ? "" : "s"}: ${healthy} healthy, ${items.length - healthy} not.`
+          : "Every partner was healthy at its last check.",
+      );
+      setVersion((v) => v + 1);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : String(e));
+    } finally {
+      setChecking(null);
+    }
+  };
+
   return (
     <>
       <div className="page-head-row">
@@ -172,16 +234,31 @@ export function Partners({ health, dataVersion }: { health: Health | null; dataV
             EDC — one level only — so their parts show up in your trees.
           </p>
         </div>
-        <button
-          type="button"
-          className="btn btn-primary"
-          disabled={!canSync || syncing !== null}
-          title={canSync ? undefined : "No EDC configured"}
-          onClick={() => sync()}
-        >
-          <SyncIcon className={syncing === "*" ? "spin" : undefined} />
-          {syncing === "*" ? "Syncing…" : "Sync all partners"}
-        </button>
+        <div className="actions">
+          <button
+            type="button"
+            className="btn btn-secondary"
+            disabled={!canCheck || checking !== null}
+            title={
+              canCheck
+                ? "Catalog check (read-only) of partners never checked or not healthy at their last check"
+                : "No EDC configured"
+            }
+            onClick={checkUnhealthy}
+          >
+            {checking === "catalog" ? "Checking…" : "Check unhealthy"}
+          </button>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={!canSync || syncing !== null}
+            title={canSync ? undefined : "No EDC configured"}
+            onClick={() => sync()}
+          >
+            <SyncIcon className={syncing === "*" ? "spin" : undefined} />
+            {syncing === "*" ? "Syncing…" : "Sync all partners"}
+          </button>
+        </div>
       </div>
 
       {!canSync && (
@@ -191,6 +268,7 @@ export function Partners({ health, dataVersion }: { health: Health | null; dataV
         </div>
       )}
       <ErrorAlert error={error} />
+      {checkSummary && <div className="alert alert-info">{checkSummary}</div>}
 
       <div className="table-box">
         <table>
@@ -201,6 +279,7 @@ export function Partners({ health, dataVersion }: { health: Health | null; dataV
               <th scope="col">Twins</th>
               <th scope="col">Connector (DSP)</th>
               <th scope="col">Last sync</th>
+              <th scope="col">Health</th>
               <th scope="col">
                 <span className="sr-only">Actions</span>
               </th>
@@ -215,11 +294,15 @@ export function Partners({ health, dataVersion }: { health: Health | null; dataV
                 busy={syncing === partner.bpnl}
                 onSync={() => sync(partner.bpnl)}
                 onSaved={() => setVersion((v) => v + 1)}
+                canCheck={canCheck}
+                checking={checking}
+                onChecking={setChecking}
+                onChecked={() => setVersion((v) => v + 1)}
               />
             ))}
             {partners && partners.length === 0 && (
               <tr>
-                <td colSpan={6} className="muted">
+                <td colSpan={7} className="muted">
                   No partners yet. Sync your own twins: partners come from your BoM and usage aspects.
                 </td>
               </tr>

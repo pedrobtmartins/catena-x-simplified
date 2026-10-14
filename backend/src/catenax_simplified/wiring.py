@@ -12,6 +12,7 @@ from tractusx_sdk.industry.services import AasService
 from .config import Settings
 from .dataspace.direct import DirectNotificationSender, DirectPartnerClient
 from .dataspace.dtr import SdkTwinRegistry
+from .dataspace.health import DirectHealthChecker, EdcHealthChecker
 from .dataspace.notification_assets import NotificationAssetPublisher
 from .dataspace.notifications import EdcNotificationSender
 from .dataspace.partners import EdcPartnerClient
@@ -84,6 +85,15 @@ def build_notification_sender(settings: Settings, consumer=None):
     if consumer is None:
         return None
     return EdcNotificationSender(consumer, accepted_policies=_accepted_policies(settings))
+
+
+def build_health_checker(settings: Settings, consumer=None):
+    if settings.dev_direct:
+        return DirectHealthChecker(settings.dev_partner_dtrs)
+    consumer = consumer or build_edc_consumer(settings)
+    if consumer is None:
+        return None
+    return EdcHealthChecker(consumer, accepted_policies=_accepted_policies(settings))
 
 
 def build_asset_publisher(settings: Settings) -> NotificationAssetPublisher | None:
