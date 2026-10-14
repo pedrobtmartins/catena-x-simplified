@@ -278,7 +278,7 @@ Having one node on v3 ensures the mixed-version scenario is tested from day one.
 | Backend    | Python 3.12+, FastAPI, SQLAlchemy, Tractus-X SDK |
 | Database   | PostgreSQL 15+                            |
 | Frontend   | React + TypeScript (Vite)                 |
-| Deployment | Container image ✅, Docker Compose ✅; Helm chart (phase 3) |
+| Deployment | Container image, Docker Compose, Helm chart ✅                |
 | CI         | GitHub Actions: lint, format, tests, UI build |
 
 ## 10. Phases

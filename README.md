@@ -83,14 +83,16 @@ docker run -p 8000:8000 -e CXS_OWN_BPNL=BPNL000000000T1A -v cxs-data:/data caten
 
 With Postgres, next to an existing EDC and DTR: [`deploy/compose.yaml`](deploy/compose.yaml)
 (`cp deploy/.env.example deploy/.env`, fill it in, `docker compose -f deploy/compose.yaml up -d`).
-The database schema is migrated at startup (Alembic). Behind a TLS-inspecting proxy, pass its CA
+On Kubernetes: the Helm chart in [`deploy/helm/catenax-simplified`](deploy/helm/catenax-simplified/values.yaml)
+(`helm install traceability deploy/helm/catenax-simplified -f my-values.yaml`). The database
+schema is migrated at startup (Alembic). Behind a TLS-inspecting proxy, pass its CA
 certificate as a build secret: `docker build --secret id=ca,src=ca.crt …`.
 
 ## Repository layout
 
 - [`backend/`](backend/README.md) — FastAPI application (Python, Tractus-X SDK)
 - [`web/`](web/README.md) — React UI
-- [`deploy/`](deploy/compose.yaml) — Docker Compose for one participant (app + Postgres)
+- [`deploy/`](deploy/compose.yaml) — Docker Compose (app + Postgres) and the Helm chart for one participant
 - [`docs/architecture.md`](docs/architecture.md) — architecture and decisions
 - [`docs/glossary.md`](docs/glossary.md) — Catena-X and Tractus-X terms
 - [`docs/pitch/`](docs/pitch/README.md) — pitch deck (open `docs/pitch/index.html`)

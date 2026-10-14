@@ -1,0 +1,7 @@
+catena-x-simplified ({{ .Values.config.CXS_OWN_BPNL }}) is starting.
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "cxs.fullname" . }} 8000:{{ .Values.service.port }}
+  open http://localhost:8000
+
+Health and configuration: GET /api/health. The notification endpoints
+(/api/qualitynotifications/*) must only be reachable through your EDC's data plane.

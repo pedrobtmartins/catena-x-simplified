@@ -55,3 +55,11 @@ jobs:
           curl -fs localhost:8000/api/health
           curl -fs -o /dev/null localhost:8000/
           docker logs app
+
+  helm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - run: helm lint deploy/helm/catenax-simplified
+      - run: helm template t deploy/helm/catenax-simplified --set secrets.CXS_EDC_API_KEY=x --set ingress.enabled=true > /dev/null

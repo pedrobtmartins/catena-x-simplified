@@ -1,0 +1,14 @@
+apiVersion: v2
+name: catenax-simplified
+description: Lightweight Catena-X traceability app (Traceability KIT) — next to an existing EDC and DTR
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+license: Apache-2.0
+home: https://github.com/pedrobtmartins/catena-x-simplified
+sources:
+  - https://github.com/pedrobtmartins/catena-x-simplified
+keywords:
+  - catena-x
+  - tractus-x
+  - traceability
