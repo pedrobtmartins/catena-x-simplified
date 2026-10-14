@@ -1,0 +1,39 @@
+# One participant's app with Postgres, next to an existing EDC and DTR.
+#   cp deploy/.env.example deploy/.env   # then fill in the participant's settings
+#   docker compose -f deploy/compose.yaml up -d
+name: catenax-simplified
+
+services:
+  app:
+    image: ${CXS_IMAGE:-catenax-simplified:latest}
+    build:
+      context: ..
+    env_file: .env
+    environment:
+      CXS_DATABASE_URL: postgresql+psycopg://traceability:${POSTGRES_PASSWORD:-change-me}@db:5432/traceability
+    ports:
+      - "${CXS_PORT:-8000}:8000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"  # reach services on the host (e.g. the mock DTR)
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: traceability
+      POSTGRES_USER: traceability
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U traceability -d traceability"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+
+volumes:
+  db-data:

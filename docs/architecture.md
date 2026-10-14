@@ -278,7 +278,7 @@ Having one node on v3 ensures the mixed-version scenario is tested from day one.
 | Backend    | Python 3.12+, FastAPI, SQLAlchemy, Tractus-X SDK |
 | Database   | PostgreSQL 15+                            |
 | Frontend   | React + TypeScript (Vite)                 |
-| Deployment | Container image + Helm chart (phase 3)    |
+| Deployment | Container image ✅, Docker Compose ✅; Helm chart (phase 3) |
 | CI         | GitHub Actions: lint, format, tests, UI build |
 
 ## 10. Phases
@@ -341,7 +341,7 @@ Having one node on v3 ensures the mixed-version scenario is tested from day one.
   Automatic lookup through the Catena-X discovery services is not implemented yet.
 - **EDR cache**: negotiated contracts and tokens are reused per process (SDK in-memory connection
   manager); a restart re-negotiates. A persistent connection manager is a later option.
-- **Schema migrations**: phase 1 creates the database schema at startup; Alembic migrations are
-  introduced before the first deployment that must keep data.
+- **Schema migrations**: Alembic migrations are applied at startup. Databases created before
+  migrations existed are adopted (missing tables created, then stamped as current).
 - **Partner IDs**: Catena-X IDs are compared verbatim (only a missing `urn:uuid:` prefix is
   added); case differences between publishers would not match.

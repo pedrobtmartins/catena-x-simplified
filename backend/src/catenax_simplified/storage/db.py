@@ -1,6 +1,10 @@
 from __future__ import annotations
 
-from sqlalchemy import Engine, create_engine
+from pathlib import Path
+
+from alembic import command
+from alembic.config import Config
+from sqlalchemy import Engine, create_engine, inspect
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
@@ -16,9 +20,23 @@ def make_engine(url: str) -> Engine:
     return create_engine(url, pool_pre_ping=True)
 
 
+MIGRATIONS = Path(__file__).resolve().parent.parent / "migrations"
+
+
 def init_schema(engine: Engine) -> None:
-    # Phase 1 creates the schema directly; migrations (Alembic) follow once the schema settles.
-    Base.metadata.create_all(engine)
+    """Bring the database schema to the latest migration (Alembic)."""
+    config = Config()
+    config.set_main_option("script_location", str(MIGRATIONS))
+    with engine.begin() as connection:
+        config.attributes["connection"] = connection
+        tables = set(inspect(connection).get_table_names())
+        if tables and "alembic_version" not in tables:
+            # A database created before migrations existed (create_all): the schema only grew
+            # by whole tables until then, so add any missing ones and record it as current.
+            Base.metadata.create_all(connection)
+            command.stamp(config, "head")
+        else:
+            command.upgrade(config, "head")
 
 
 def make_session_factory(engine: Engine) -> sessionmaker:

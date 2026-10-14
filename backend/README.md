@@ -10,6 +10,7 @@ src/catenax_simplified/
                   notification sending, publishing our notification assets
   notifications/  quality notification payloads (API 1.2.1/2.0.0), state model, service
   storage/        local cache and notification log (SQLAlchemy; SQLite or Postgres)
+  migrations/     database migrations (Alembic), applied at startup
   traceability/   own-twin and partner sync, one-level as-built tree
   api/            REST API for the UI
 devtools/         mock participant (DTR + submodels) for local development
