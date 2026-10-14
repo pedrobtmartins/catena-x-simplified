@@ -81,13 +81,137 @@ export interface Stats {
   customers: number;
 }
 
+export interface NotificationAssets {
+  state: "not_configured" | "publishing" | "published" | "failed";
+  message: string | null;
+  at: string | null;
+  asset_ids: string[];
+}
+
 export interface Health {
   status: string;
   own_bpnl: string;
   dtr_configured: boolean;
+  edc_configured: boolean;
+  can_send_notifications: boolean;
+  notification_assets: NotificationAssets;
   dtr_url: string | null;
   sync_interval_seconds: number;
   supported_aspects: string[];
+}
+
+export interface Partner {
+  bpnl: string;
+  name: string | null;
+  roles: ("supplier" | "customer")[];
+  linked_twins: number;
+  cached_parts: number;
+  connector_address: string | null;
+  connector_source: "api" | "settings" | null;
+  last_sync_at: string | null;
+  last_status: "ok" | "partial" | "failed" | "no_connector" | null;
+  last_message: string | null;
+  twins_found: number;
+  twins_missing: number;
+}
+
+export interface PartnerSyncResult {
+  bpnl: string;
+  roles: string[];
+  linked_twins: number;
+  twins_found: number;
+  twins_missing: number;
+  removed_parts: number;
+  status: string;
+  issues: string[];
+}
+
+export interface PartnerSyncReport {
+  started_at: string;
+  finished_at: string | null;
+  partners: PartnerSyncResult[];
+}
+
+export type NotificationType = "alert" | "investigation";
+export type Severity = "MINOR" | "MAJOR" | "CRITICAL" | "LIFE-THREATENING";
+export type Status = "CREATED" | "SENT" | "RECEIVED" | "ACKNOWLEDGED" | "ACCEPTED" | "DECLINED" | "CLOSED";
+export const SEVERITIES: Severity[] = ["MINOR", "MAJOR", "CRITICAL", "LIFE-THREATENING"];
+
+export interface Notification {
+  id: number;
+  notification_id: string;
+  type: NotificationType;
+  direction: "inbound" | "outbound";
+  partner_bpnl: string;
+  status: Status;
+  severity: Severity;
+  description: string | null;
+  affected_items: string[];
+  expected_response_by: string | null;
+  related_message_id: string | null;
+  forwarded_from_id: number | null;
+  api_version: string | null;
+  last_error: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NotificationPage {
+  items: Notification[];
+  total: number;
+  limit: number;
+  offset: number;
+}
+
+export interface NotificationMessage {
+  direction: "inbound" | "outbound";
+  operation: "receive" | "update";
+  message_id: string;
+  status: Status | null;
+  information: string | null;
+  at: string;
+}
+
+export interface NotificationDetail extends Notification {
+  items: { global_asset_id: string; part: Part | null }[];
+  messages: NotificationMessage[];
+  forwarded_from: Notification | null;
+  forwarded_to: Notification[];
+  actions: string[]; // "send" and/or target statuses
+}
+
+export interface NotificationSummary {
+  inbound_open: number;
+  inbound_new: number;
+  outbound_open: number;
+}
+
+export interface Plan {
+  type: NotificationType;
+  recipients: Record<string, string[]>;
+  unmatched: string[];
+}
+
+export interface ForwardPlan extends Plan {
+  source_id: number;
+  own_parts: string[];
+}
+
+export interface NotificationCreate {
+  type: NotificationType;
+  affected_items: string[];
+  severity: Severity;
+  description: string;
+  expected_response_by?: string | null;
+  forwarded_from?: number | null;
+  send: boolean;
+}
+
+export interface NotificationQuery {
+  direction?: "inbound" | "outbound";
+  openOnly?: boolean;
+  limit: number;
+  offset: number;
 }
 
 export class ApiError extends Error {
@@ -136,7 +260,52 @@ export const api = {
   sync: () => request<SyncReport>("/api/sync", { method: "POST" }),
   lastSync: () => request<SyncReport>("/api/sync/last"),
   syncRuns: (limit = 20) => request<{ items: SyncReport[] }>(`/api/sync/runs?limit=${limit}`),
+
+  partners: () => request<Partner[]>("/api/partners"),
+  updatePartner: (bpnl: string, update: { name?: string | null; connector_address?: string | null }) =>
+    request<Partner>(`/api/partners/${encodeURIComponent(bpnl)}`, json("PUT", update)),
+  syncPartners: (bpnl?: string) =>
+    request<PartnerSyncReport>(`/api/partners/sync${bpnl ? `?bpnl=${encodeURIComponent(bpnl)}` : ""}`, {
+      method: "POST",
+    }),
+
+  notifications: (q: NotificationQuery) => {
+    const query = new URLSearchParams({ limit: String(q.limit), offset: String(q.offset) });
+    if (q.direction) query.set("direction", q.direction);
+    if (q.openOnly) query.set("open_only", "true");
+    return request<NotificationPage>(`/api/notifications?${query}`);
+  },
+  notificationSummary: () => request<NotificationSummary>("/api/notifications/summary"),
+  notification: (id: number) => request<NotificationDetail>(`/api/notifications/${id}`),
+  plan: (type: NotificationType, affected_items: string[]) =>
+    request<Plan>("/api/notifications/plan", json("POST", { type, affected_items })),
+  forwardPlan: (id: number) => request<ForwardPlan>(`/api/notifications/${id}/forward-plan`),
+  createNotifications: (body: NotificationCreate) =>
+    request<Notification[]>("/api/notifications", json("POST", body)),
+  sendNotification: (id: number) => request<Notification>(`/api/notifications/${id}/send`, { method: "POST" }),
+  changeStatus: (id: number, status: Status, information?: string) =>
+    request<Notification>(`/api/notifications/${id}/status`, json("POST", { status, information: information || null })),
 };
+
+function json(method: string, body: unknown): RequestInit {
+  return { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) };
+}
+
+export const TYPE_LABEL: Record<NotificationType, string> = { alert: "Quality alert", investigation: "Investigation" };
+
+export const STATUS_LABEL: Record<Status, string> = {
+  CREATED: "Draft",
+  SENT: "Sending",
+  RECEIVED: "Received",
+  ACKNOWLEDGED: "Acknowledged",
+  ACCEPTED: "Accepted",
+  DECLINED: "Declined",
+  CLOSED: "Closed",
+};
+
+export function severityLabel(severity: Severity): string {
+  return severity === "LIFE-THREATENING" ? "Life-threatening" : severity[0] + severity.slice(1).toLowerCase();
+}
 
 /** "urn:samm:io.catenax.serial_part:3.0.0#SerialPart" → { name: "SerialPart", version: "3.0.0", major: 3 } */
 export function parseSemanticId(semanticId: string): { name: string; version: string; major: number | null } {

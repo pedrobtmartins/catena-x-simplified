@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, localIdentifiers, parseSemanticId, shortId, type PartPage, type Stats } from "./api";
 import { SearchIcon } from "./icons";
+import { ChipGroup } from "./ui";
 
 const PAGE_SIZE = 50;
 
@@ -20,34 +21,6 @@ function versionSplit(stats: Stats): { v3: number; v4: number; other: number } {
 
 function plural(n: number, one: string, many: string) {
   return `${n} ${n === 1 ? one : many}`;
-}
-
-function ChipGroup<T>({
-  label,
-  options,
-  value,
-  onChange,
-}: {
-  label: string;
-  options: { label: string; value: T }[];
-  value: T;
-  onChange: (value: T) => void;
-}) {
-  return (
-    <div className="chip-group" role="group" aria-label={label}>
-      {options.map((option) => (
-        <button
-          key={option.label}
-          type="button"
-          className="chip"
-          aria-pressed={option.value === value}
-          onClick={() => onChange(option.value)}
-        >
-          {option.label}
-        </button>
-      ))}
-    </div>
-  );
 }
 
 export function PartList({ dataVersion }: { dataVersion: number }) {

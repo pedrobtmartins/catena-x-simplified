@@ -227,5 +227,6 @@ def test_assets_are_published_at_startup(client):
     ] == "publishing" and time.monotonic() < deadline:
         time.sleep(0.05)
     assert health["notification_assets"]["state"] == "published"
+    assert health["can_send_notifications"] is True
     assert health["notification_assets"]["asset_ids"] == ["cxs-receive-alert-2.0.0"]
     assert client.post("/api/notifications/assets").json()["state"] == "published"

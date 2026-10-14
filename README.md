@@ -14,10 +14,11 @@ See [docs/architecture.md](docs/architecture.md) for the design and
 
 Phase 1 (core) is implemented: aspect model adapters (v3/v4), own DTR sync via the Tractus-X SDK
 with a recorded sync history, local cache, one-level as-built tree, REST API and the web UI
-(parts, part detail with tree, sync history). Phase 2 is in progress: reading direct partners'
-twins through the EDC and the quality notification backend (alerts and investigations, Notification
-API 1.2.1 and 2.0.0, state model, assisted forwarding) are implemented; the UI for partners and
-notifications follows. See [the phases](docs/architecture.md#10-phases).
+(parts, part detail with tree, sync history). Phase 2 (partners and notifications) is implemented:
+direct partners' twins read through the EDC, quality alerts and investigations (Notification API
+1.2.1 and 2.0.0, KIT state model, assisted hop-by-hop forwarding) and their UI (inbox/outbox,
+notification detail, composer, partners). It is tested against mocks; the run against real EDCs on
+the umbrella environment is phase 3. See [the phases](docs/architecture.md#10-phases).
 
 ## Quick start
 

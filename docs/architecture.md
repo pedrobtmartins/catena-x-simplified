@@ -107,7 +107,7 @@ flowchart LR
 | `traceability`  | Own-twin and partner sync, one-level tree. | ✅ |
 | `notifications` | 1.2.1/2.0.0 payloads, state machine, send/receive, recipients and affected parts from the local tree, assisted forwarding. | ✅ (UI follows) |
 | `api`           | REST API for the UI.                                                        | ✅ |
-| `web`           | React UI (Tractus-X portal palette).                                        | parts, part detail with tree, sync history ✅ |
+| `web`           | React UI (Tractus-X portal palette).                                        | parts, part detail with tree, sync history, partners, notifications (inbox/outbox, detail, composer, forwarding) ✅ |
 
 ## 5. Performance principles (lessons from Trace-X)
 
@@ -283,7 +283,7 @@ Having one node on v3 ensures the mixed-version scenario is tested from day one.
    and periodic, with per-submodel issue reporting, stale-part removal and a recorded sync
    history), one-level tree, REST API, web UI (parts, part detail with tree, sync history), mock
    participant, CI.
-2. **Partners and notifications** — in three pull requests:
+2. **Partners and notifications** ✅ — in three pull requests:
    1. *Partner consumption* ✅ — direct partners derived from own BoM/usage relations; connector
       address from settings or the API; DTR negotiation (`dct:type` DigitalTwinRegistry), lookup by
       Catena-X ID, per-asset negotiation from the descriptor's `subprotocolBody`, SerialPart/Batch
@@ -292,7 +292,9 @@ Having one node on v3 ensures the mixed-version scenario is tested from day one.
       KIT policies, published at startup; one parser for both versions; sending picks the highest
       compatible version in the partner's catalog; KIT state model; recipients and affected parts
       from the local tree; assisted forwarding; message log; REST API.
-   3. *UI* — partners, notification inbox/outbox, alert and investigation actions.
+   3. *UI* ✅ — partners (connector editing, partner sync), notification inbox/outbox, notification
+      detail with the state path and actions, composer for alerts and investigations with
+      recipients from the local tree, next-hop forwarding.
 3. **Demo** — seeding of the three umbrella participants, automated E2E scenario, complete UI.
 4. **Extensions** — Block Notifications 2.0.0, qualityTask/ZeroKmFailure, migration to 26.09.
 

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, formatDateTime, parseSemanticId, type Part, type PartTree, type TreeNode } from "./api";
+import { composeHref } from "./Compose";
 import { CopyIcon, InfoIcon } from "./icons";
 
 function quantity(node: TreeNode): string | null {
@@ -92,6 +93,12 @@ export function PartDetail({ id, dataVersion }: { id: string; dataVersion: numbe
   const part = tree?.part;
   const model = part ? parseSemanticId(part.semantic_id) : null;
   const serial = part ? Object.values(part.local_identifiers)[0] : undefined;
+  // Own part: investigate its supplier parts; partner part: investigate the part itself.
+  const investigate = !tree
+    ? []
+    : tree.part.is_own
+      ? tree.children.filter((n) => n.business_partner).map((n) => n.global_asset_id)
+      : [tree.part.global_asset_id];
   const partnerMissing = tree ? [...tree.parents, ...tree.children].some((n) => !n.part) : false;
   const sources = tree
     ? [
@@ -144,12 +151,29 @@ export function PartDetail({ id, dataVersion }: { id: string; dataVersion: numbe
               </div>
             </div>
             <div className="actions">
-              <button type="button" className="btn btn-secondary" disabled>
-                Start investigation · Phase 2
-              </button>
-              <button type="button" className="btn btn-primary" disabled>
-                Send quality alert · Phase 2
-              </button>
+              {investigate.length > 0 ? (
+                <a className="btn btn-secondary" href={composeHref("investigation", investigate)}>
+                  Start investigation
+                </a>
+              ) : (
+                <button type="button" className="btn btn-secondary" disabled title="No supplier parts to investigate">
+                  Start investigation
+                </button>
+              )}
+              {part.is_own && tree.parents.some((n) => n.business_partner) ? (
+                <a className="btn btn-primary" href={composeHref("alert", [part.global_asset_id])}>
+                  Send quality alert
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  className="btn btn-primary"
+                  disabled
+                  title={part.is_own ? "No direct customer known for this part" : "Alerts are about own parts"}
+                >
+                  Send quality alert
+                </button>
+              )}
             </div>
           </div>
 
@@ -217,7 +241,7 @@ export function PartDetail({ id, dataVersion }: { id: string; dataVersion: numbe
             {partnerMissing && (
               <div className="alert alert-info">
                 <InfoIcon />
-                Dashed cards are partner twins not yet in the cache; they are fetched through the EDC in phase 2.
+                Dashed cards are partner twins not in the cache yet; a partner sync reads them through the EDC (see Partners).
               </div>
             )}
           </section>

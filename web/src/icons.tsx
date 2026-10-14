@@ -46,6 +46,15 @@ export const BellIcon = ({ size = 18 }: IconProps) => (
   </svg>
 );
 
+export const PartnersIcon = ({ size = 18 }: IconProps) => (
+  <svg {...base(size)}>
+    <circle cx="6" cy="12" r="2.5" />
+    <circle cx="18" cy="6" r="2.5" />
+    <circle cx="18" cy="18" r="2.5" />
+    <path d="m8.3 10.9 7.4-3.8M8.3 13.1l7.4 3.8" />
+  </svg>
+);
+
 export const ClockIcon = ({ size = 18 }: IconProps) => (
   <svg {...base(size)}>
     <circle cx="12" cy="12" r="9" />
