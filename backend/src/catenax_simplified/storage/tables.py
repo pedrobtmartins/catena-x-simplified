@@ -64,3 +64,19 @@ class SyncRunRow(Base):
     removed_parts: Mapped[int] = mapped_column(default=0)
     complete: Mapped[bool] = mapped_column(Boolean, default=False)
     issues: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+
+
+class PartnerRow(Base):
+    """A direct partner: how to reach its connector and how its last sync went."""
+
+    __tablename__ = "partners"
+
+    bpnl: Mapped[str] = mapped_column(String(32), primary_key=True)
+    name: Mapped[str | None] = mapped_column(String(255))
+    connector_address: Mapped[str | None] = mapped_column(String(512))
+    last_sync_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # ok | partial | failed | no_connector
+    last_status: Mapped[str | None] = mapped_column(String(16))
+    last_message: Mapped[str | None] = mapped_column(String(2000))
+    twins_found: Mapped[int] = mapped_column(default=0)
+    twins_missing: Mapped[int] = mapped_column(default=0)

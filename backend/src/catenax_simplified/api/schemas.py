@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, ConfigDict
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 
 
 def _as_utc(value: datetime | None) -> datetime | None:
@@ -115,6 +115,48 @@ class HealthOut(BaseModel):
     status: str
     own_bpnl: str
     dtr_configured: bool
+    edc_configured: bool
     dtr_url: str | None
     sync_interval_seconds: int
     supported_aspects: list[str]
+
+
+class PartnerOut(BaseModel):
+    bpnl: str
+    name: str | None
+    roles: list[str]  # supplier and/or customer
+    linked_twins: int
+    cached_parts: int
+    connector_address: str | None
+    connector_source: str | None  # "api" (set here) or "settings"
+    last_sync_at: UtcDatetime | None
+    last_status: str | None  # ok | partial | failed | no_connector
+    last_message: str | None
+    twins_found: int
+    twins_missing: int
+
+
+class PartnerUpdate(BaseModel):
+    name: str | None = None
+    connector_address: str | None = Field(default=None, max_length=512)
+
+
+class PartnerSyncResultOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    bpnl: str
+    roles: list[str]
+    linked_twins: int
+    twins_found: int
+    twins_missing: int
+    removed_parts: int
+    status: str
+    issues: list[str]
+
+
+class PartnerSyncReportOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    started_at: UtcDatetime
+    finished_at: UtcDatetime | None
+    partners: list[PartnerSyncResultOut]

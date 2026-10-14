@@ -32,7 +32,20 @@ class Settings(BaseSettings):
     submodel_href_rewrites: list[tuple[str, str]] = []
     submodel_headers: dict[str, str] = {}
 
-    # Periodic sync of own twins; 0 disables it (sync can still be triggered via the API).
+    # Own EDC (Tractus-X connector 0.12, Saturn) for reading direct partners' twins.
+    edc_management_url: str | None = None  # e.g. https://edc.example.com
+    edc_management_path: str = "/management"
+    edc_api_key: str | None = None  # sent as X-Api-Key
+    # Usage policies the company accepts, as offered in partners' catalogs (JSON list of policy
+    # bodies without @id/@type). Empty = negotiate nothing.
+    accepted_policies: list[dict] = []
+    # Accept any offered policy. Development only; never in production.
+    accept_any_policy: bool = False
+    # Partners' DSP endpoints by BPNL (JSON object); addresses set through the API win.
+    partner_connectors: dict[str, str] = {}
+
+    # Periodic sync of own twins (and partners, when an EDC is configured); 0 disables it
+    # (both can still be triggered through the API).
     sync_interval_seconds: int = 0
 
     # Directory with the built web UI; served at "/" when set.

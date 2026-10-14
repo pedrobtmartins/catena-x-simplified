@@ -125,7 +125,8 @@ export const api = {
   health: () => request<Health>("/api/health"),
   stats: () => request<Stats>("/api/stats"),
   parts: (q: PartQuery) => {
-    const query = new URLSearchParams({ limit: String(q.limit), offset: String(q.offset) });
+    // The parts page lists own parts; partner parts appear in the tree of the part they belong to.
+    const query = new URLSearchParams({ limit: String(q.limit), offset: String(q.offset), own_only: "true" });
     if (q.search) query.set("search", q.search);
     if (q.kind) query.set("kind", q.kind);
     if (q.aspectMajor) query.set("aspect_major", String(q.aspectMajor));

@@ -101,10 +101,10 @@ flowchart LR
 
 | Module          | Responsibility                                                              | Status  |
 |-----------------|-----------------------------------------------------------------------------|---------|
-| `dataspace`     | Single gateway to EDC/DTR/submodels. Uses the Tractus-X SDK. Contract and EDR cache. | DTR + own submodels ✅; EDC in phase 2 |
+| `dataspace`     | Single gateway to EDC/DTR/submodels. Uses the Tractus-X SDK. Contract and EDR cache. | DTR + own submodels ✅; partner consumption via EDC ✅ (mock-tested) |
 | `aspects`       | Per-version aspect model adapters → internal model. Registry of `semanticId`s. | ✅ |
 | `storage`       | Local cache of parts and one-level relations; recorded sync runs (SQLAlchemy). | ✅ |
-| `traceability`  | Own-twin sync, one-level tree, affected-parts calculation, recipient suggestions. | sync + tree ✅ |
+| `traceability`  | Own-twin and partner sync, one-level tree, affected-parts calculation, recipient suggestions. | syncs + tree ✅ |
 | `notifications` | 1.2.1/2.0.0 payloads, state machine, send/receive, registering the assets in the EDC. | phase 2 |
 | `api`           | REST API for the UI.                                                        | ✅ |
 | `web`           | React UI (Tractus-X portal palette).                                        | parts, part detail with tree, sync history ✅ |
@@ -263,9 +263,14 @@ Having one node on v3 ensures the mixed-version scenario is tested from day one.
    and periodic, with per-submodel issue reporting, stale-part removal and a recorded sync
    history), one-level tree, REST API, web UI (parts, part detail with tree, sync history), mock
    participant, CI.
-2. **Notifications** — EDC consumption of direct partners (catalog, negotiation, EDR reuse, partner
-   twin cache), EDC assets, sending/receiving 1.2.1 and 2.0.0, state machine, alerts and
-   investigations, assisted forwarding.
+2. **Partners and notifications** — in three pull requests:
+   1. *Partner consumption* ✅ — direct partners derived from own BoM/usage relations; connector
+      address from settings or the API; DTR negotiation (`dct:type` DigitalTwinRegistry), lookup by
+      Catena-X ID, per-asset negotiation from the descriptor's `subprotocolBody`, SerialPart/Batch
+      cached as partner parts; usage-policy allow-list; EDR reuse through the SDK connection manager.
+   2. *Notifications* — EDC assets, receiving/sending 1.2.1 and 2.0.0, state machine, alerts and
+      investigations, assisted forwarding.
+   3. *UI* — partners, notification inbox/outbox, alert and investigation actions.
 3. **Demo** — seeding of the three umbrella participants, automated E2E scenario, complete UI.
 4. **Extensions** — Block Notifications 2.0.0, qualityTask/ZeroKmFailure, migration to 26.09.
 
@@ -286,10 +291,14 @@ Having one node on v3 ensures the mixed-version scenario is tested from day one.
 - **Wallet**: Tractus-X releases do not include a complete FOSS identity wallet; in production this
   depends on the participant's identity solution (out of scope). In dev the wallet stub is used.
 - **Partners on Jupiter until the end of 2026**: not reachable by the app until they migrate.
-- **Tractus-X SDK and EDC 0.12.0**: phase 1 uses the SDK (0.8.x) for the DTR only; its EDC
-  (Saturn) controllers are first exercised in phase 2.
-- **Discovery**: confirm in phase 2 which connector discovery mechanism is available in the 26.03
-  umbrella (discovery services vs. DID-based discovery).
+- **Tractus-X SDK and EDC 0.12.0**: partner consumption uses the SDK's Saturn consumer
+  (`/v3/catalog`, `/v3/contractnegotiations`, `/v3/edrs`, `/v4alpha/connectordiscovery`). It is
+  tested against a mocked SDK and mocked data planes, not yet against a real EDC; that happens on
+  the umbrella environment. EDC 0.13 (26.09) moves connector discovery to `/v3`.
+- **Connector addresses**: partners' DSP endpoints come from `CXS_PARTNER_CONNECTORS` or the API.
+  Automatic lookup through the Catena-X discovery services is not implemented yet.
+- **EDR cache**: negotiated contracts and tokens are reused per process (SDK in-memory connection
+  manager); a restart re-negotiates. A persistent connection manager is a later option.
 - **Schema migrations**: phase 1 creates the database schema at startup; Alembic migrations are
   introduced before the first deployment that must keep data.
 - **Partner IDs**: Catena-X IDs are compared verbatim (only a missing `urn:uuid:` prefix is
