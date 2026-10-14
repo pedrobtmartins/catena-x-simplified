@@ -9,6 +9,11 @@
 - **Dataspace access** goes through the `dataspace` module (Tractus-X SDK) behind its interfaces;
   domain code never calls the EDC or DTR directly and never names an aspect model URN outside
   `aspects/registry.py`.
+- **Database changes** come with an Alembic migration (`backend/src/catenax_simplified/migrations`):
+  change `storage/tables.py`, then
+  `cd backend && CXS_DATABASE_URL=sqlite:///./scratch.db uv run alembic upgrade head && CXS_DATABASE_URL=sqlite:///./scratch.db uv run alembic revision --autogenerate -m "…"`,
+  review the generated file and keep it in the same pull request. The app applies migrations at
+  startup; `tests/test_migrations.py` fails when tables and migrations disagree.
 - **Documentation** moves with the code: a new setting goes into `backend/.env.example` and the
   backend README, a new endpoint into the API table, a new screen into the web README.
 
@@ -30,6 +35,9 @@ uv run pytest
 cd ../web
 npm ci
 npm run build        # type-check and build
+
+cd ..
+docker build -t catenax-simplified .   # CI also builds the image and smoke-tests it
 ```
 
 Changed a slide in `docs/pitch/slides/`? Rebuild the viewer: `python3 docs/pitch/build.py`.

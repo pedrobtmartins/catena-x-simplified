@@ -1,0 +1,71 @@
+# Default values for catenax-simplified. Every app setting is a CXS_* environment variable
+# (see backend/README.md); put plain settings in `config`, secrets in `secrets` or an existing
+# Secret (`existingSecret`).
+
+image:
+  repository: catenax-simplified
+  tag: ""            # defaults to the chart's appVersion
+  pullPolicy: IfNotPresent
+imagePullSecrets: []
+
+nameOverride: ""
+fullnameOverride: ""
+
+# Plain settings → ConfigMap (values must be strings; JSON for lists and objects).
+config:
+  CXS_OWN_BPNL: "BPNL000000000000"
+  # CXS_DTR_BASE_URL: "http://dtr.example:8080"
+  # CXS_EDC_MANAGEMENT_URL: "http://edc-controlplane:8081"
+  # CXS_EDC_MANAGEMENT_PATH: "/management"
+  # CXS_NOTIFICATION_BASE_URL: "http://catenax-simplified:8000"   # how our EDC's data plane reaches us
+  # CXS_ACCEPTED_POLICIES: '[...]'
+  # CXS_PARTNER_CONNECTORS: '{"BPNL…": "https://edc.partner/api/v1/dsp"}'
+  # CXS_SYNC_INTERVAL_SECONDS: "900"
+
+# Secret settings → Secret created by the chart (e.g. CXS_EDC_API_KEY, CXS_NOTIFICATION_API_KEY,
+# CXS_OAUTH_CLIENT_SECRET, CXS_DATABASE_URL with credentials).
+secrets: {}
+# Or reference a Secret you manage; its keys become environment variables.
+existingSecret: ""
+
+# Without CXS_DATABASE_URL the app uses SQLite in /data (kept on this volume).
+persistence:
+  enabled: true
+  size: 1Gi
+  storageClass: ""
+  accessModes: [ReadWriteOnce]
+
+service:
+  type: ClusterIP
+  port: 8000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: traceability.example.com
+      paths: ["/"]
+  tls: []
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi
+
+podSecurityContext:
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  runAsNonRoot: true
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: [ALL]
+
+podAnnotations: {}
+nodeSelector: {}
+tolerations: []
+affinity: {}
