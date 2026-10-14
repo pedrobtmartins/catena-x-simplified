@@ -77,7 +77,11 @@ class Edc:
     def upsert(self, kind: str, body: dict) -> None:
         response = self.session.post(f"{self.url}/v3/{kind}", data=json.dumps(body), timeout=30)
         if response.status_code == 409:
-            response = self.session.put(f"{self.url}/v3/{kind}", data=json.dumps(body), timeout=30)
+            # Assets and contract definitions are updated at the collection, policies by id.
+            url = f"{self.url}/v3/{kind}"
+            if kind == "policydefinitions":
+                url += f"/{body['@id']}"
+            response = self.session.put(url, data=json.dumps(body), timeout=30)
         if response.status_code not in (200, 204):
             raise SystemExit(f"{kind} {body['@id']}: HTTP {response.status_code} {response.text}")
 
@@ -170,7 +174,10 @@ def seed(key: str, p: dict, bpns: dict[str, str]) -> None:
     dtr = p["dtr"].rstrip("/") + "/api/v3/shell-descriptors"
     for shell in shells:
         response = http.post(dtr, json=shell, timeout=30)
-        if response.status_code == 409:
+        # The DTR answers an existing shell with 400 "... does already exists" (not 409).
+        if response.status_code == 409 or (
+            response.status_code == 400 and "already exist" in response.text
+        ):
             encoded = base64.urlsafe_b64encode(shell["id"].encode()).decode()
             response = http.put(f"{dtr}/{encoded.rstrip('=')}", json=shell, timeout=30)
         if response.status_code not in (200, 201, 204):

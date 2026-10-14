@@ -29,6 +29,9 @@ dataconsumerOne:
       keycloak:
         fullnameOverride: dataconsumer-1-registry-keycloak
     postgresql:
+      # Own name label too: with only fullnameOverride every DTR database Service selects all
+      # three DTR databases (app.kubernetes.io/name=postgresql) and the registries mix data.
+      nameOverride: dataconsumer-1-digital-twin-db
       fullnameOverride: dataconsumer-1-digital-twin-db
       primary:
         persistence:
@@ -55,6 +58,9 @@ dataconsumerTwo:
       keycloak:
         fullnameOverride: dataconsumer-2-registry-keycloak
     postgresql:
+      # Own name label too: with only fullnameOverride every DTR database Service selects all
+      # three DTR databases (app.kubernetes.io/name=postgresql) and the registries mix data.
+      nameOverride: dataconsumer-2-digital-twin-db
       fullnameOverride: dataconsumer-2-digital-twin-db
       primary:
         persistence:

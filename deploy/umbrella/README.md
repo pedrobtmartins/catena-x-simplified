@@ -1,4 +1,4 @@
-# Umbrella 26.03 lab (work in progress — not yet verified end to end)
+# Umbrella 26.03 lab (work in progress — seeding verified, app-to-EDC flow not yet)
 
 Three companies on the Tractus-X umbrella's legacy data-exchange profile (wallet stub):
 
@@ -15,6 +15,25 @@ Three companies on the Tractus-X umbrella's legacy data-exchange profile (wallet
   shells) from inside the cluster, using the app image.
 - `participants.json` — in-cluster endpoints of the three companies.
 
-Status: the umbrella with these values was installed and all pods ran on a k3s cluster; the
-seeding has **not** run yet, and the app instances are not configured against the EDCs yet.
-A runbook follows once the end-to-end flow has passed.
+Status: on a local k3s cluster (colima on Apple Silicon) the umbrella with these values runs,
+the seeding runs (and can be run again), each DTR holds only its own company's twins (18 / 6 /
+3), and Tier-1's EDC gets Tier-2's catalog with both seeded datasets over DSP 2025-1. The app
+instances are not configured against the EDCs yet. A full runbook follows once the end-to-end
+flow has passed.
+
+Notes from that run:
+
+- **Ingress and `*.tx.test` inside the cluster**: install ingress-nginx and point the names at
+  it with a CoreDNS rewrite (k3s reads `coredns-custom`):
+  `rewrite name regex (.+)\.tx\.test ingress-nginx-controller.ingress-nginx.svc.cluster.local answer auto`.
+- **Apple Silicon**: the DTR image (`sldt-digital-twin-registry:0.11.0`) is amd64 only, so the
+  VM needs Rosetta (`colima start --kubernetes --vm-type vz --vz-rosetta`). If amd64 pods start
+  failing with `exec ...: no such file or directory`, restart the VM to register Rosetta again.
+- **App image**: `seed-job.sh` uses `catenax-simplified:latest`; with colima's Docker runtime,
+  `DOCKER_BUILDKIT=1 docker build -t catenax-simplified:latest .` at the repository root makes it
+  available to the cluster.
+- **The Vaults run in dev mode (in memory)**: after a VM or Vault restart the EDCs fail with
+  `Failed to fetch client secret from the vault with alias: edc-wallet-secret`. Re-run the
+  umbrella's `*-post-install-vault-setup` jobs (from `helm get hooks umbrella`).
+- **Helm 4**: `helm upgrade` conflicts with the caBundle that vault-k8s manages in its webhooks;
+  pass `--server-side=false`.
