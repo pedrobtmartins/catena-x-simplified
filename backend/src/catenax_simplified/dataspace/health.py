@@ -247,6 +247,10 @@ class DirectHealthChecker:
             raise ValueError(f"unknown level {level!r}")
         ok, detail = self._get(f"{partner.connector_address.rstrip('/')}/api/health")
         steps = [CheckStep("discovery", "Partner app", "ok" if ok else "failed", detail)]
+        if level == "discovery":
+            steps.append(
+                _skipped("edc_discovery", "Connector discovery (EDC)", "no EDC in development mode")
+            )
         if level in ("catalog", "full"):
             registry = self._registries.get(partner.bpnl)
             if not registry:

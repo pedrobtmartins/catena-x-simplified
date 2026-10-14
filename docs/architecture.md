@@ -307,7 +307,8 @@ Having one node on v3 ensures the mixed-version scenario is tested from day one.
       through the EDR). The full level creates negotiation and transfer state in both connectors,
       so it requires explicit confirmation. Checks run one at a time, are stored per partner
       (`partner_checks`) with their steps, and error details are scrubbed of credentials. In dev
-      direct mode the partner's app and DTR are probed instead.
+      direct mode the partner's app and DTR are probed instead, and the result is reported as
+      *skipped* rather than healthy, since nothing went through an EDC.
 3. **Demo** — seeding of the three umbrella participants, automated E2E scenario, complete UI.
 4. **Extensions** — Block Notifications 2.0.0, qualityTask/ZeroKmFailure, migration to 26.09.
 

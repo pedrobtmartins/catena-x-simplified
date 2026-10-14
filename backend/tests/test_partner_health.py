@@ -9,6 +9,7 @@ from catenax_simplified.api import create_app
 from catenax_simplified.config import Settings
 from catenax_simplified.dataspace.edc import DCT_TYPE_KEYS, Partner
 from catenax_simplified.dataspace.health import (
+    LEVELS,
     CheckStep,
     DirectHealthChecker,
     EdcHealthChecker,
@@ -18,6 +19,7 @@ from catenax_simplified.dataspace.health import (
 )
 from catenax_simplified.dataspace.partners import DTR_ASSET_TYPE
 from catenax_simplified.notifications import NotificationType
+from catenax_simplified.traceability.partner_health import overall_status
 
 PARTNER = Partner("BPNL000000000T2A", "https://edc.tier2/api/v1/dsp")
 DTR_PLANE = "https://edc.tier2/api/public/dtr"
@@ -201,6 +203,26 @@ def test_direct_checker_in_development_mode():
     assert steps["dtr_offer"].status == "ok"
     assert steps["registry_access"].status == "skipped"
     assert steps["notification:UpdateQualityAlertNotification"].status == "skipped"
+
+
+@responses.activate
+@pytest.mark.parametrize("level", LEVELS)
+def test_development_mode_is_never_reported_healthy(level):
+    responses.get("http://tier2-app/api/health", json={"status": "ok"})
+    responses.get("http://tier2-dtr/api/v3/shell-descriptors", json={"result": []})
+    checker = DirectHealthChecker({PARTNER.bpnl: "http://tier2-dtr/api/v3"})
+    steps = checker.check(Partner(PARTNER.bpnl, "http://tier2-app"), level, SUPPLIER_TYPES)
+    assert overall_status(steps) == "skipped"
+
+
+def test_overall_status_precedence():
+    def steps(*statuses):
+        return [CheckStep(str(i), "step", s, "") for i, s in enumerate(statuses)]
+
+    assert overall_status(steps("ok", "ok")) == "healthy"
+    assert overall_status(steps("ok", "skipped")) == "skipped"
+    assert overall_status(steps("warn", "skipped")) == "degraded"
+    assert overall_status(steps("failed", "warn", "skipped")) == "failed"
 
 
 def test_dataset_ids_reads_nested_and_single_datasets():
