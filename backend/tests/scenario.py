@@ -67,3 +67,28 @@ def payloads() -> dict:
         ),
         _href(MODULE_B, "bom") + "/$value": bom_v3(MODULE_B, [CELL_3], TIER2),
     }
+
+
+# --- the Tier-2 supplier's registry, as seen through the dataspace -------------------------
+
+TIER2_CONNECTOR = "https://edc.tier2.example/api/v1/dsp"
+TIER2_BASE = "https://edc.tier2.example/api/public"
+
+
+def _tier2_href(gid: str) -> str:
+    return f"{TIER2_BASE}/{gid}/serialpart/submodel"
+
+
+def tier2_twins() -> dict:
+    """CELL_1 (v3) and CELL_3 (v4) are published; CELL_2 is not in Tier-2's registry."""
+    return {
+        (TIER2, CELL_1): shell_descriptor(CELL_1, {SERIAL_PART_V3: _tier2_href(CELL_1)}),
+        (TIER2, CELL_3): shell_descriptor(CELL_3, {SERIAL_PART_V4: _tier2_href(CELL_3)}),
+    }
+
+
+def tier2_payloads() -> dict:
+    return {
+        _tier2_href(CELL_1) + "/$value": part_v3(CELL_1, "Li-ion cell", "CELL-21700", serial="C1"),
+        _tier2_href(CELL_3) + "/$value": part_v4(CELL_3, "Li-ion cell", "CELL-21700", serial="C3"),
+    }

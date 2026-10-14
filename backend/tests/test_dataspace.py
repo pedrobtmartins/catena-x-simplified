@@ -47,7 +47,12 @@ def test_sdk_registry_follows_cursor_and_maps_descriptors():
     assert [t.global_asset_id for t in twins] == [GID_1, GID_2]
     assert twins[0].manufacturer_id == "BPNL000000000T1A"
     assert twins[0].submodels == (
-        SubmodelRef(SERIAL_PART_V4, "https://edc.example/api/public/a/submodel", "SUBMODEL-3.0"),
+        SubmodelRef(
+            SERIAL_PART_V4,
+            "https://edc.example/api/public/a/submodel",
+            "SUBMODEL-3.0",
+            "dspEndpoint=https://edc.example/api/v1/dsp;id=x",
+        ),
     )
     assert twins[1].manufacturer_id is None
     # The SDK forwards the BPN header used for specificAssetId visibility.

@@ -12,12 +12,12 @@ from .ports import DataspaceError, SubmodelRef, TwinRef
 MANUFACTURER_ID_KEY = "manufacturerId"
 
 
-def _first_endpoint(descriptor: Mapping[str, Any]) -> tuple[str | None, str | None]:
+def _first_endpoint(descriptor: Mapping[str, Any]) -> tuple[str | None, str | None, str | None]:
     for endpoint in descriptor.get("endpoints") or []:
-        href = (endpoint.get("protocolInformation") or {}).get("href")
-        if href:
-            return href, endpoint.get("interface")
-    return None, None
+        info = endpoint.get("protocolInformation") or {}
+        if info.get("href"):
+            return info["href"], endpoint.get("interface"), info.get("subprotocolBody")
+    return None, None, None
 
 
 def _semantic_id(descriptor: Mapping[str, Any]) -> str | None:
@@ -44,9 +44,16 @@ def twin_from_descriptor(shell: Mapping[str, Any]) -> TwinRef | None:
     submodels = []
     for descriptor in shell.get("submodelDescriptors") or []:
         semantic_id = _semantic_id(descriptor)
-        href, interface = _first_endpoint(descriptor)
+        href, interface, subprotocol_body = _first_endpoint(descriptor)
         if semantic_id and href:
-            submodels.append(SubmodelRef(semantic_id=semantic_id, href=href, interface=interface))
+            submodels.append(
+                SubmodelRef(
+                    semantic_id=semantic_id,
+                    href=href,
+                    interface=interface,
+                    subprotocol_body=subprotocol_body,
+                )
+            )
     return TwinRef(
         aas_id=shell.get("id", ""),
         global_asset_id=global_asset_id,

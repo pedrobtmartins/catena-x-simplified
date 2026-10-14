@@ -1,7 +1,7 @@
 import pytest
 import responses
 import scenario
-from fakes import FakeRegistry
+from fakes import FakePartnerClient, FakeRegistry
 from fastapi.testclient import TestClient
 
 from catenax_simplified.api import create_app
@@ -18,7 +18,11 @@ def client():
     settings = _settings(
         submodel_href_rewrites=[(scenario.BASE, "http://submodel-server/data")],
     )
-    app = create_app(settings, registry=FakeRegistry(scenario.shells()))
+    app = create_app(
+        settings,
+        registry=FakeRegistry(scenario.shells()),
+        partner_client=FakePartnerClient(scenario.tier2_twins(), scenario.tier2_payloads()),
+    )
     with (
         responses.RequestsMock(assert_all_requests_are_fired=False) as mock,
         TestClient(app) as test_client,
@@ -36,6 +40,7 @@ def test_health(client):
         "dtr_configured": True,
         "dtr_url": None,  # the registry is injected in tests
     }
+    assert health["edc_configured"] is True
     assert health["sync_interval_seconds"] == 0
     assert "io.catenax.serial_part:3.0.0" in health["supported_aspects"]
 
@@ -124,8 +129,55 @@ def test_sync_without_dtr_is_unavailable():
     with TestClient(create_app(_settings())) as client:
         assert client.get("/api/health").json()["dtr_configured"] is False
         assert client.post("/api/sync").status_code == 503
+        assert client.get("/api/health").json()["edc_configured"] is False
+        assert client.post("/api/partners/sync").status_code == 503
 
 
 def test_settings_reject_invalid_bpnl():
     with pytest.raises(ValueError):
         Settings(own_bpnl="BPNS000000000001")
+
+
+def test_partners_listing_update_and_sync(client):
+    client.post("/api/sync")
+    partners = {p["bpnl"]: p for p in client.get("/api/partners").json()}
+    assert set(partners) == {scenario.TIER2, scenario.OEM}
+    assert partners[scenario.TIER2]["roles"] == ["supplier"]
+    assert partners[scenario.TIER2]["linked_twins"] == 3
+    assert partners[scenario.OEM]["roles"] == ["customer"]
+    assert partners[scenario.TIER2]["connector_address"] is None
+
+    updated = client.put(
+        f"/api/partners/{scenario.TIER2}",
+        json={"name": "Cell supplier", "connector_address": scenario.TIER2_CONNECTOR},
+    ).json()
+    assert updated["name"] == "Cell supplier"
+    assert (updated["connector_address"], updated["connector_source"]) == (
+        scenario.TIER2_CONNECTOR,
+        "api",
+    )
+
+    report = client.post("/api/partners/sync").json()
+    results = {r["bpnl"]: r for r in report["partners"]}
+    assert (results[scenario.TIER2]["status"], results[scenario.TIER2]["twins_found"]) == (
+        "partial",
+        2,
+    )
+    assert results[scenario.OEM]["status"] == "no_connector"
+
+    tier2 = next(p for p in client.get("/api/partners").json() if p["bpnl"] == scenario.TIER2)
+    assert (tier2["cached_parts"], tier2["last_status"]) == (2, "partial")
+    assert tier2["last_sync_at"].endswith("Z")
+
+    tree = client.get(f"/api/parts/{scenario.MODULE_A}/tree").json()
+    cell = next(c for c in tree["children"] if c["global_asset_id"] == scenario.CELL_1)
+    assert cell["part"]["name_at_manufacturer"] == "Li-ion cell"
+    assert cell["part"]["is_own"] is False
+
+    one = client.post("/api/partners/sync", params={"bpnl": scenario.OEM}).json()
+    assert [r["bpnl"] for r in one["partners"]] == [scenario.OEM]
+
+
+def test_cannot_register_own_bpnl_as_partner(client):
+    response = client.put(f"/api/partners/{scenario.TIER1}", json={"name": "me"})
+    assert response.status_code == 422

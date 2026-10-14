@@ -20,6 +20,8 @@ class SubmodelRef:
     semantic_id: str
     href: str
     interface: str | None = None
+    # "dspEndpoint=…;id=…": where to negotiate for the submodel's asset (partner twins).
+    subprotocol_body: str | None = None
 
 
 @dataclass(frozen=True)

@@ -38,3 +38,23 @@ class FakeReader:
         if isinstance(payload, Exception):
             raise payload
         return payload
+
+
+class FakePartnerClient:
+    """Partner twins by (bpnl, globalAssetId); payloads by value URL, as FakeReader."""
+
+    def __init__(self, twins: dict, payloads: dict, unreachable: set | None = None):
+        self.twins = twins
+        self.reader = FakeReader(payloads)
+        self.unreachable = unreachable or set()
+        self.lookups: list[tuple[str, str]] = []
+
+    def find_twin(self, partner, global_asset_id):
+        if partner.bpnl in self.unreachable:
+            raise DataspaceError(f"negotiation with {partner.bpnl} failed: timeout")
+        self.lookups.append((partner.bpnl, global_asset_id))
+        shell = self.twins.get((partner.bpnl, global_asset_id))
+        return twin_from_descriptor(shell) if shell else None
+
+    def read_submodel(self, partner, ref):
+        return self.reader.read(ref)

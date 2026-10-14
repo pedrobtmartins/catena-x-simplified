@@ -8,7 +8,7 @@ from sqlalchemy import delete, func, or_, select
 from sqlalchemy.orm import Session
 
 from ..aspects import Part, Relations
-from .tables import PartRow, RelationRow, SyncRunRow
+from .tables import PartnerRow, PartRow, RelationRow, SyncRunRow
 
 
 class PartRepository:
@@ -208,6 +208,76 @@ class PartRepository:
             "customer_links": distinct_count(customer_pairs),
             "customers": distinct_count(customers),
         }
+
+    def partner_counterparts(self) -> dict[str, dict[str, set[str]]]:
+        """Direct partners of own parts and the counterpart twins each one owns.
+
+        ``{bpnl: {"supplier": {child ids}, "customer": {parent ids}}}`` — children of own parts
+        come from suppliers, parents of own parts belong to customers.
+        """
+        own_ids = select(PartRow.global_asset_id).where(PartRow.is_own.is_(True))
+        result: dict[str, dict[str, set[str]]] = {}
+
+        def add(bpnl: str, role: str, gid: str) -> None:
+            roles = result.setdefault(bpnl, {"supplier": set(), "customer": set()})
+            roles[role].add(gid)
+
+        for bpnl, child in self._session.execute(
+            select(RelationRow.business_partner, RelationRow.child_id).where(
+                RelationRow.parent_id.in_(own_ids), RelationRow.business_partner.is_not(None)
+            )
+        ):
+            add(bpnl, "supplier", child)
+        for bpnl, parent in self._session.execute(
+            select(RelationRow.business_partner, RelationRow.parent_id).where(
+                RelationRow.child_id.in_(own_ids), RelationRow.business_partner.is_not(None)
+            )
+        ):
+            add(bpnl, "customer", parent)
+        return result
+
+    def partner_part_counts(self) -> dict[str, int]:
+        """Number of cached partner parts per partner BPNL."""
+        return dict(
+            self._session.execute(
+                select(PartRow.manufacturer_id, func.count())
+                .where(PartRow.is_own.is_(False))
+                .group_by(PartRow.manufacturer_id)
+            ).all()
+        )
+
+    def delete_partner_parts_except(self, manufacturer_id: str, keep: Collection[str]) -> int:
+        """Remove a partner's cached parts that are no longer linked to an own part."""
+        stale = [
+            gid
+            for gid in self._session.scalars(
+                select(PartRow.global_asset_id).where(
+                    PartRow.is_own.is_(False), PartRow.manufacturer_id == manufacturer_id
+                )
+            )
+            if gid not in keep
+        ]
+        if stale:
+            self._session.execute(delete(PartRow).where(PartRow.global_asset_id.in_(stale)))
+        return len(stale)
+
+
+class PartnerRepository:
+    def __init__(self, session: Session):
+        self._session = session
+
+    def get(self, bpnl: str) -> PartnerRow | None:
+        return self._session.get(PartnerRow, bpnl)
+
+    def get_or_create(self, bpnl: str) -> PartnerRow:
+        row = self.get(bpnl)
+        if row is None:
+            row = PartnerRow(bpnl=bpnl, twins_found=0, twins_missing=0)
+            self._session.add(row)
+        return row
+
+    def all(self) -> Sequence[PartnerRow]:
+        return self._session.scalars(select(PartnerRow).order_by(PartnerRow.bpnl)).all()
 
 
 class SyncRunRepository:
