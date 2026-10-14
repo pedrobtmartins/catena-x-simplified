@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, ApiError, formatDateTime, type CheckLevel, type Health, type Partner } from "./api";
-import { CheckIcon, SyncIcon } from "./icons";
+import { CheckIcon, ChevronIcon, SyncIcon } from "./icons";
 import { HealthBadge, HealthPanel } from "./PartnerHealth";
 import { ErrorAlert } from "./ui";
 
@@ -122,8 +122,8 @@ function PartnerRow({
             onClick={() => setExpanded((v) => !v)}
           >
             <HealthBadge check={partner.last_check} />
-            <span className="chevron" aria-hidden="true">
-              {expanded ? "▾" : "▸"}
+            <span className="chevron">
+              <ChevronIcon />
             </span>
           </button>
         </td>

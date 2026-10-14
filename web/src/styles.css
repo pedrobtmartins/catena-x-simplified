@@ -1434,8 +1434,10 @@ a.btn-secondary:hover {
 /* ---------- partner health ---------- */
 .health-toggle {
   display: flex;
+  justify-content: space-between;
   align-items: center;
   gap: 10px;
+  width: calc(100% + 12px);
   padding: 4px 6px;
   margin: -4px -6px;
   border: 0;
@@ -1452,7 +1454,31 @@ a.btn-secondary:hover {
 }
 
 .health-toggle .chevron {
-  color: var(--text-3);
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 14px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.health-toggle .chevron svg {
+  transform: rotate(-90deg);
+  transition: transform 0.15s ease;
+}
+
+.health-toggle[aria-expanded="true"] .chevron svg {
+  transform: none;
+}
+
+.health-toggle:hover .chevron,
+.health-toggle[aria-expanded="true"] .chevron {
+  border-color: var(--primary);
+  color: var(--primary);
 }
 
 .row-expanded td {
@@ -1464,7 +1490,12 @@ a.btn-secondary:hover {
   padding-top: 0;
 }
 
+/* The panel spans the whole row; width 0 keeps its content (long URLs, error details) out of the
+   table's column sizing, so opening it doesn't make the columns jump. */
 .health-panel {
+  box-sizing: border-box;
+  width: 0;
+  min-width: 100%;
   display: flex;
   flex-direction: column;
   gap: 14px;
