@@ -43,6 +43,10 @@ POLICY_CONTEXT = [
 DTR_TYPE = "https://w3id.org/catenax/taxonomy#DigitalTwinRegistry"
 
 
+def reference(value: str) -> dict:
+    return {"type": "ExternalReference", "keys": [{"type": "GlobalReference", "value": value}]}
+
+
 def constraint(left: str, operator: str, right: Any) -> dict:
     return {"leftOperand": left, "operator": operator, "rightOperand": right}
 
@@ -152,12 +156,15 @@ def seed(key: str, p: dict, bpns: dict[str, str]) -> None:
             response.raise_for_status()
             endpoint["href"] = f"{public}/{submodel_id}"
             endpoint["subprotocolBody"] = f"id={assets_id};dspEndpoint={p['dsp']}"
-        for asset_id in shell["specificAssetIds"]:
-            # Visible to every partner (the DTR's access control is off in the umbrella).
-            asset_id["externalSubjectId"] = {
-                "type": "ExternalReference",
-                "keys": [{"type": "GlobalReference", "value": "PUBLIC_READABLE"}],
-            }
+        # Shared with every lab company, own included: the DTR shows a shell (with its
+        # globalAssetId) to an Edc-Bpn that is the externalSubjectId of one of its specific
+        # asset IDs, and allows one externalSubjectId per entry. PUBLIC_READABLE only works for
+        # manufacturerPartId and digitalTwinType here.
+        shell["specificAssetIds"] = [
+            {**asset_id, "externalSubjectId": reference(bpn)}
+            for asset_id in shell["specificAssetIds"]
+            for bpn in sorted(set(bpns.values()))
+        ]
 
     edc = Edc(p["management"], p["api_key"])
     edc.policy("cxs-seed-access", ACCESS)

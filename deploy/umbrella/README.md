@@ -27,9 +27,13 @@ Three companies on the Tractus-X umbrella's legacy data-exchange profile (wallet
 
 Status: on a local k3s cluster (colima on Apple Silicon) the umbrella with these values runs,
 the seeding runs (and can be run again), each DTR holds only its own company's twins (18 / 6 /
-3), and Tier-1's EDC gets Tier-2's catalog with both seeded datasets over DSP 2025-1. The app
-instances are not configured against the EDCs yet. A full runbook follows once the end-to-end
-flow has passed.
+3), and Tier-1's EDC gets Tier-2's catalog with both seeded datasets over DSP 2025-1. With the
+`app-*.yaml` values the three apps start, publish their notification assets, sync their own twins
+(18 / 6 / 3) and read every direct partner's twins through the EDCs (negotiation, EDR, DTR and
+submodels; none missing). The seeding shares every specific asset ID with the three BPNs: the
+DTR only shows a shell to the BPN in `Edc-Bpn` (which the app sends to its own DTR, and the data
+plane on a partner's behalf) that one of its IDs is shared with. Health checks and quality
+notifications against the EDCs are not verified yet; a full runbook follows once they are.
 
 Notes from that run:
 
