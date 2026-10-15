@@ -51,13 +51,18 @@ started from. [`.env.example`](.env.example) lists them all with comments; see a
 | `CXS_OWN_BPNL`                  | The participant's BPNL (required)                                    |
 | `CXS_DATABASE_URL`              | SQLAlchemy URL, e.g. `postgresql+psycopg://…` (install the `postgres` extra) |
 | `CXS_DTR_BASE_URL`              | Own DTR base URL; `CXS_DTR_API_PATH` defaults to `/api/v3`           |
-| `CXS_OAUTH_*`                   | Keycloak client credentials for the DTR (`URL`, `REALM`, `CLIENT_ID`, `CLIENT_SECRET`) |
+| `CXS_OAUTH_*`                   | OAuth 2.0 client credentials for the own DTR: `CLIENT_ID`, `CLIENT_SECRET`, optional `SCOPE`, and either a Keycloak `URL` + `REALM` or any `TOKEN_URL` (wins) |
 | `CXS_SUBMODEL_HREF_REWRITES`    | JSON list of `[public_prefix, internal_prefix]`: reads own submodels from the backend instead of the public data plane |
 | `CXS_SUBMODEL_HEADERS`          | JSON object of extra headers for the submodel backend (e.g. an API key) |
-| `CXS_EDC_MANAGEMENT_URL`        | Own EDC management API (Saturn); with `CXS_EDC_MANAGEMENT_PATH` and `CXS_EDC_API_KEY`. Enables partner sync |
+| `CXS_EDC_MANAGEMENT_URL`        | Own EDC management API (Saturn); with `CXS_EDC_MANAGEMENT_PATH`. Enables partner sync |
+| `CXS_EDC_API_KEY`               | Sent as `X-Api-Key` to the management API |
+| `CXS_EDC_OAUTH_*`               | Or OAuth 2.0 client credentials for the management API (`TOKEN_URL`, `CLIENT_ID`, `CLIENT_SECRET`, optional `SCOPE`); a fresh token is sent with every call. Both can be set |
 | `CXS_ACCEPTED_POLICIES`         | JSON list of usage policies accepted in partners' catalogs; empty = no negotiation |
 | `CXS_ACCEPT_ANY_POLICY`         | Accept any offered policy — development only                         |
 | `CXS_PARTNER_CONNECTORS`        | JSON object BPNL → partner DSP endpoint (addresses set through the API win) |
+| `CXS_CENTRAL_IDP_*`             | Technical user of the dataspace's central IdP (`URL`, `REALM` (default `CX-Central`), `CLIENT_ID`, `CLIENT_SECRET`) for the core services below; independent of the DTR's `CXS_OAUTH_*` |
+| `CXS_DISCOVERY_FINDER_URL`      | Discovery Finder (`…/api/v1.0/administration/connectors/discovery/search`): finds partners' DSP endpoints by BPNL on the Setup page |
+| `CXS_BPDM_POOL_URL`             | BPDM Pool API up to the version segment (e.g. `https://business-partners.example/pool/api`): partners' legal names by BPNL (`/v7/legal-entities/{bpnl}`) |
 | `CXS_NOTIFICATION_BASE_URL`     | Where our EDC's data plane reaches this app; with an EDC, the notification assets are published at startup |
 | `CXS_NOTIFICATION_API_KEY`      | Required as `X-Api-Key` on `/api/qualitynotifications/*`; also put in the assets' data address |
 | `CXS_NOTIFICATION_ACCESS_POLICY`, `CXS_NOTIFICATION_USAGE_POLICY` | JSON ODRL permissions of the notification assets; defaults: active membership / `DataExchangeGovernance:1.0` + `cx.core.qualityNotifications:1` |
@@ -79,7 +84,12 @@ started from. [`.env.example`](.env.example) lists them all with comments; see a
 | GET    | `/api/sync/last`             | Report of the last sync                       |
 | GET    | `/api/sync/runs`             | Recorded sync runs, newest first (`limit`)    |
 | GET    | `/api/partners`              | Direct partners (from own BoM/usage relations): roles, linked twins, cached parts, connector, last sync |
-| PUT    | `/api/partners/{bpnl}`       | Set a partner's name and DSP connector address |
+| PUT    | `/api/partners/{bpnl}`       | Add a partner, or set its name and DSP connector address |
+| DELETE | `/api/partners/{bpnl}`       | Forget what was set for a partner; one found in own twins stays listed |
+| GET    | `/api/partners/{bpnl}/discovery` | DSP endpoints registered for a BPNL in the discovery services (nothing is stored) |
+| POST   | `/api/setup/connection-tests` | Read-only calls to the own DTR and EDC and the core services with the configured credentials; one result each |
+| GET    | `/api/partners/{bpnl}/legal-entity` | A BPNL's legal name from the BPDM Pool (nothing is stored) |
+| POST   | `/api/partners/names`        | Name every unnamed partner after its legal name in the BPDM Pool |
 | POST   | `/api/partners/sync`         | Cache direct partners' twins through the EDC (`bpnl` for one partner) |
 | GET    | `/api/partners/checks`       | Recorded partner health checks, newest first (`bpnl`, `limit`) |
 | POST   | `/api/partners/checks`       | Check all partners (`level`; `only_unhealthy` defaults to true) |

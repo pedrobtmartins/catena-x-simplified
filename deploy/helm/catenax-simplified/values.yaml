@@ -20,10 +20,13 @@ config:
   # CXS_NOTIFICATION_BASE_URL: "http://catenax-simplified:8000"   # how our EDC's data plane reaches us
   # CXS_ACCEPTED_POLICIES: '[...]'
   # CXS_PARTNER_CONNECTORS: '{"BPNL…": "https://edc.partner/api/v1/dsp"}'
+  # CXS_CENTRAL_IDP_URL: https://centralidp.example/auth/          # + CXS_CENTRAL_IDP_CLIENT_ID; secret below
+  # CXS_DISCOVERY_FINDER_URL: https://discoveryfinder.example/api/v1.0/administration/connectors/discovery/search
+  # CXS_BPDM_POOL_URL: https://business-partners.example/pool/api
   # CXS_SYNC_INTERVAL_SECONDS: "900"
 
 # Secret settings → Secret created by the chart (e.g. CXS_EDC_API_KEY, CXS_NOTIFICATION_API_KEY,
-# CXS_OAUTH_CLIENT_SECRET, CXS_DATABASE_URL with credentials).
+# CXS_OAUTH_CLIENT_SECRET, CXS_EDC_OAUTH_CLIENT_SECRET, CXS_CENTRAL_IDP_CLIENT_SECRET, CXS_DATABASE_URL with credentials).
 secrets: {}
 # Or reference a Secret you manage; its keys become environment variables.
 existingSecret: ""

@@ -337,8 +337,10 @@ Having one node on v3 ensures the mixed-version scenario is tested from day one.
   must only be reachable through our EDC's data plane (which enforces the contract) and are
   protected by `CXS_NOTIFICATION_API_KEY`; matching the BPNL of the contract agreement is a later
   hardening step.
-- **Connector addresses**: partners' DSP endpoints come from `CXS_PARTNER_CONNECTORS` or the API.
-  Automatic lookup through the Catena-X discovery services is not implemented yet.
+- **Connector addresses**: partners' DSP endpoints come from `CXS_PARTNER_CONNECTORS` or the API;
+  the Setup page can look them up in the dataspace's discovery services (Discovery Finder → EDC
+  Discovery) by BPNL, and the user picks one. Partner names come from the BPDM Pool. Both use a
+  technical user of the central IdP (`CXS_CENTRAL_IDP_*`), separate from the DTR's credentials.
 - **EDR cache**: negotiated contracts and tokens are reused per process (SDK in-memory connection
   manager); a restart re-negotiates. A persistent connection manager is a later option.
 - **Schema migrations**: Alembic migrations are applied at startup. Databases created before
