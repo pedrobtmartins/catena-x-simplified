@@ -1623,3 +1623,242 @@ a.btn-secondary:hover {
     gap: 4px;
   }
 }
+
+/* ---------- setup ---------- */
+
+.card-note {
+  margin-top: 4px;
+}
+
+.config dd.setting {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.config dd.setting .dot {
+  flex: none;
+}
+
+.setup-form {
+  margin-top: 20px;
+}
+
+.setup-form .field {
+  flex: 1 1 200px;
+}
+
+.setup-form .field-wide {
+  flex: 2 1 360px;
+  max-width: none;
+}
+
+.input-row {
+  display: flex;
+  gap: 8px;
+}
+
+.input-row .input {
+  flex: 1;
+  min-width: 0;
+}
+
+.input[aria-invalid="true"] {
+  border-color: #a3160f;
+}
+
+.field-hint {
+  margin-top: 10px;
+}
+
+.candidates-box {
+  margin-top: 16px;
+}
+
+.candidates {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.candidates li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+}
+
+.candidates .cell-id {
+  overflow-wrap: anywhere;
+}
+
+.setup-partners {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.config dd.setting-check {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+
+/* ---------- guided setup ---------- */
+
+.checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.checklist-done {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.setup-progress {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-subtle);
+  overflow: hidden;
+}
+
+.setup-progress span {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.setup-steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.setup-step + .setup-step {
+  border-top: 1px solid var(--border);
+}
+
+.setup-step-head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px 16px;
+  background: none;
+  border: 0;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.setup-step-head:hover {
+  background: var(--surface-subtle);
+}
+
+.setup-step-head .chevron {
+  margin-left: auto;
+  flex: none;
+  transition: transform 0.15s ease;
+}
+
+.setup-step-head[aria-expanded="true"] .chevron {
+  transform: rotate(180deg);
+}
+
+.setup-step-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.setup-step-marker {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1.5px solid var(--border-strong);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-2);
+}
+
+.setup-step-done .setup-step-marker {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.setup-step-failed .setup-step-marker {
+  background: #a3160f;
+  border-color: #a3160f;
+  color: #fff;
+}
+
+.setup-step-optional .setup-step-marker {
+  border-style: dashed;
+}
+
+.setup-step-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 0 16px 18px 58px;
+  color: var(--text-2);
+}
+
+.setup-step-body ul {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.setup-step-body details summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.setup-step-body details[open] summary {
+  margin-bottom: 8px;
+}
+
+.settings-list {
+  font-size: 13px;
+}
+
+.request-text {
+  margin: 10px 0 0;
+  white-space: pre-wrap;
+  font-family: var(--mono);
+  font-size: 12px;
+  user-select: all;
+}
+
+@media (max-width: 720px) {
+  .setup-step-body {
+    padding-left: 16px;
+  }
+}
