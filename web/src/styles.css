@@ -446,6 +446,65 @@ code,
   font-size: 13px;
 }
 
+/* connector overview on the partners page: stat cards that filter the table */
+.connector-overview {
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.connector-overview .stat {
+  padding: 12px 14px;
+  gap: 2px;
+}
+
+.connector-overview .stat-value {
+  font-size: 24px;
+}
+
+.connector-overview .stat-note {
+  font-size: 12px;
+}
+
+.stat-filter {
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  border-top-width: 4px;
+}
+
+.stat-filter:hover {
+  border-color: var(--border-strong);
+}
+
+.stat-filter[aria-pressed="true"] {
+  border-color: var(--primary);
+  background: var(--primary-tint);
+}
+
+.stat-ok {
+  border-top-color: var(--success);
+}
+
+.stat-warn {
+  border-top-color: var(--orange);
+}
+
+.stat-error {
+  border-top-color: var(--danger);
+}
+
+.link-btn {
+  font: inherit;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+
 .split-bar {
   display: flex;
   height: 10px;
