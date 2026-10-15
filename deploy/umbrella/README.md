@@ -14,6 +14,16 @@ Three companies on the Tractus-X umbrella's legacy data-exchange profile (wallet
 - `seed.py` / `seed-job.sh` — seeds each company (submodels, EDC policies/assets/contracts, DTR
   shells) from inside the cluster, using the app image.
 - `participants.json` — in-cluster endpoints of the three companies.
+- `app-tier2.yaml`, `app-tier1.yaml`, `app-oem.yaml` — values of this repository's chart for each
+  company's app against its EDC, DTR and submodel server: direct partners' DSP endpoints, the
+  usage policies the seeding and the apps' notification assets offer, the umbrella's test API
+  keys. Lab values only. Install them into the umbrella's namespace (image as for the seeding):
+
+  ```bash
+  for c in tier2 tier1 oem; do
+    helm install cxs-$c deploy/helm/catenax-simplified -n umbrella -f deploy/umbrella/app-$c.yaml
+  done
+  ```
 
 Status: on a local k3s cluster (colima on Apple Silicon) the umbrella with these values runs,
 the seeding runs (and can be run again), each DTR holds only its own company's twins (18 / 6 /
