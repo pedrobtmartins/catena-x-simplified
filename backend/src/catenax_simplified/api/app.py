@@ -6,17 +6,20 @@ import logging
 import threading
 from collections.abc import AsyncIterator, Callable, Iterator
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path as FsPath
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Path, Query, Request, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session, sessionmaker
 from starlette.concurrency import run_in_threadpool
 
 from ..aspects.registry import SUPPORTED
 from ..config import Settings
-from ..dataspace import SubmodelReader, TwinRegistry
+from ..dataspace import DataspaceError, SubmodelReader, TwinRegistry
+from ..dataspace.business_partners import BusinessPartnerDirectory
+from ..dataspace.connections import ConnectionTester
+from ..dataspace.discovery import ConnectorDiscovery
 from ..dataspace.health import PartnerHealthChecker
 from ..dataspace.notification_assets import NotificationAssetPublisher
 from ..dataspace.notifications import NotificationSender
@@ -34,22 +37,31 @@ from ..storage import (
 from ..traceability import OwnTwinSync, PartnerHealth, PartnerSync, part_tree
 from ..wiring import (
     build_asset_publisher,
+    build_connection_tester,
+    build_connector_discovery,
     build_edc_consumer,
     build_health_checker,
     build_notification_sender,
     build_partner_client,
+    build_partner_directory,
     build_submodel_reader,
     build_twin_registry,
+    central_auth,
+    dtr_auth,
 )
 from . import notifications
 from .schemas import (
+    ConnectionCheckOut,
+    ConnectorDiscoveryOut,
     HealthOut,
+    LegalEntityOut,
     NotificationAssetsOut,
     PartListItem,
     PartnerBatchCheckRequest,
     PartnerCheckOut,
     PartnerCheckPage,
     PartnerCheckRequest,
+    PartnerNameOut,
     PartnerOut,
     PartnerSyncReportOut,
     PartnerUpdate,
@@ -94,6 +106,7 @@ def _session(request: Request) -> Iterator[Session]:
 
 
 SessionDep = Annotated[Session, Depends(_session)]
+Bpnl = Annotated[str, Path(pattern=r"^BPNL[0-9A-Za-z]{12}$")]
 
 router = APIRouter(prefix="/api")
 
@@ -109,11 +122,32 @@ def health(request: Request) -> HealthOut:
         can_send_notifications=request.app.state.notifications.can_send,
         dev_direct=settings.dev_direct,
         can_check_partners=request.app.state.health_runner.configured,
+        can_discover_connectors=request.app.state.discovery is not None,
+        can_look_up_names=request.app.state.directory is not None,
+        dtr_auth="oauth" if dtr_auth(settings) else "none",
+        edc_auth=[
+            name
+            for name, used in (
+                ("oauth", settings.edc_oauth_token_url),
+                ("api_key", settings.edc_api_key),
+            )
+            if used
+        ],
+        central_idp_url=settings.central_idp_url,
         notification_assets=request.app.state.asset_publishing.status,
         dtr_url=settings.dtr_base_url,
         sync_interval_seconds=settings.sync_interval_seconds,
         supported_aspects=sorted(SUPPORTED),
     )
+
+
+@router.post("/setup/connection-tests", response_model=list[ConnectionCheckOut])
+async def test_connections(request: Request) -> list[ConnectionCheckOut]:
+    """Read-only calls to the own DTR and EDC and to the core services, with the configured
+    credentials."""
+    tester: ConnectionTester = request.app.state.connection_tester
+    checks = await run_in_threadpool(tester.run)
+    return [ConnectionCheckOut.model_validate(c) for c in checks]
 
 
 @router.get("/stats", response_model=StatsOut)
@@ -228,7 +262,7 @@ def list_partners(session: SessionDep, request: Request) -> list[PartnerOut]:
 
 @router.put("/partners/{bpnl}", response_model=PartnerOut)
 def update_partner(
-    bpnl: str, update: PartnerUpdate, session: SessionDep, request: Request
+    bpnl: Bpnl, update: PartnerUpdate, session: SessionDep, request: Request
 ) -> PartnerOut:
     if bpnl == request.app.state.settings.own_bpnl:
         raise HTTPException(status_code=422, detail="that is your own BPNL")
@@ -240,6 +274,78 @@ def update_partner(
         row.connector_address = fields["connector_address"]
     session.commit()
     return next(p for p in list_partners(session, request) if p.bpnl == bpnl)
+
+
+@router.delete("/partners/{bpnl}", status_code=204)
+def remove_partner(bpnl: Bpnl, session: SessionDep) -> Response:
+    """Forget what was set for a partner (name, address, last sync). A partner found in your
+    own twins stays listed; one added by hand disappears. Its check history is kept."""
+    repository = PartnerRepository(session)
+    row = repository.get(bpnl)
+    if row is None:
+        raise HTTPException(status_code=404, detail="partner not found")
+    repository.delete(row)
+    session.commit()
+    return Response(status_code=204)
+
+
+def _directory(request: Request) -> BusinessPartnerDirectory:
+    directory: BusinessPartnerDirectory | None = request.app.state.directory
+    if directory is None:
+        raise HTTPException(status_code=503, detail="no BPDM Pool configured (CXS_BPDM_POOL_URL)")
+    return directory
+
+
+@router.get("/partners/{bpnl}/legal-entity", response_model=LegalEntityOut)
+async def legal_entity(bpnl: Bpnl, request: Request) -> LegalEntityOut:
+    """A BPNL's legal name from the BPDM Pool. Nothing is stored."""
+    directory = _directory(request)
+    try:
+        name = await run_in_threadpool(directory.legal_name, bpnl)
+    except DataspaceError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return LegalEntityOut(bpnl=bpnl, legal_name=name)
+
+
+@router.post("/partners/names", response_model=list[PartnerNameOut])
+async def fill_partner_names(request: Request) -> list[PartnerNameOut]:
+    """Name every partner without a name after its legal name in the BPDM Pool. Names set by
+    hand are kept."""
+    directory = _directory(request)
+    with request.app.state.session_factory() as session:
+        unnamed = [p.bpnl for p in list_partners(session, request) if not p.name]
+    results = []
+    for bpnl in unnamed:
+        try:
+            name = await run_in_threadpool(directory.legal_name, bpnl)
+        except DataspaceError as exc:
+            results.append(PartnerNameOut(bpnl=bpnl, status="failed", message=str(exc)))
+            continue
+        if name is None:
+            results.append(PartnerNameOut(bpnl=bpnl, status="not_found"))
+            continue
+        with request.app.state.session_factory() as session:
+            row = PartnerRepository(session).get_or_create(bpnl)
+            row.name = name[:255]
+            session.commit()
+        results.append(PartnerNameOut(bpnl=bpnl, status="named", name=name))
+    return results
+
+
+@router.get("/partners/{bpnl}/discovery", response_model=ConnectorDiscoveryOut)
+async def discover_connectors(bpnl: Bpnl, request: Request) -> ConnectorDiscoveryOut:
+    """Ask the dataspace's discovery services for the DSP endpoints registered for a BPNL. Nothing
+    is stored: pick one and set it with PUT /api/partners/{bpnl}."""
+    discovery: ConnectorDiscovery | None = request.app.state.discovery
+    if discovery is None:
+        raise HTTPException(
+            status_code=503, detail="no Discovery Finder configured (CXS_DISCOVERY_FINDER_URL)"
+        )
+    try:
+        endpoints = await run_in_threadpool(discovery.find, bpnl)
+    except DataspaceError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return ConnectorDiscoveryOut(bpnl=bpnl, endpoints=endpoints)
 
 
 @router.post("/partners/sync", response_model=PartnerSyncReportOut)
@@ -354,6 +460,9 @@ def create_app(
     notification_sender: NotificationSender | None = None,
     asset_publisher: NotificationAssetPublisher | None = None,
     health_checker: PartnerHealthChecker | None = None,
+    discovery: ConnectorDiscovery | None = None,
+    directory: BusinessPartnerDirectory | None = None,
+    connection_tester: ConnectionTester | None = None,
 ) -> FastAPI:
     """Create the application. The keyword arguments override the configured adapters (tests)."""
     engine = make_engine(settings.database_url)
@@ -435,10 +544,14 @@ def create_app(
     app.state.health_runner = health_runner
     app.state.notifications = notification_service
     app.state.asset_publishing = asset_publishing
+    central = central_auth(settings) if discovery is None or directory is None else None
+    app.state.discovery = discovery or build_connector_discovery(settings, central)
+    app.state.directory = directory or build_partner_directory(settings, central)
+    app.state.connection_tester = connection_tester or build_connection_tester(settings)
     app.include_router(router)
     app.include_router(notifications.router)
     app.include_router(notifications.kit_router)
 
     if settings.web_dist_dir:
-        app.mount("/", StaticFiles(directory=Path(settings.web_dist_dir), html=True), name="web")
+        app.mount("/", StaticFiles(directory=FsPath(settings.web_dist_dir), html=True), name="web")
     return app

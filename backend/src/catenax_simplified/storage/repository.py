@@ -287,6 +287,9 @@ class PartnerRepository:
     def all(self) -> Sequence[PartnerRow]:
         return self._session.scalars(select(PartnerRow).order_by(PartnerRow.bpnl)).all()
 
+    def delete(self, row: PartnerRow) -> None:
+        self._session.delete(row)
+
 
 class PartnerCheckRepository:
     def __init__(self, session: Session):

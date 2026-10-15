@@ -22,11 +22,14 @@ class Settings(BaseSettings):
     dtr_api_path: str = "/api/v3"
     dtr_page_size: int = 100
 
-    # Optional OAuth2 client credentials (Keycloak) for the DTR.
+    # Optional OAuth 2.0 client credentials for the own DTR: a Keycloak server and realm, or any
+    # token endpoint (CXS_OAUTH_TOKEN_URL wins).
     oauth_url: str | None = None
     oauth_realm: str | None = None
+    oauth_token_url: str | None = None
     oauth_client_id: str | None = None
     oauth_client_secret: str | None = None
+    oauth_scope: str | None = None
 
     # Own submodels: rewrite the public data plane prefix of an href to the internal backend.
     submodel_href_rewrites: list[tuple[str, str]] = []
@@ -36,6 +39,11 @@ class Settings(BaseSettings):
     edc_management_url: str | None = None  # e.g. https://edc.example.com
     edc_management_path: str = "/management"
     edc_api_key: str | None = None  # sent as X-Api-Key
+    # Or OAuth 2.0 client credentials for the management API (any token endpoint); both can be set.
+    edc_oauth_token_url: str | None = None
+    edc_oauth_client_id: str | None = None
+    edc_oauth_client_secret: str | None = None
+    edc_oauth_scope: str | None = None
     # Usage policies the company accepts, as offered in partners' catalogs (JSON list of policy
     # bodies without @id/@type). Empty = negotiate nothing.
     accepted_policies: list[dict] = []
@@ -43,6 +51,19 @@ class Settings(BaseSettings):
     accept_any_policy: bool = False
     # Partners' DSP endpoints by BPNL (JSON object); addresses set through the API win.
     partner_connectors: dict[str, str] = {}
+
+    # Central IdP of the dataspace (Keycloak, realm CX-Central): a technical user for the core
+    # services below. Independent of the DTR's credentials.
+    central_idp_url: str | None = None  # e.g. https://centralidp.example.com/auth/
+    central_idp_realm: str = "CX-Central"
+    central_idp_client_id: str | None = None
+    central_idp_client_secret: str | None = None
+    # Discovery Finder (…/api/v1.0/administration/connectors/discovery/search): finds partners'
+    # DSP endpoints by BPNL.
+    discovery_finder_url: str | None = None
+    # BPDM Pool API, up to the version segment (e.g. https://business-partners.example/pool/api):
+    # partners' legal names by BPNL.
+    bpdm_pool_url: str | None = None
 
     # Quality notifications. Where our EDC's data plane reaches this app (e.g. http://app:8000);
     # when set with an EDC, the notification assets are published in our EDC at startup.
