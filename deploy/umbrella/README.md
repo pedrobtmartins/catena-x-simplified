@@ -28,7 +28,11 @@ Notes from that run:
   `rewrite name regex (.+)\.tx\.test ingress-nginx-controller.ingress-nginx.svc.cluster.local answer auto`.
 - **Apple Silicon**: the DTR image (`sldt-digital-twin-registry:0.11.0`) is amd64 only, so the
   VM needs Rosetta (`colima start --kubernetes --vm-type vz --vz-rosetta`). If amd64 pods start
-  failing with `exec ...: no such file or directory`, restart the VM to register Rosetta again.
+  failing with `exec ...: no such file or directory`, the binfmt handler (flag `F`) holds a stale
+  handle on `/mnt/lima-rosetta/rosetta`. Re-register it inside the VM (`colima ssh`, as root:
+  `echo -1 > /proc/sys/fs/binfmt_misc/rosetta`, then write the same entry to `.../register`) and
+  delete the failing pods. That keeps the in-memory Vaults; restarting the VM also works but
+  wipes them (see below).
 - **App image**: `seed-job.sh` uses `catenax-simplified:latest`; with colima's Docker runtime,
   `DOCKER_BUILDKIT=1 docker build -t catenax-simplified:latest .` at the repository root makes it
   available to the cluster.
