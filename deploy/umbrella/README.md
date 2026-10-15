@@ -31,10 +31,10 @@ Verified on a local k3s cluster (colima on Apple Silicon), 14–15 October 2026:
 - the three apps start, publish their notification assets (also again after a restart), sync their
   own twins (18 / 6 / 3) and read every direct partner's twins through the EDCs (discovery over
   DSP 2025-1, negotiation, EDR, DTR, submodels; none missing);
-- Tier-1's partner checks pass at every level: catalog for both partners, full EDR for Tier-2
-  (discovery, DTR and notification offers, EDR, registry answer);
-- a quality alert Tier-1 → OEM arrives, and the OEM's acknowledgement comes back (Notification API
-  2.0.0).
+- partner checks pass at every level: the full EDR check (discovery, DTR and notification offers,
+  EDR, registry answer) is *Healthy* for every direct partner of every company;
+- a quality alert travels Tier-2 → Tier-1 → OEM (Tier-1 forwards it for the module that contains
+  the cell), and the acceptance comes back on both hops (Notification API 2.0.0).
 
 The runbook below is put together from those runs; it has not been replayed from an empty machine
 in one go yet.
