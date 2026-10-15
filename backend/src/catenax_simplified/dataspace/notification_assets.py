@@ -109,10 +109,17 @@ class NotificationAssetPublisher:
         self._access = access_permissions or DEFAULT_ACCESS_PERMISSIONS
         self._usage = usage_permissions or DEFAULT_USAGE_PERMISSIONS
 
-    def _upsert(self, controller: Any, model: Any, what: str) -> None:
+    def _upsert(self, controller: Any, model: Any, what: str, *, by_id: str | None = None) -> None:
         response = controller.create(obj=model)
         if response.status_code == 409:
-            response = controller.update(obj=model)
+            if by_id:
+                # The EDC updates policy definitions only at their ID (PUT on the collection is
+                # 405), while the SDK's update() always uses the collection.
+                response = controller.adapter.put(
+                    url=f"{controller.endpoint_url}/{by_id}", data=model.to_data()
+                )
+            else:
+                response = controller.update(obj=model)
         if response.status_code not in (200, 204):
             raise DataspaceError(
                 f"could not publish {what}: HTTP {response.status_code} {response.text[:300]}"
@@ -125,7 +132,7 @@ class NotificationAssetPublisher:
             policy = ModelFactory.get_policy_model(
                 dataspace_version="saturn", oid=oid, permissions=permissions
             )
-            self._upsert(self._provider.policies, policy, f"policy {oid}")
+            self._upsert(self._provider.policies, policy, f"policy {oid}", by_id=oid)
 
         published = []
         for asset in notification_assets(self._base_url, self._prefix):
