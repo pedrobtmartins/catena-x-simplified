@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, ApiError, formatDateTime, type CheckLevel, type CheckStatus, type Health, type Partner } from "./api";
+import { ConnectorOverview, healthOf, type HealthFilter } from "./ConnectorOverview";
 import { CheckIcon, ChevronIcon, SyncIcon } from "./icons";
 import { HealthBadge, HealthPanel, STATUS as CHECK_STATUS } from "./PartnerHealth";
 import { ErrorAlert } from "./ui";
@@ -182,8 +183,10 @@ export function Partners({ health, dataVersion }: { health: Health | null; dataV
   const [version, setVersion] = useState(0);
   const [checking, setChecking] = useState<CheckLevel | null>(null);
   const [checkSummary, setCheckSummary] = useState<string | null>(null);
+  const [healthFilter, setHealthFilter] = useState<HealthFilter>(null);
   const canSync = Boolean(health?.edc_configured);
   const canCheck = Boolean(health?.can_check_partners);
+  const visible = healthFilter === null ? partners : partners?.filter((p) => healthOf(p) === healthFilter);
 
   useEffect(() => {
     api.partners().then(setPartners, (e: Error) => setError(e.message));
@@ -273,6 +276,10 @@ export function Partners({ health, dataVersion }: { health: Health | null; dataV
       <ErrorAlert error={error} />
       {checkSummary && <div className="alert alert-info">{checkSummary}</div>}
 
+      {partners && partners.length > 0 && (
+        <ConnectorOverview partners={partners} filter={healthFilter} onFilter={setHealthFilter} />
+      )}
+
       <div className="table-box">
         <table>
           <thead>
@@ -289,7 +296,7 @@ export function Partners({ health, dataVersion }: { health: Health | null; dataV
             </tr>
           </thead>
           <tbody>
-            {partners?.map((partner) => (
+            {visible?.map((partner) => (
               <PartnerRow
                 key={partner.bpnl}
                 partner={partner}
@@ -307,6 +314,16 @@ export function Partners({ health, dataVersion }: { health: Health | null; dataV
               <tr>
                 <td colSpan={7} className="muted">
                   No partners yet. Sync your own twins: partners come from your BoM and usage aspects.
+                </td>
+              </tr>
+            )}
+            {partners && partners.length > 0 && visible?.length === 0 && (
+              <tr>
+                <td colSpan={7} className="muted">
+                  No partners with this health status.{" "}
+                  <button type="button" className="link-btn" onClick={() => setHealthFilter(null)}>
+                    Show all
+                  </button>
                 </td>
               </tr>
             )}

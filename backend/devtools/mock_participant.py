@@ -75,8 +75,14 @@ def _cells(n: int) -> list[str]:
     return [_uuid("cccccccc", n * 10 + c) for c in range(1, 4)]
 
 
-def build_dataset(participant: str = "tier1") -> tuple[list[dict], dict[str, dict]]:
-    """Return (shell descriptors, submodel payloads by path) of one company."""
+def build_dataset(
+    participant: str = "tier1", bpns: dict[str, str] | None = None
+) -> tuple[list[dict], dict[str, dict]]:
+    """Return (shell descriptors, submodel payloads by path) of one company.
+
+    ``bpns`` maps ``tier1``/``tier2``/``oem`` to other BPNLs (e.g. a test environment's)."""
+    bpns = {**PARTICIPANTS, **(bpns or {})}
+    TIER1, TIER2, OEM = bpns["tier1"], bpns["tier2"], bpns["oem"]  # noqa: N806
     shells: list[dict] = []
     submodels: dict[str, dict] = {}
 
@@ -120,9 +126,7 @@ def build_dataset(participant: str = "tier1") -> tuple[list[dict], dict[str, dic
                 "id": gid.replace("urn:uuid:", "urn:uuid:aa5"),
                 "idShort": id_short,
                 "globalAssetId": gid,
-                "specificAssetIds": [
-                    {"name": "manufacturerId", "value": PARTICIPANTS[participant]}
-                ],
+                "specificAssetIds": [{"name": "manufacturerId", "value": bpns[participant]}],
                 "submodelDescriptors": descriptors,
             }
         )

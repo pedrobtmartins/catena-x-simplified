@@ -36,7 +36,9 @@ def build_twin_registry(settings: Settings) -> SdkTwinRegistry | None:
         api_path=settings.dtr_api_path,
         auth_service=auth,
     )
-    return SdkTwinRegistry(service, page_size=settings.dtr_page_size)
+    # Sent as Edc-Bpn: the DTR shows a shell's globalAssetId and specific asset IDs to its owner
+    # and to the BPNs they are shared with; an anonymous call sees no shells at all.
+    return SdkTwinRegistry(service, page_size=settings.dtr_page_size, bpn=settings.own_bpnl)
 
 
 def build_submodel_reader(settings: Settings) -> HttpSubmodelReader:

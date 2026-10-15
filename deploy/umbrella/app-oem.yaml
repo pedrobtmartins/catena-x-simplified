@@ -1,0 +1,29 @@
+# OEM (vehicles) = umbrella dataconsumerTwo: the app against the umbrella lab (see README.md).
+# Lab values only: the umbrella's test BPNLs and EDC API keys, in-cluster service names from
+# participants.json, the usage policies seed.py offers. Never a template for a real dataspace.
+#   helm install cxs-oem deploy/helm/catenax-simplified -n umbrella -f deploy/umbrella/app-oem.yaml
+fullnameOverride: cxs-oem
+
+image:
+  repository: catenax-simplified
+  tag: latest
+  pullPolicy: IfNotPresent
+
+config:
+  CXS_OWN_BPNL: "BPNL00000003AVTH"
+  CXS_DTR_BASE_URL: "http://umbrella-dataconsumer-2-dtr:8080"
+  # Own submodels: hrefs point at the public data plane; read them from the backend behind it.
+  CXS_SUBMODEL_HREF_REWRITES: '[["http://dataconsumer-2-dataplane.tx.test/api/public","http://umbrella-dataconsumer-2-submodelserver:8080"]]'
+  CXS_EDC_MANAGEMENT_URL: "http://umbrella-dataconsumer-2-edc-controlplane:8081"
+  CXS_EDC_MANAGEMENT_PATH: "/management"
+  # Direct partners' DSP endpoints (unversioned; discovery picks DSP 2025-1).
+  CXS_PARTNER_CONNECTORS: '{"BPNL00000003AZQP":"http://dataconsumer-1-controlplane.tx.test/api/v1/dsp"}'
+  # Exactly the offers in the lab: seed.py's twins and submodels, and the apps' notification assets.
+  CXS_ACCEPTED_POLICIES: '[{"permission":{"action":"use","constraint":{"and":[{"leftOperand":"Membership","operator":"eq","rightOperand":"active"},{"leftOperand":"FrameworkAgreement","operator":"eq","rightOperand":"DataExchangeGovernance:1.0"},{"leftOperand":"UsagePurpose","operator":"isAnyOf","rightOperand":["cx.core.industrycore:1"]}]}}},{"permission":{"action":"use","constraint":{"and":[{"leftOperand":"FrameworkAgreement","operator":"eq","rightOperand":"DataExchangeGovernance:1.0"},{"leftOperand":"UsagePurpose","operator":"isAnyOf","rightOperand":["cx.core.qualityNotifications:1"]}]}}}]'
+  # Where our EDC's data plane reaches this app (its Service in the umbrella namespace).
+  CXS_NOTIFICATION_BASE_URL: "http://cxs-oem:8000"
+  CXS_SYNC_INTERVAL_SECONDS: "0"
+
+secrets:
+  CXS_EDC_API_KEY: "TEST3"
+  CXS_NOTIFICATION_API_KEY: "lab-notifications"

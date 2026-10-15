@@ -166,10 +166,27 @@ class Response:
         self.status_code, self.text = status_code, text
 
 
+class Adapter:
+    def __init__(self, controller):
+        self.controller = controller
+
+    def put(self, url, data):
+        self.controller.calls.append(("update", json.loads(data)))
+        self.controller.put_urls.append(url)
+        return Response(204)
+
+
 class Controller:
-    def __init__(self, existing=()):
+    """Like the EDC's management API through the SDK: ``update()`` is a PUT on the collection,
+    which the EDC rejects with 405 where it only updates at the ID (policy definitions)."""
+
+    def __init__(self, endpoint_url, existing=(), update_by_id=False):
+        self.endpoint_url = endpoint_url
         self.existing = set(existing)
+        self.update_by_id = update_by_id
         self.calls = []
+        self.put_urls = []
+        self.adapter = Adapter(self)
 
     def create(self, obj):
         data = json.loads(obj.to_data())
@@ -177,15 +194,18 @@ class Controller:
         return Response(409 if data["@id"] in self.existing else 200)
 
     def update(self, obj):
+        if self.update_by_id:
+            return Response(405)
         self.calls.append(("update", json.loads(obj.to_data())))
+        self.put_urls.append(self.endpoint_url)
         return Response(204)
 
 
 class Provider:
     def __init__(self, existing=()):
-        self.assets = Controller(existing)
-        self.policies = Controller(existing)
-        self.contract_definitions = Controller(existing)
+        self.assets = Controller("/v3/assets", existing)
+        self.policies = Controller("/v3/policydefinitions", existing, update_by_id=True)
+        self.contract_definitions = Controller("/v3/contractdefinitions", existing)
 
 
 def test_eight_assets_two_endpoints():
@@ -224,6 +244,7 @@ def test_publisher_creates_or_updates_everything():
 
     usage = [data for op, data in provider.policies.calls if op == "update"]
     assert [p["@id"] for p in usage] == ["cxs-usage"]
+    assert provider.policies.put_urls == ["/v3/policydefinitions/cxs-usage"]
     constraints = usage[0]["policy"]["permission"][0]["constraint"]["and"]
     assert {c["leftOperand"] for c in constraints} == {"FrameworkAgreement", "UsagePurpose"}
 
@@ -236,3 +257,18 @@ def test_publisher_reports_edc_errors():
     provider.assets.create = lambda obj: Response(400, "invalid asset")
     with pytest.raises(DataspaceError, match="HTTP 400 invalid asset"):
         NotificationAssetPublisher(provider, "http://app:8000").publish()
+
+
+def test_publisher_republishes_everything_on_restart():
+    everything = {f"cxs-{p}" for p in ("access", "usage")} | {
+        i
+        for a in notification_assets("http://app:8000", "cxs")
+        for i in (a.asset_id, f"{a.asset_id}-contract")
+    }
+    provider = Provider(existing=everything)
+    assert len(NotificationAssetPublisher(provider, "http://app:8000", prefix="cxs").publish()) == 8
+    assert provider.policies.put_urls == [
+        "/v3/policydefinitions/cxs-access",
+        "/v3/policydefinitions/cxs-usage",
+    ]
+    assert len(provider.assets.put_urls) == len(provider.contract_definitions.put_urls) == 8
