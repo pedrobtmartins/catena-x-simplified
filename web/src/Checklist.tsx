@@ -174,7 +174,8 @@ function steps(health: Health, partners: Partner[], lastRun: SyncReport | null, 
       ask: [
         "A technical user for the Catena-X central identity provider (client ID and secret) — your company admin " +
           "requests it in the Catena-X portal",
-        "The addresses of the Discovery Finder and the BPDM Pool of your dataspace (from its operating company)",
+        "The addresses of the BPDM Pool and of the Discovery Finder — or of the EDC Discovery directly — of your " +
+          "dataspace (from its operating company)",
       ],
       settings: [
         "CXS_CENTRAL_IDP_URL",
@@ -182,6 +183,7 @@ function steps(health: Health, partners: Partner[], lastRun: SyncReport | null, 
         "CXS_CENTRAL_IDP_CLIENT_ID",
         "CXS_CENTRAL_IDP_CLIENT_SECRET",
         "CXS_DISCOVERY_FINDER_URL",
+        "CXS_EDC_DISCOVERY_URL",
         "CXS_BPDM_POOL_URL",
       ],
       action: "test",

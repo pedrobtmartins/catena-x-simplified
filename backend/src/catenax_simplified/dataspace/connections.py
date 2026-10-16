@@ -155,12 +155,47 @@ class ConnectionTester:
         s = self._settings
         name = "Connector discovery"
         missing = self._needs_central(
-            "discovery", name, s.discovery_finder_url, "CXS_DISCOVERY_FINDER_URL"
+            "discovery",
+            name,
+            s.edc_discovery_url or s.discovery_finder_url,
+            "CXS_EDC_DISCOVERY_URL or CXS_DISCOVERY_FINDER_URL",
         )
         if missing:
             return missing
         if not central_ok:
             return ConnectionCheck("discovery", name, "skipped", "needs a central IdP token")
+
+        def test_edc_discovery() -> str:
+            # The own BPNL: every participant's connector is registered there.
+            response = self._call(
+                "POST",
+                s.edc_discovery_url,
+                json=[s.own_bpnl],
+                headers=self._bearer(self._central_auth),
+            )
+            if not response.ok:
+                raise _Failed(_http_failure(response))
+            try:
+                entries = response.json()
+            except ValueError as exc:
+                raise _Failed("the EDC Discovery answered without JSON") from exc
+            if not isinstance(entries, list):
+                raise _Failed("the EDC Discovery did not answer with a list")
+            own = [
+                endpoint
+                for entry in entries
+                if isinstance(entry, dict) and entry.get("bpn") == s.own_bpnl
+                for endpoint in entry.get("connectorEndpoint") or []
+            ]
+            registered = (
+                f"{len(own)} connector(s) registered for {s.own_bpnl}"
+                if own
+                else (f"no connector registered yet for {s.own_bpnl}")
+            )
+            return f"EDC Discovery at {s.edc_discovery_url} answered: {registered}."
+
+        if s.edc_discovery_url:
+            return self._check("discovery", name, test_edc_discovery)
 
         def test() -> str:
             response = self._call(
@@ -170,7 +205,15 @@ class ConnectionTester:
                 headers=self._bearer(self._central_auth),
             )
             if not response.ok:
-                raise _Failed(_http_failure(response))
+                failure = _http_failure(response)
+                if response.status_code == 400 and s.discovery_finder_url.rstrip("/").endswith(
+                    "/connectors/discovery"
+                ):
+                    failure += (
+                        " — this looks like the EDC Discovery's address: enter it as the EDC"
+                        " Discovery address (CXS_EDC_DISCOVERY_URL) instead"
+                    )
+                raise _Failed(failure)
             endpoints = {
                 e.get("type"): e.get("endpointAddress")
                 for e in (response.json() or {}).get("endpoints") or []

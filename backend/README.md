@@ -62,6 +62,7 @@ started from. [`.env.example`](.env.example) lists them all with comments; see a
 | `CXS_PARTNER_CONNECTORS`        | JSON object BPNL → partner DSP endpoint (addresses set through the API win) |
 | `CXS_CENTRAL_IDP_*`             | Technical user of the dataspace's central IdP (`URL`, `REALM` (default `CX-Central`), `CLIENT_ID`, `CLIENT_SECRET`) for the core services below; independent of the DTR's `CXS_OAUTH_*` |
 | `CXS_DISCOVERY_FINDER_URL`      | Discovery Finder (`…/api/v1.0/administration/connectors/discovery/search`): finds partners' DSP endpoints by BPNL on the Setup page |
+| `CXS_EDC_DISCOVERY_URL`         | EDC Discovery (`…/api/administration/connectors/discovery`), asked directly instead of through the Discovery Finder; wins when both are set |
 | `CXS_BPDM_POOL_URL`             | BPDM Pool API up to the version segment (e.g. `https://business-partners.example/pool/api`): partners' legal names by BPNL (`/v7/legal-entities/{bpnl}`) |
 | `CXS_NOTIFICATION_BASE_URL`     | Where our EDC's data plane reaches this app; with an EDC, the notification assets are published at startup |
 | `CXS_NOTIFICATION_API_KEY`      | Required as `X-Api-Key` on `/api/qualitynotifications/*`; also put in the assets' data address |
