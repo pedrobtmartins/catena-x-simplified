@@ -67,6 +67,12 @@ class Settings(BaseSettings):
     # BPDM Pool API, up to the version segment (e.g. https://business-partners.example/pool/api):
     # partners' legal names by BPNL.
     bpdm_pool_url: str | None = None
+    # Or a BPDM Pool offered through an EDC, such as the Cofinity-X Business Partner Explorer
+    # (needs our EDC and a subscription): its DSP endpoint, the BPN of its connector and, if its
+    # catalog offers us more than one asset, the asset to negotiate for. Wins over the BPDM Pool.
+    bp_explorer_address: str | None = None
+    bp_explorer_bpnl: str = Field(default="BPNLCOFINITYEZFA", pattern=r"^BPNL[0-9A-Za-z]{12}$")
+    bp_explorer_asset_id: str | None = None
 
     # Quality notifications. Where our EDC's data plane reaches this app (e.g. http://app:8000);
     # when set with an EDC, the notification assets are published in our EDC at startup.

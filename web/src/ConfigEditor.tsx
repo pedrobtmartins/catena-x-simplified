@@ -24,6 +24,14 @@ export const GROUPS: { key: ConfigGroup; title: string; intro: string }[] = [
     title: "Dataspace services (optional)",
     intro: "A technical user of the Catena-X identity provider, to find partners' connectors and names by BPNL.",
   },
+  {
+    key: "names",
+    title: "Partner names through your connector (optional)",
+    intro:
+      "Where your dataspace offers the golden record only through its connector — such as the Cofinity-X " +
+      "Business Partner Explorer, after subscribing to it — your connector fetches partners' legal names from " +
+      "there. Your accepted usage policies must include the explorer's policy. Used instead of the BPDM Pool.",
+  },
 ];
 
 function message(e: unknown): string {

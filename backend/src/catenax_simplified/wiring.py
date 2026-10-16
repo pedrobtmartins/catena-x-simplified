@@ -10,7 +10,7 @@ from tractusx_sdk.industry.services import AasService
 
 from .admin import AdminAuth
 from .config import Settings
-from .dataspace.business_partners import BpdmPool
+from .dataspace.business_partners import BpdmPool, BpExplorer, BusinessPartnerDirectory
 from .dataspace.connections import ConnectionTester
 from .dataspace.direct import DirectNotificationSender, DirectPartnerClient
 from .dataspace.discovery import ConnectorDiscovery, EdcDiscovery, SdkConnectorDiscovery
@@ -155,7 +155,30 @@ def build_connector_discovery(
     return None
 
 
-def build_partner_directory(settings: Settings, auth: ClientCredentials | None) -> BpdmPool | None:
+def build_bp_explorer(settings: Settings, consumer=None) -> BpExplorer | None:
+    """The Business Partner Explorer through our EDC, if both are configured."""
+    if settings.dev_direct or not settings.bp_explorer_address:
+        return None
+    consumer = consumer or build_edc_consumer(settings)
+    if consumer is None:
+        return None
+    return BpExplorer(
+        consumer,
+        accepted_policies=_accepted_policies(settings),
+        address=settings.bp_explorer_address,
+        bpnl=settings.bp_explorer_bpnl,
+        asset_id=settings.bp_explorer_asset_id,
+    )
+
+
+def build_partner_directory(
+    settings: Settings, auth: ClientCredentials | None, consumer=None
+) -> BusinessPartnerDirectory | None:
+    """Where partners' legal names come from: the Business Partner Explorer if configured, else
+    the BPDM Pool."""
+    explorer = build_bp_explorer(settings, consumer)
+    if explorer is not None:
+        return explorer
     if not settings.bpdm_pool_url or auth is None:
         return None
     return BpdmPool(settings.bpdm_pool_url, auth)
@@ -184,13 +207,15 @@ def build_asset_publisher(settings: Settings) -> NotificationAssetPublisher | No
     )
 
 
-def build_connection_tester(settings: Settings) -> ConnectionTester:
-    # Own OAuth clients, so a test always asks the IdPs for a fresh token.
+def build_connection_tester(settings: Settings, consumer=None) -> ConnectionTester:
+    # Own OAuth clients, so a test always asks the IdPs for a fresh token; an own explorer client,
+    # so a test always reads the catalog again.
     return ConnectionTester(
         settings,
         dtr_auth=dtr_auth(settings),
         edc_auth=edc_auth(settings),
         central_auth=central_auth(settings),
+        bp_explorer=build_bp_explorer(settings, consumer),
     )
 
 

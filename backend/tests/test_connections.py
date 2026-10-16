@@ -60,9 +60,10 @@ def _mock_all(mock, dtr_status=200):
 def test_every_connection_works():
     _mock_all(responses)
     checks = _run(_settings())
-    assert {k: c.status for k, c in checks.items()} == dict.fromkeys(
-        ["dtr", "edc", "central_idp", "discovery", "bpdm"], "ok"
-    )
+    assert {k: c.status for k, c in checks.items()} == {
+        **dict.fromkeys(["dtr", "edc", "central_idp", "discovery", "bpdm"], "ok"),
+        "bp_explorer": "not_configured",
+    }
     assert (
         checks["edc"].detail == "The management API answered with an OAuth token and the API key."
     )
@@ -145,13 +146,21 @@ def test_nothing_configured():
     assert {c.status for c in checks.values()} == {"not_configured"}
     assert checks["edc"].detail == "CXS_EDC_MANAGEMENT_URL is not set"
     assert checks["bpdm"].detail == "CXS_BPDM_POOL_URL is not set"
+    assert checks["bp_explorer"].detail == "CXS_BP_EXPLORER_ADDRESS is not set"
 
 
 def test_connection_tests_endpoint():
     settings = Settings(own_bpnl=scenario.TIER1, database_url="sqlite:///:memory:")
     with TestClient(create_app(settings, registry=FakeRegistry([]))) as client:
         checks = client.post("/api/setup/connection-tests").json()
-    assert [c["key"] for c in checks] == ["dtr", "edc", "central_idp", "discovery", "bpdm"]
+    assert [c["key"] for c in checks] == [
+        "dtr",
+        "edc",
+        "central_idp",
+        "discovery",
+        "bpdm",
+        "bp_explorer",
+    ]
     assert checks[0] == {
         "key": "dtr",
         "name": "Digital Twin Registry",

@@ -35,7 +35,9 @@ function steps(health: Health, partners: Partner[], lastRun: SyncReport | null, 
   const edc = fromCheck(checks?.edc, health.edc_configured);
   const assets = health.notification_assets;
   const missing = partners.filter((p) => !p.connector_address).length;
-  const servicesFailed = [checks?.central_idp, checks?.discovery, checks?.bpdm].find((c) => c?.status === "failed");
+  const servicesFailed = [checks?.central_idp, checks?.discovery, checks?.bpdm, checks?.bp_explorer].find(
+    (c) => c?.status === "failed",
+  );
   const services = health.can_discover_connectors || health.can_look_up_names;
 
   return [
@@ -163,7 +165,7 @@ function steps(health: Health, partners: Partner[], lastRun: SyncReport | null, 
         : services
           ? [
               health.can_discover_connectors && "Connector addresses are found by BPNL",
-              health.can_look_up_names && "partner names come from BPDM",
+              health.can_look_up_names && `partner names come from the ${health.names_source ?? "BPDM Pool"}`,
             ]
               .filter(Boolean)
               .join("; ") + "."
@@ -176,6 +178,8 @@ function steps(health: Health, partners: Partner[], lastRun: SyncReport | null, 
           "requests it in the Catena-X portal",
         "The addresses of the BPDM Pool and of the Discovery Finder — or of the EDC Discovery directly — of your " +
           "dataspace (from its operating company)",
+        "Or, where the golden record is offered only through a connector (Cofinity-X: subscribe to the Business " +
+          "Partner Explorer), its DSP endpoint and BPN — names are then read through your connector",
       ],
       settings: [
         "CXS_CENTRAL_IDP_URL",
@@ -185,6 +189,9 @@ function steps(health: Health, partners: Partner[], lastRun: SyncReport | null, 
         "CXS_DISCOVERY_FINDER_URL",
         "CXS_EDC_DISCOVERY_URL",
         "CXS_BPDM_POOL_URL",
+        "CXS_BP_EXPLORER_ADDRESS",
+        "CXS_BP_EXPLORER_BPNL",
+        "CXS_BP_EXPLORER_ASSET_ID",
       ],
       action: "test",
       group: "services",

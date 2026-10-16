@@ -1,7 +1,8 @@
 """Tests the connections to the participant's own services and the dataspace's core services.
 
 Every call is read-only: a one-shell page of the DTR, a one-asset query of the EDC management
-API, a token of the central IdP, the Discovery Finder's endpoint list and the own BPNL in BPDM.
+API, a token of the central IdP, the Discovery Finder's endpoint list, the own BPNL in BPDM and
+the Business Partner Explorer's catalog (no negotiation).
 """
 
 from __future__ import annotations
@@ -13,6 +14,7 @@ import requests
 
 from ..config import Settings
 from ..trust import certificate_hint
+from .business_partners import BpExplorer
 from .health import scrub
 from .ports import DataspaceError
 
@@ -21,7 +23,7 @@ EDC_NAMESPACE = "https://w3id.org/edc/v0.0.1/ns/"
 
 @dataclass(frozen=True)
 class ConnectionCheck:
-    key: str  # dtr | edc | central_idp | discovery | bpdm
+    key: str  # dtr | edc | central_idp | discovery | bpdm | bp_explorer
     name: str
     status: str  # ok | failed | skipped | not_configured
     detail: str
@@ -49,13 +51,16 @@ class ConnectionTester:
         dtr_auth: Any = None,
         edc_auth: Any = None,
         central_auth: Any = None,
+        bp_explorer: BpExplorer | None = None,
         timeout: float = 15,
     ):
-        """The ``*_auth`` objects are the OAuth clients the app itself uses (``token()``)."""
+        """The ``*_auth`` objects are the OAuth clients the app itself uses (``token()``);
+        ``bp_explorer``: the explorer client, if it and our EDC are configured."""
         self._settings = settings
         self._dtr_auth = dtr_auth
         self._edc_auth = edc_auth
         self._central_auth = central_auth
+        self._bp_explorer = bp_explorer
         self._timeout = timeout
 
     def run(self) -> list[ConnectionCheck]:
@@ -67,6 +72,7 @@ class ConnectionTester:
             central,
             self._discovery(central_ok),
             self._bpdm(central_ok),
+            self._bp_explorer_offer(),
         ]
 
     def _bearer(self, auth: Any) -> dict[str, str]:
@@ -251,3 +257,25 @@ class ConnectionTester:
             return f"Your legal name: {legal_name}." if legal_name else "The pool answered."
 
         return self._check("bpdm", name, test)
+
+    def _bp_explorer_offer(self) -> ConnectionCheck:
+        s = self._settings
+        name = "Partner names (Business Partner Explorer)"
+        if not s.bp_explorer_address:
+            return ConnectionCheck(
+                "bp_explorer", name, "not_configured", "CXS_BP_EXPLORER_ADDRESS is not set"
+            )
+        if self._bp_explorer is None:
+            return ConnectionCheck(
+                "bp_explorer", name, "not_configured", "needs your EDC (CXS_EDC_MANAGEMENT_URL)"
+            )
+        explorer = self._bp_explorer
+
+        def test() -> str:
+            try:
+                asset_id = explorer.find_offer()
+            except DataspaceError as exc:
+                raise _Failed(_with_hint(scrub(str(exc)), str(exc))) from exc
+            return f"{explorer.bpnl} offers {asset_id}; names are read through your EDC."
+
+        return self._check("bp_explorer", name, test)
