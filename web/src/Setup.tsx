@@ -182,8 +182,8 @@ function Participant({
           label="Connector discovery"
           value={
             health.can_discover_connectors
-              ? "Discovery Finder configured"
-              : "Not configured (CXS_DISCOVERY_FINDER_URL and CXS_CENTRAL_IDP_*)"
+              ? "Discovery configured"
+              : "Not configured (CXS_EDC_DISCOVERY_URL or CXS_DISCOVERY_FINDER_URL, and CXS_CENTRAL_IDP_*)"
           }
           configured={health.can_discover_connectors}
           check={checks?.discovery}
@@ -347,7 +347,7 @@ function AddPartner({
               type="button"
               className="btn btn-secondary"
               disabled={!canDiscover || !valid}
-              title={canDiscover ? "Find the connectors registered for this BPNL" : "No Discovery Finder configured"}
+              title={canDiscover ? "Find the connectors registered for this BPNL" : "No connector discovery configured"}
               onClick={() => setDiscovering(trimmed)}
             >
               Discover
@@ -446,7 +446,7 @@ function SetupRow({
               className="btn btn-secondary"
               aria-expanded={discovering}
               disabled={!canDiscover}
-              title={canDiscover ? "Find the connectors registered for this BPNL" : "No Discovery Finder configured"}
+              title={canDiscover ? "Find the connectors registered for this BPNL" : "No connector discovery configured"}
               onClick={() => setDiscovering((v) => !v)}
             >
               Discover

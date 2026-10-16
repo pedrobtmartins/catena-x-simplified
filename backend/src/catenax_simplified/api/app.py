@@ -343,7 +343,8 @@ async def discover_connectors(bpnl: Bpnl, request: Request) -> ConnectorDiscover
     discovery: ConnectorDiscovery | None = request.app.state.discovery
     if discovery is None:
         raise HTTPException(
-            status_code=503, detail="no Discovery Finder configured (CXS_DISCOVERY_FINDER_URL)"
+            status_code=503,
+            detail="no discovery configured (CXS_EDC_DISCOVERY_URL or CXS_DISCOVERY_FINDER_URL)",
         )
     try:
         endpoints = await run_in_threadpool(discovery.find, bpnl)

@@ -339,7 +339,8 @@ Having one node on v3 ensures the mixed-version scenario is tested from day one.
   hardening step.
 - **Connector addresses**: partners' DSP endpoints come from `CXS_PARTNER_CONNECTORS` or the API;
   the Setup page can look them up in the dataspace's discovery services (Discovery Finder → EDC
-  Discovery) by BPNL, and the user picks one. Partner names come from the BPDM Pool. Both use a
+  Discovery, or the EDC Discovery directly when only its address is published) by BPNL, and the
+  user picks one. Partner names come from the BPDM Pool. Both use a
   technical user of the central IdP (`CXS_CENTRAL_IDP_*`), separate from the DTR's credentials.
 - **Settings entered in the UI**: an admin (one local account, `CXS_ADMIN_PASSWORD_HASH`) can enter
   the connection settings on the Setup page. The deployment's settings win and are locked; the

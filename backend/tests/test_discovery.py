@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from catenax_simplified.api import create_app
 from catenax_simplified.config import Settings
 from catenax_simplified.dataspace import DataspaceError
-from catenax_simplified.dataspace.discovery import SdkConnectorDiscovery
+from catenax_simplified.dataspace.discovery import EdcDiscovery, SdkConnectorDiscovery
 from catenax_simplified.wiring import build_connector_discovery, central_auth
 
 FINDER = "https://discoveryfinder.example/api/v1.0/administration/connectors/discovery/search"
@@ -94,6 +94,44 @@ def test_discovery_needs_a_finder_and_the_central_idp():
     assert build(central_idp_url="https://centralidp.example/auth/", dev_direct=True) is None
 
 
+@responses.activate
+def test_edc_discovery_asked_directly():
+    a, b = "https://edc-a.example/api/v1/dsp", "https://edc-b.example/api/v1/dsp"
+    responses.post(
+        EDC_DISCOVERY,
+        json=[
+            {"bpn": "BPNL000000000OTH", "connectorEndpoint": ["https://other/api/v1/dsp"]},
+            {"bpn": NEW, "connectorEndpoint": [a, b, a]},
+        ],
+        match=[responses.matchers.json_params_matcher([NEW])],
+    )
+    discovery = EdcDiscovery(EDC_DISCOVERY, FakeOAuth())
+    assert discovery.find(NEW) == [a, b]
+    assert discovery.find(NEW) == [a, b]
+    assert responses.calls[0].request.headers["Authorization"] == "Bearer token"
+    assert all(call.request.url == EDC_DISCOVERY for call in responses.calls)
+
+
+@responses.activate
+def test_edc_discovery_failures_are_dataspace_errors():
+    responses.post(EDC_DISCOVERY, status=400, json={"errors": {"$": ["Invalid input data"]}})
+    with pytest.raises(DataspaceError, match="HTTP 400"):
+        EdcDiscovery(EDC_DISCOVERY, FakeOAuth()).find(NEW)
+
+
+def test_the_edc_discovery_address_wins_over_the_finder():
+    settings = Settings(
+        own_bpnl=scenario.TIER1,
+        central_idp_url="https://centralidp.example/auth/",
+        discovery_finder_url=FINDER,
+        edc_discovery_url=EDC_DISCOVERY,
+    )
+    assert isinstance(build_connector_discovery(settings, central_auth(settings)), EdcDiscovery)
+    finder_only = settings.model_copy(update={"edc_discovery_url": None})
+    discovery = build_connector_discovery(finder_only, central_auth(finder_only))
+    assert isinstance(discovery, SdkConnectorDiscovery)
+
+
 def _client(discovery=None):
     settings = Settings(own_bpnl=scenario.TIER1, database_url="sqlite:///:memory:")
     app = create_app(settings, registry=FakeRegistry([]), discovery=discovery)
@@ -119,7 +157,7 @@ def test_discovery_not_configured_or_failing():
         assert client.get("/api/health").json()["can_discover_connectors"] is False
         response = client.get(f"/api/partners/{NEW}/discovery")
         assert response.status_code == 503
-        assert "CXS_DISCOVERY_FINDER_URL" in response.json()["detail"]
+        assert "CXS_EDC_DISCOVERY_URL" in response.json()["detail"]
     with _client(FakeDiscovery(error="discovery finder down")) as client:
         response = client.get(f"/api/partners/{NEW}/discovery")
         assert (response.status_code, response.json()["detail"]) == (502, "discovery finder down")
