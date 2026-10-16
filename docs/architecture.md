@@ -341,6 +341,11 @@ Having one node on v3 ensures the mixed-version scenario is tested from day one.
   the Setup page can look them up in the dataspace's discovery services (Discovery Finder → EDC
   Discovery) by BPNL, and the user picks one. Partner names come from the BPDM Pool. Both use a
   technical user of the central IdP (`CXS_CENTRAL_IDP_*`), separate from the DTR's credentials.
+- **Settings entered in the UI**: an admin (one local account, `CXS_ADMIN_PASSWORD_HASH`) can enter
+  the connection settings on the Setup page. The deployment's settings win and are locked; the
+  stored ones fill the gaps, secrets encrypted with a key derived from `CXS_SECRET_KEY`. A change
+  rebuilds the adapters in place (the runners keep their locks), so no restart is needed. Only
+  administration needs the login; single sign-on with the company's IdP is a later option.
 - **EDR cache**: negotiated contracts and tokens are reused per process (SDK in-memory connection
   manager); a restart re-negotiates. A persistent connection manager is a later option.
 - **Schema migrations**: Alembic migrations are applied at startup. Databases created before
