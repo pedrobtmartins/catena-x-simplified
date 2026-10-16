@@ -27,6 +27,7 @@ config:
   # Or partner names through our EDC from the Cofinity-X Business Partner Explorer (wins over BPDM):
   # CXS_BP_EXPLORER_ADDRESS: https://business-partner-explorer-edc.dataspaceos.svc.cofinity-x.com/api/v1/dsp
   # CXS_BP_EXPLORER_BPNL: BPNLCOFINITYEZFA
+  # CXS_SYNC_TWIN_IDS: "urn:uuid:…\nurn:uuid:…"   # load only these own twins (a test subset)
   # CXS_SYNC_INTERVAL_SECONDS: "900"
 
 # Secret settings → Secret created by the chart (e.g. CXS_EDC_API_KEY, CXS_NOTIFICATION_API_KEY,

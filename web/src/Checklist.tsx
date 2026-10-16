@@ -80,7 +80,8 @@ function steps(health: Health, partners: Partner[], lastRun: SyncReport | null, 
       state: lastRun?.complete ? "done" : "todo",
       status: lastRun
         ? lastRun.complete
-          ? `${lastRun.parts} parts loaded from ${lastRun.twins} twins.`
+          ? `${lastRun.parts} parts loaded from ${lastRun.twins} twins` +
+            (health.sync_subset > 0 ? ` (a test subset: ${health.sync_subset} twins listed).` : ".")
           : "The last sync did not finish — see Sync history."
         : "Your parts have not been loaded yet.",
       what: "Reading your twins once shows your parts and finds your direct suppliers and customers.",

@@ -21,6 +21,15 @@ class FakeRegistry:
             if twin is not None:
                 yield twin
 
+    def get_twin(self, aas_id: str) -> TwinRef | None:
+        self.requests = getattr(self, "requests", []) + [("get", aas_id)]
+        shell = next((s for s in self.shells if s.get("id") == aas_id), None)
+        return twin_from_descriptor(shell) if shell else None
+
+    def find_aas_ids(self, global_asset_id: str) -> list[str]:
+        self.requests = getattr(self, "requests", []) + [("lookup", global_asset_id)]
+        return [s["id"] for s in self.shells if s.get("globalAssetId") == global_asset_id]
+
 
 class FakeReader:
     """Serves payloads by value URL; an exception value is raised instead of returned."""

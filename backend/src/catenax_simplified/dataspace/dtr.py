@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import base64
+import json
 from collections.abc import Iterator, Mapping
 from typing import Any
 
@@ -63,7 +65,8 @@ def twin_from_descriptor(shell: Mapping[str, Any]) -> TwinRef | None:
 
 
 class SdkTwinRegistry:
-    """Reads all shell descriptors of a DTR, following the pagination cursor."""
+    """Reads the shell descriptors of a DTR: all of them (following the pagination cursor), or
+    single ones by AAS ID or by ``globalAssetId``."""
 
     def __init__(self, service: AasService, page_size: int = 100, bpn: str | None = None):
         self._service = service
@@ -89,3 +92,43 @@ class SdkTwinRegistry:
             cursor = metadata.cursor if metadata else None
             if not cursor:
                 return
+
+    def get_twin(self, aas_id: str) -> TwinRef | None:
+        """The twin with this AAS ID; None if the DTR does not have (or show) it."""
+        try:
+            shell = self._service.get_asset_administration_shell_descriptor_by_id(
+                aas_id, bpn=self._bpn
+            )
+        except Exception as exc:
+            raise DataspaceError(f"DTR request for {aas_id} failed: {exc}") from exc
+        if not hasattr(shell, "model_dump") or not hasattr(shell, "id"):
+            return None  # an error result (e.g. 404)
+        return twin_from_descriptor(shell.model_dump(by_alias=True, exclude_none=True))
+
+    def find_aas_ids(self, global_asset_id: str) -> list[str]:
+        """The AAS IDs of the shells for a ``globalAssetId`` (DTR lookup API)."""
+        asset_id = json.dumps({"name": "globalAssetId", "value": global_asset_id})
+        encoded = base64.urlsafe_b64encode(asset_id.encode()).decode().rstrip("=")
+        url = f"{self._service.aas_lookup_url}/lookup/shells"
+        try:
+            response = self._service.session.get(
+                url,
+                params={"assetIds": encoded},
+                headers=self._service._prepare_headers(self._bpn),
+                verify=self._service.verify_ssl,
+                timeout=30,
+            )
+        except Exception as exc:
+            raise DataspaceError(f"DTR lookup of {global_asset_id} failed: {exc}") from exc
+        if response.status_code == 404:
+            return []
+        if not response.ok:
+            raise DataspaceError(
+                f"DTR lookup of {global_asset_id} failed: HTTP {response.status_code}"
+            )
+        try:
+            body = response.json()
+        except ValueError as exc:
+            raise DataspaceError(f"DTR lookup of {global_asset_id} returned no JSON") from exc
+        ids = body.get("result", []) if isinstance(body, dict) else body
+        return [i for i in ids or [] if isinstance(i, str)]

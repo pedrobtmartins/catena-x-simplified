@@ -37,6 +37,14 @@ class TwinRegistry(Protocol):
         """Yield every shell descriptor visible to the application."""
         ...
 
+    def get_twin(self, aas_id: str) -> TwinRef | None:
+        """The twin with this AAS ID; None if the registry does not have it."""
+        ...
+
+    def find_aas_ids(self, global_asset_id: str) -> list[str]:
+        """The AAS IDs of the shells for a ``globalAssetId``."""
+        ...
+
 
 class SubmodelReader(Protocol):
     def read(self, ref: SubmodelRef) -> dict[str, Any]:

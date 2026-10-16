@@ -26,6 +26,8 @@ class ConfigField:
     secret: bool = False
     url: bool = False
     bpnl: bool = False
+    # A list of twin IDs: entered as text (or a pasted CSV), stored one ID per line.
+    twin_ids: bool = False
     hint: str = ""
     # Other settings that lock this one when the deployment sets them.
     locked_by: tuple[str, ...] = ()
@@ -51,6 +53,16 @@ FIELDS: tuple[ConfigField, ...] = (
     ConfigField("oauth_client_secret", "registry", "Client secret", secret=True),
     ConfigField(
         "oauth_scope", "registry", "Scope", hint="Only if your identity provider needs one"
+    ),
+    ConfigField(
+        "sync_twin_ids",
+        "registry",
+        "Load only these twins",
+        twin_ids=True,
+        hint=(
+            "For a test with part of a large registry: AAS IDs, one per line — or paste a CSV, "
+            "every urn:uuid in it is taken. Their own children are loaded too. Empty: every twin."
+        ),
     ),
     ConfigField(
         "edc_management_url",
