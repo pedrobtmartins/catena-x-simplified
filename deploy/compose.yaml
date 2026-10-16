@@ -13,6 +13,10 @@ services:
       CXS_DATABASE_URL: postgresql+psycopg://traceability:${POSTGRES_PASSWORD:-change-me}@db:5432/traceability
     ports:
       - "${CXS_PORT:-8000}:8000"
+    volumes:
+      # Extra CA certificates (e.g. your company's root CA for an EDC, DTR or IdP with internal
+      # certificates): drop *.crt/*.pem files into deploy/certs, or point CXS_CA_CERTS_DIR elsewhere.
+      - ${CXS_CA_CERTS_DIR:-./certs}:/etc/catenax-simplified/ca-certificates:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"  # reach services on the host (e.g. the mock DTR)
     depends_on:

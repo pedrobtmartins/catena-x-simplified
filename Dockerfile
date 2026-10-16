@@ -6,6 +6,10 @@
 #
 # Behind a TLS-inspecting proxy, pass its CA certificate as a build secret:
 #   docker build --secret id=ca,src=/path/to/ca.crt --build-arg HTTPS_PROXY=… .
+#
+# At runtime, a company's private root CA (for an EDC, DTR or IdP with internal certificates) is
+# trusted by mounting it into /etc/catenax-simplified/ca-certificates:
+#   docker run -v ./certs:/etc/catenax-simplified/ca-certificates:ro …
 
 ARG PYTHON_VERSION=3.12
 ARG NODE_VERSION=22
@@ -37,14 +41,16 @@ LABEL org.opencontainers.image.title="catena-x-simplified" \
       org.opencontainers.image.description="Lightweight Catena-X traceability app (Traceability KIT)" \
       org.opencontainers.image.source="https://github.com/pedrobtmartins/catena-x-simplified" \
       org.opencontainers.image.licenses="Apache-2.0"
-RUN useradd --uid 10001 --create-home app && mkdir /data && chown app /data
+RUN useradd --uid 10001 --create-home app && mkdir /data && chown app /data \
+    && mkdir -p /etc/catenax-simplified/ca-certificates
 WORKDIR /app
 COPY --from=backend /app/.venv /app/.venv
 COPY --from=web /web/dist /app/web
 ENV PATH=/app/.venv/bin:$PATH \
     PYTHONUNBUFFERED=1 \
     CXS_WEB_DIST_DIR=/app/web \
-    CXS_DATABASE_URL=sqlite:////data/catenax-simplified.db
+    CXS_DATABASE_URL=sqlite:////data/catenax-simplified.db \
+    CXS_EXTRA_CA_DIR=/etc/catenax-simplified/ca-certificates
 USER 10001
 VOLUME ["/data"]
 EXPOSE 8000

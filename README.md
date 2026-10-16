@@ -86,7 +86,10 @@ With Postgres, next to an existing EDC and DTR: [`deploy/compose.yaml`](deploy/c
 On Kubernetes: the Helm chart in [`deploy/helm/catenax-simplified`](deploy/helm/catenax-simplified/values.yaml)
 (`helm install traceability deploy/helm/catenax-simplified -f my-values.yaml`). The database
 schema is migrated at startup (Alembic). Behind a TLS-inspecting proxy, pass its CA
-certificate as a build secret: `docker build --secret id=ca,src=ca.crt …`.
+certificate as a build secret: `docker build --secret id=ca,src=ca.crt …`. If your EDC, DTR or IdP
+use certificates from your company's own CA, mount its root certificate at runtime (`deploy/certs/`
+with Compose, `caCertificates` in the Helm chart): see
+[Private CA certificates](backend/README.md#private-ca-certificates).
 
 ## Repository layout
 

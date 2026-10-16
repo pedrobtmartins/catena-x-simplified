@@ -33,6 +33,19 @@ secrets: {}
 # Or reference a Secret you manage; its keys become environment variables.
 existingSecret: ""
 
+# Extra CA certificates trusted next to the public ones, e.g. your company's root CA when the EDC,
+# DTR or IdP use certificates from an internal CA. Keys ending in .crt, .pem or .cer (PEM or DER)
+# are mounted into /etc/catenax-simplified/ca-certificates; the app adds them to its CA bundle at
+# startup. Any combination of the three sources works.
+caCertificates:
+  existingConfigMap: ""   # a ConfigMap you manage
+  existingSecret: ""      # a Secret you manage
+  certificates: {}        # inline PEM; the chart creates a ConfigMap
+  #   company-root.crt: |
+  #     -----BEGIN CERTIFICATE-----
+  #     …
+  #     -----END CERTIFICATE-----
+
 # Without CXS_DATABASE_URL the app uses SQLite in /data (kept on this volume).
 persistence:
   enabled: true
