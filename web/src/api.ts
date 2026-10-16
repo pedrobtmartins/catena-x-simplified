@@ -130,6 +130,31 @@ export interface ConnectionCheck {
   detail: string;
 }
 
+export interface Me {
+  login_enabled: boolean;
+  admin: string | null;
+  config_editable: boolean;
+}
+
+export type ConfigGroup = "registry" | "connector" | "notifications" | "services";
+
+export interface ConfigField {
+  key: string;
+  variable: string;
+  group: ConfigGroup;
+  label: string;
+  hint: string;
+  secret: boolean;
+  url: boolean;
+  source: "deploy" | "app" | null;
+  locked: boolean;
+  value: string | null;
+  is_set: boolean;
+  unreadable: boolean;
+  updated_at: string | null;
+  updated_by: string | null;
+}
+
 export type CheckLevel = "discovery" | "catalog" | "full";
 // "skipped": nothing failed, but the dataspace part was not checked (development mode, no EDC).
 export type CheckStatus = "healthy" | "degraded" | "skipped" | "failed";
@@ -305,6 +330,12 @@ export const api = {
     const response = await fetch(`/api/partners/${encodeURIComponent(bpnl)}`, { method: "DELETE" });
     if (!response.ok) throw new ApiError(response.status, response.statusText);
   },
+  me: () => request<Me>("/api/auth/me"),
+  login: (username: string, password: string) => request<Me>("/api/auth/login", json("POST", { username, password })),
+  logout: () => request<Me>("/api/auth/logout", { method: "POST" }),
+  config: () => request<ConfigField[]>("/api/setup/config"),
+  saveConfig: (values: Record<string, string | null>) =>
+    request<{ fields: ConfigField[]; checks: ConnectionCheck[] }>("/api/setup/config", json("PUT", { values })),
   testConnections: () => request<ConnectionCheck[]>("/api/setup/connection-tests", { method: "POST" }),
   legalEntity: (bpnl: string) =>
     request<{ bpnl: string; legal_name: string | null }>(`/api/partners/${encodeURIComponent(bpnl)}/legal-entity`),

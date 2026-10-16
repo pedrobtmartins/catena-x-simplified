@@ -22,7 +22,9 @@ React + TypeScript (Vite). Screens:
 - **Setup** — a guided checklist (what each piece is, what to ask the IT team for, the settings it
   goes in, and a *Copy request for IT* message), the own participant with *Test connections*,
   adding partners by BPNL and finding their connectors and names through the dataspace services.
-  The app opens on it while no Digital Twin Registry is configured.
+  The app opens on it while no Digital Twin Registry is configured. With the admin login set up,
+  an admin signs in (*Admin sign-in*) to enter the connection settings there (*Fill it in here*,
+  *Edit settings*) and to change partners.
 
 Sending and status changes need a configured EDC; without one, drafts can still be created.
 

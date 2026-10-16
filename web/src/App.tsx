@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, ApiError, formatTime, syncState, type Health, type NotificationSummary, type SyncReport } from "./api";
+import { api, ApiError, formatTime, syncState, type Health, type Me, type NotificationSummary, type SyncReport } from "./api";
 import { Compose } from "./Compose";
+import { Login } from "./Login";
 import { BellIcon, ClockIcon, LogoMark, PartnersIcon, PartsIcon, SettingsIcon, SyncIcon } from "./icons";
 import { NotificationDetail } from "./NotificationDetail";
 import { Notifications } from "./Notifications";
@@ -16,6 +17,7 @@ type Route =
   | { page: "sync" }
   | { page: "partners" }
   | { page: "setup" }
+  | { page: "login" }
   | { page: "notifications" }
   | { page: "notification"; id: number }
   | { page: "compose"; query: string };
@@ -30,6 +32,7 @@ function parseRoute(hash: string): Route {
   if (hash === "#/sync") return { page: "sync" };
   if (hash === "#/partners") return { page: "partners" };
   if (hash === "#/setup") return { page: "setup" };
+  if (hash === "#/login") return { page: "login" };
   return { page: "parts" };
 }
 
@@ -39,6 +42,7 @@ const SECTION: Record<Route["page"], "parts" | "sync" | "partners" | "notificati
   sync: "sync",
   partners: "partners",
   setup: "setup",
+  login: "setup",
   notifications: "notifications",
   notification: "notifications",
   compose: "notifications",
@@ -67,6 +71,18 @@ export function App() {
   const [dataVersion, setDataVersion] = useState(0);
 
   const [summary, setSummary] = useState<NotificationSummary | null>(null);
+  const [me, setMe] = useState<Me | null>(null);
+  const loadHealth = useCallback(() => api.health().then(setHealth, (e: Error) => setError(e.message)), []);
+
+  useEffect(() => {
+    api.me().then(setMe, () => setMe(null));
+  }, [route]);
+
+  const signOut = async () => {
+    setMe(await api.logout());
+  };
+  // Changing partners needs an admin once the admin login is set up.
+  const canEdit = !me?.login_enabled || Boolean(me.admin);
 
   useEffect(() => {
     api.health().then((h) => {
@@ -115,6 +131,19 @@ export function App() {
         </a>
         {health && <span className="bpnl-chip">{health.own_bpnl}</span>}
         <div className="spacer" />
+        {me?.login_enabled &&
+          (me.admin ? (
+            <span className="admin-chip">
+              <span className="sub">Signed in as</span> {me.admin}
+              <button type="button" className="link-btn" onClick={signOut}>
+                Sign out
+              </button>
+            </span>
+          ) : (
+            <a className="link-btn admin-chip" href="#/login">
+              Admin sign-in
+            </a>
+          ))}
         <span className="sync-status" aria-live="polite">
           {lastRun ? (
             <>
@@ -189,12 +218,21 @@ export function App() {
           {route.page === "parts" && <PartList dataVersion={dataVersion} />}
           {route.page === "part" && <PartDetail id={route.id} dataVersion={dataVersion} />}
           {route.page === "sync" && <SyncHistory health={health} dataVersion={dataVersion} />}
-          {route.page === "partners" && <Partners health={health} dataVersion={dataVersion} />}
+          {route.page === "partners" && <Partners health={health} dataVersion={dataVersion} canEdit={canEdit} />}
           {route.page === "setup" && (
-            <Setup health={health} dataVersion={dataVersion} lastRun={lastRun} syncing={syncing} onSync={sync} />
+            <Setup
+              health={health}
+              me={me}
+              dataVersion={dataVersion}
+              lastRun={lastRun}
+              syncing={syncing}
+              onSync={sync}
+              onHealthChange={loadHealth}
+            />
           )}
           {route.page === "notifications" && <Notifications key={window.location.hash} dataVersion={dataVersion} />}
           {route.page === "notification" && <NotificationDetail id={route.id} health={health} />}
+          {route.page === "login" && <Login me={me} onSignedIn={setMe} />}
           {route.page === "compose" && <Compose key={route.query} query={route.query} health={health} />}
         </main>
       </div>

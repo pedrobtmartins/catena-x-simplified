@@ -1862,3 +1862,80 @@ a.btn-secondary:hover {
     padding-left: 16px;
   }
 }
+
+/* ---------- admin ---------- */
+
+.admin-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  margin-left: 12px;
+}
+
+.login {
+  max-width: 460px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.config-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  scroll-margin-top: 16px;
+}
+
+.config-form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.config-group {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px 20px;
+  margin: 0;
+  min-width: 0;
+  scroll-margin-top: 16px;
+}
+
+.config-group legend {
+  font-weight: 600;
+  font-size: 16px;
+  padding: 0 6px;
+}
+
+.config-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px 20px;
+  margin-top: 12px;
+}
+
+.config-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.config-field label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+
+.config-field .input:disabled {
+  background: var(--surface-subtle);
+  color: var(--text-2);
+}
+
+.secret-set {
+  flex: 1;
+  align-self: center;
+  color: var(--text-2);
+  font-size: 13px;
+}

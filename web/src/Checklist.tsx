@@ -1,6 +1,6 @@
 // The guided setup: what the app needs, in plain language, and what to ask the IT team for.
 import { useState } from "react";
-import type { Health, Partner, SyncReport } from "./api";
+import type { ConfigGroup, Health, Me, Partner, SyncReport } from "./api";
 import { CheckIcon, ChevronIcon } from "./icons";
 import type { Checks, useConnectionTests } from "./Setup";
 
@@ -20,6 +20,8 @@ interface Step {
   /** The settings the IT team fills in. */
   settings: string[];
   action?: "test" | "sync" | "partners";
+  /** The settings group an admin can fill in on this page. */
+  group?: ConfigGroup;
 }
 
 function fromCheck(check: Checks[keyof Checks], configured: boolean): { state: StepState; status?: string } {
@@ -68,6 +70,7 @@ function steps(health: Health, partners: Partner[], lastRun: SyncReport | null, 
         "CXS_OAUTH_SCOPE (if your identity provider needs one)",
       ],
       action: "test",
+      group: "registry",
     },
     {
       key: "parts",
@@ -110,6 +113,7 @@ function steps(health: Health, partners: Partner[], lastRun: SyncReport | null, 
         "CXS_EDC_OAUTH_SCOPE",
       ],
       action: "test",
+      group: "connector",
     },
     {
       key: "notifications",
@@ -130,6 +134,7 @@ function steps(health: Health, partners: Partner[], lastRun: SyncReport | null, 
         "A secret key that protects the inbox (your IT team chooses one)",
       ],
       settings: ["CXS_NOTIFICATION_BASE_URL", "CXS_NOTIFICATION_API_KEY"],
+      group: "notifications",
     },
     {
       key: "partners",
@@ -180,6 +185,7 @@ function steps(health: Health, partners: Partner[], lastRun: SyncReport | null, 
         "CXS_BPDM_POOL_URL",
       ],
       action: "test",
+      group: "services",
     },
   ];
 }
@@ -206,18 +212,23 @@ const STATE_LABEL: Record<StepState, string> = { done: "Done", todo: "To do", fa
 
 export function Checklist({
   health,
+  me,
   partners,
   lastRun,
   syncing,
   onSync,
   tests,
+  onFill,
 }: {
   health: Health;
+  me: Me | null;
   partners: Partner[];
   lastRun: SyncReport | null;
   syncing: boolean;
   onSync: () => void;
   tests: ReturnType<typeof useConnectionTests>;
+  /** Opens the settings form at a group; null when the user cannot enter settings here. */
+  onFill: ((group: ConfigGroup) => void) | null;
 }) {
   const all = steps(health, partners, lastRun, tests.checks);
   const required = all.filter((s) => !s.optional);
@@ -317,7 +328,7 @@ export function Checklist({
                   <p>{step.what}</p>
                   {step.ask.length > 0 && (
                     <>
-                      <p className="overline">Ask your IT team for</p>
+                      <p className="overline">{onFill ? "You need" : "Ask your IT team for"}</p>
                       <ul>
                         {step.ask.map((a) => (
                           <li key={a}>{a}</li>
@@ -339,7 +350,17 @@ export function Checklist({
                       </ul>
                     </details>
                   )}
+                  {step.group && me?.login_enabled && !onFill && (
+                    <p className="sub">
+                      Or an admin fills it in here: <a href="#/login">sign in as admin</a>.
+                    </p>
+                  )}
                   <div className="actions">
+                    {step.group && onFill && (
+                      <button type="button" className="btn btn-primary" onClick={() => onFill(step.group!)}>
+                        Fill it in here
+                      </button>
+                    )}
                     {step.action === "test" && (
                       <button type="button" className="btn btn-secondary" disabled={tests.testing} onClick={tests.test}>
                         {tests.testing ? "Testing…" : "Test connections"}

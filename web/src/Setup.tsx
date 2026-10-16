@@ -1,6 +1,17 @@
 import { useEffect, useState } from "react";
-import { api, ApiError, BPNL_PATTERN, type ConnectionCheck, type Health, type Partner, type SyncReport } from "./api";
+import {
+  api,
+  ApiError,
+  BPNL_PATTERN,
+  type ConfigGroup,
+  type ConnectionCheck,
+  type Health,
+  type Me,
+  type Partner,
+  type SyncReport,
+} from "./api";
 import { Checklist } from "./Checklist";
+import { ConfigEditor } from "./ConfigEditor";
 import { CheckIcon } from "./icons";
 import { ErrorAlert } from "./ui";
 
@@ -63,21 +74,32 @@ export function useConnectionTests() {
   const [checks, setChecks] = useState<Checks | null>(null);
   const [testing, setTesting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const show = (results: ConnectionCheck[]) => setChecks(Object.fromEntries(results.map((c) => [c.key, c])));
   const test = async () => {
     setTesting(true);
     setError(null);
     try {
-      setChecks(Object.fromEntries((await api.testConnections()).map((c) => [c.key, c])));
+      show(await api.testConnections());
     } catch (e) {
       setError(message(e));
     } finally {
       setTesting(false);
     }
   };
-  return { checks, testing, error, test };
+  return { checks, testing, error, test, show };
 }
 
-function Participant({ health, tests }: { health: Health; tests: ReturnType<typeof useConnectionTests> }) {
+function Participant({
+  health,
+  me,
+  tests,
+  onEdit,
+}: {
+  health: Health;
+  me: Me | null;
+  tests: ReturnType<typeof useConnectionTests>;
+  onEdit: (() => void) | null;
+}) {
   const assets = health.notification_assets;
   const { checks, testing, error, test } = tests;
   const failed = checks ? Object.values(checks).filter((c) => c.status === "failed").length : 0;
@@ -87,13 +109,31 @@ function Participant({ health, tests }: { health: Health; tests: ReturnType<type
     <section className="card" aria-labelledby="participant-title">
       <div className="card-head" style={{ alignItems: "center" }}>
         <h2 id="participant-title">Your participant</h2>
-        <button type="button" className="btn btn-secondary" onClick={test} disabled={testing}>
-          {testing ? "Testing…" : "Test connections"}
-        </button>
+        <div className="actions">
+          {onEdit && (
+            <button type="button" className="btn btn-primary" onClick={onEdit}>
+              Edit settings
+            </button>
+          )}
+          <button type="button" className="btn btn-secondary" onClick={test} disabled={testing}>
+            {testing ? "Testing…" : "Test connections"}
+          </button>
+        </div>
       </div>
       <p className="sub card-note">
-        Set when the app is deployed (<span className="mono">CXS_*</span> variables, see backend/README.md). The test
-        makes read-only calls with the configured credentials.
+        {onEdit ? (
+          "Enter the settings here, or let the deployment set them (CXS_* variables, which win)."
+        ) : me?.login_enabled ? (
+          <>
+            Set by the deployment or by an admin. <a href="#/login">Sign in as admin</a> to enter settings here.
+          </>
+        ) : (
+          <>
+            Set when the app is deployed (<span className="mono">CXS_*</span> variables, see backend/README.md). To
+            enter them here instead, your IT team sets up the admin login (CXS_ADMIN_PASSWORD_HASH and CXS_SECRET_KEY).
+          </>
+        )}{" "}
+        The test makes read-only calls with the configured credentials.
       </p>
       <ErrorAlert error={error} />
       {checks && (
@@ -169,7 +209,7 @@ function Candidates({
 }: {
   bpnl: string;
   current: string | null;
-  onUse: (address: string) => void;
+  onUse: ((address: string) => void) | null;
 }) {
   const [endpoints, setEndpoints] = useState<string[] | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -197,11 +237,11 @@ function Candidates({
               <CheckIcon />
               In use
             </span>
-          ) : (
+          ) : onUse ? (
             <button type="button" className="btn btn-secondary" onClick={() => onUse(endpoint)}>
               Use
             </button>
-          )}
+          ) : null}
         </li>
       ))}
     </ul>
@@ -212,11 +252,13 @@ function AddPartner({
   partners,
   canDiscover,
   canLookUp,
+  canEdit,
   onAdded,
 }: {
   partners: Partner[];
   canDiscover: boolean;
   canLookUp: boolean;
+  canEdit: boolean;
   onAdded: () => void;
 }) {
   const [bpnl, setBpnl] = useState("");
@@ -312,7 +354,12 @@ function AddPartner({
             </button>
           </div>
         </div>
-        <button type="submit" className="btn btn-primary" disabled={!valid || saving}>
+        <button
+          type="submit"
+          className="btn btn-primary"
+          disabled={!valid || saving || !canEdit}
+          title={canEdit ? undefined : "Sign in as admin to change partners"}
+        >
           {existing ? "Update partner" : "Add partner"}
         </button>
       </form>
@@ -325,7 +372,7 @@ function AddPartner({
       )}
       {discovering && (
         <div className="candidates-box">
-          <Candidates bpnl={discovering} current={address.trim() || null} onUse={setAddress} />
+          <Candidates bpnl={discovering} current={address.trim() || null} onUse={canEdit ? setAddress : null} />
         </div>
       )}
       <ErrorAlert error={error} />
@@ -336,10 +383,12 @@ function AddPartner({
 function SetupRow({
   partner,
   canDiscover,
+  canEdit,
   onChanged,
 }: {
   partner: Partner;
   canDiscover: boolean;
+  canEdit: boolean;
   onChanged: () => void;
 }) {
   const [discovering, setDiscovering] = useState(false);
@@ -402,7 +451,7 @@ function SetupRow({
             >
               Discover
             </button>
-            {addedHere && (
+            {addedHere && canEdit && (
               <button
                 type="button"
                 className="btn btn-secondary"
@@ -422,7 +471,11 @@ function SetupRow({
             <Candidates
               bpnl={partner.bpnl}
               current={partner.connector_address}
-              onUse={(address) => void run(() => api.updatePartner(partner.bpnl, { connector_address: address }))}
+              onUse={
+                canEdit
+                  ? (address) => void run(() => api.updatePartner(partner.bpnl, { connector_address: address }))
+                  : null
+              }
             />
           </td>
         </tr>
@@ -433,18 +486,27 @@ function SetupRow({
 
 export function Setup({
   health,
+  me,
   dataVersion,
   lastRun,
   syncing,
   onSync,
+  onHealthChange,
 }: {
   health: Health | null;
+  me: Me | null;
   dataVersion: number;
   lastRun: SyncReport | null;
   syncing: boolean;
   onSync: () => void;
+  onHealthChange: () => void;
 }) {
   const tests = useConnectionTests();
+  // Changing partners needs an admin once the admin login is set up.
+  const canEdit = !me?.login_enabled || Boolean(me.admin);
+  const canConfigure = Boolean(me?.admin && me.config_editable);
+  const [editing, setEditing] = useState<ConfigGroup | "all" | null>(null);
+  const edit = canConfigure ? (group: ConfigGroup | "all") => setEditing(group) : null;
   const [partners, setPartners] = useState<Partner[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [version, setVersion] = useState(0);
@@ -491,10 +553,38 @@ export function Setup({
       <ErrorAlert error={error} />
 
       {health && partners && (
-        <Checklist health={health} partners={partners} lastRun={lastRun} syncing={syncing} onSync={onSync} tests={tests} />
+        <Checklist
+          health={health}
+          me={me}
+          partners={partners}
+          lastRun={lastRun}
+          syncing={syncing}
+          onSync={onSync}
+          tests={tests}
+          onFill={edit}
+        />
       )}
-      {health && <Participant health={health} tests={tests} />}
-      {partners && <AddPartner partners={partners} canDiscover={canDiscover} canLookUp={canLookUp} onAdded={reload} />}
+      {editing && canConfigure && (
+        <ConfigEditor
+          focus={editing === "all" ? null : editing}
+          onClose={() => setEditing(null)}
+          onSaved={(checks) => {
+            tests.show(checks);
+            onHealthChange();
+            reload();
+          }}
+        />
+      )}
+      {health && <Participant health={health} me={me} tests={tests} onEdit={edit && (() => edit("all"))} />}
+      {partners && (
+        <AddPartner
+          partners={partners}
+          canDiscover={canDiscover}
+          canLookUp={canLookUp}
+          canEdit={canEdit}
+          onAdded={reload}
+        />
+      )}
 
       <section className="setup-partners" id="setup-partners" aria-labelledby="setup-partners-title">
         <div className="card-head">
@@ -510,7 +600,7 @@ export function Setup({
                 <button
                   type="button"
                   className="btn btn-secondary"
-                  disabled={!canLookUp || naming}
+                  disabled={!canLookUp || naming || !canEdit}
                   title={
                     canLookUp ? "Name unnamed partners after their legal name in the BPDM Pool" : "No BPDM Pool configured"
                   }
@@ -537,7 +627,13 @@ export function Setup({
             </thead>
             <tbody>
               {partners?.map((partner) => (
-                <SetupRow key={partner.bpnl} partner={partner} canDiscover={canDiscover} onChanged={reload} />
+                <SetupRow
+                  key={partner.bpnl}
+                  partner={partner}
+                  canDiscover={canDiscover}
+                  canEdit={canEdit}
+                  onChanged={reload}
+                />
               ))}
               {partners && partners.length === 0 && (
                 <tr>

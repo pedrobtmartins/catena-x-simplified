@@ -22,6 +22,7 @@ function PartnerRow({
   checking,
   onChecking,
   onChecked,
+  canEdit,
 }: {
   partner: Partner;
   canSync: boolean;
@@ -32,6 +33,7 @@ function PartnerRow({
   checking: CheckLevel | null;
   onChecking: (level: CheckLevel | null) => void;
   onChecked: () => void;
+  canEdit: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -141,7 +143,13 @@ function PartnerRow({
               </>
             ) : (
               <>
-                <button type="button" className="btn btn-secondary" onClick={() => setEditing(true)}>
+                <button
+                  type="button"
+                  className="btn btn-secondary"
+                  disabled={!canEdit}
+                  title={canEdit ? undefined : "Sign in as admin to change partners"}
+                  onClick={() => setEditing(true)}
+                >
                   Edit
                 </button>
                 <button
@@ -176,7 +184,15 @@ function PartnerRow({
   );
 }
 
-export function Partners({ health, dataVersion }: { health: Health | null; dataVersion: number }) {
+export function Partners({
+  health,
+  dataVersion,
+  canEdit,
+}: {
+  health: Health | null;
+  dataVersion: number;
+  canEdit: boolean;
+}) {
   const [partners, setPartners] = useState<Partner[] | null>(null);
   const [syncing, setSyncing] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -304,6 +320,7 @@ export function Partners({ health, dataVersion }: { health: Health | null; dataV
                 busy={syncing === partner.bpnl}
                 onSync={() => sync(partner.bpnl)}
                 onSaved={() => setVersion((v) => v + 1)}
+                canEdit={canEdit}
                 canCheck={canCheck}
                 checking={checking}
                 onChecking={setChecking}
