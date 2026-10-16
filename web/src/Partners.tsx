@@ -23,6 +23,7 @@ function PartnerRow({
   onChecking,
   onChecked,
   canEdit,
+  ownBpnl,
 }: {
   partner: Partner;
   canSync: boolean;
@@ -34,6 +35,7 @@ function PartnerRow({
   onChecking: (level: CheckLevel | null) => void;
   onChecked: () => void;
   canEdit: boolean;
+  ownBpnl: string | null;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [editing, setEditing] = useState(false);
@@ -172,6 +174,7 @@ function PartnerRow({
           <td colSpan={7}>
             <HealthPanel
               partner={partner}
+              ownBpnl={ownBpnl}
               canCheck={canCheck}
               busy={checking}
               onBusy={onChecking}
@@ -321,6 +324,7 @@ export function Partners({
                 onSync={() => sync(partner.bpnl)}
                 onSaved={() => setVersion((v) => v + 1)}
                 canEdit={canEdit}
+                ownBpnl={health?.own_bpnl ?? null}
                 canCheck={canCheck}
                 checking={checking}
                 onChecking={setChecking}
