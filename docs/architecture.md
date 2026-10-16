@@ -328,7 +328,12 @@ Having one node on v3 ensures the mixed-version scenario is tested from day one.
 
 - **Wallet**: Tractus-X releases do not include a complete FOSS identity wallet; in production this
   depends on the participant's identity solution (out of scope). In dev the wallet stub is used.
-- **Partners on Jupiter until the end of 2026**: not reachable by the app until they migrate.
+- **Partners on Jupiter until the end of 2026**: reached over DSP 0.8 through the own (Saturn) EDC;
+  connector discovery falls back to `dataspace-protocol-http` with the BPNL as counter-party ID.
+  Their catalogs spell policies the Jupiter way (`cx-policy:` operands, `odrl:eq`), so accepted
+  policies are compared by meaning and the equivalent offer is handed to the SDK, which compares
+  literally. Jupiter partners often offer different constraints (e.g. the DTR without
+  `Membership`); those still need their own accepted policy.
 - **Tractus-X SDK and EDC 0.12.0**: partner consumption uses the SDK's Saturn consumer
   (`/v3/catalog`, `/v3/contractnegotiations`, `/v3/edrs`, `/v4alpha/connectordiscovery`). It is
   tested against a mocked SDK and mocked data planes, not yet against a real EDC; that happens on
