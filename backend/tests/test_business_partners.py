@@ -11,7 +11,12 @@ from catenax_simplified.config import Settings
 from catenax_simplified.dataspace import DataspaceError
 from catenax_simplified.dataspace.business_partners import BpdmPool, BpExplorer
 from catenax_simplified.dataspace.connections import ConnectionTester
-from catenax_simplified.dataspace.edc import ASSET_ID_KEY
+from catenax_simplified.dataspace.edc import (
+    ASSET_ID_KEY,
+    DSP_0_8,
+    JUPITER_NEGOTIATION_CONTEXT,
+    equals,
+)
 from catenax_simplified.wiring import build_partner_directory, central_auth
 
 POOL = "https://business-partners.example/pool/api"
@@ -19,6 +24,7 @@ EXPLORER = "https://business-partner-explorer-edc.example/api/v1/dsp"
 EXPLORER_BPNL = "BPNLCOFINITYEZFA"
 DATA_PLANE = "https://business-partner-explorer-edc.example/api/public"
 SEARCH = f"{DATA_PLANE}/legal-entities/search"
+DSP_2025 = "dataspace-protocol-http:2025-1"
 POLICY = {"odrl:permission": {"odrl:action": "odrl:use"}}
 NEW = "BPNL0000000NEW1A"
 
@@ -131,13 +137,15 @@ def test_fill_the_names_of_unnamed_partners():
 class FakeConsumer:
     """Our EDC: the explorer's catalog and negotiations, as the Tractus-X SDK returns them."""
 
-    def __init__(self, asset_ids=("bpdm-pool-members-read",)):
+    def __init__(self, asset_ids=("bpdm-pool-members-read",), protocol=DSP_2025):
         self.asset_ids = list(asset_ids)
+        self.protocol = protocol
+        self.contexts = []
         self.catalog_requests = []
         self.negotiations = []
 
     def get_discovery_info(self, bpnl, counter_party_address=None):
-        return counter_party_address, f"did:web:{bpnl}", "dataspace-protocol-http:2025-1"
+        return counter_party_address, f"did:web:{bpnl}", self.protocol
 
     def get_catalog_with_filter(
         self, counter_party_id, counter_party_address, filter_expression, timeout=None, **_
@@ -147,8 +155,17 @@ class FakeConsumer:
         ids = [i for i in self.asset_ids if not wanted or i in wanted]
         return {"@type": "dcat:Catalog", "dcat:dataset": [{"@id": i} for i in ids]}
 
-    def do_dsp(self, counter_party_id, counter_party_address, filter_expression, policies, **_):
+    def do_dsp(
+        self,
+        counter_party_id,
+        counter_party_address,
+        filter_expression,
+        policies,
+        negotiation_context=None,
+        **_,
+    ):
         assert filter_expression[0]["operandLeft"] == ASSET_ID_KEY
+        self.contexts.append(negotiation_context)
         self.negotiations.append((counter_party_id, filter_expression[0]["operandRight"]))
         return DATA_PLANE, "edr-token"
 
@@ -171,11 +188,13 @@ def test_explorer_reads_the_legal_name_through_the_edc():
     assert json.loads(request.body) == {"bpnLs": [NEW]}
     assert "size=" in request.url
 
-    # The asset is found in the catalog once; the EDR is reused for the next lookup.
+    # The asset is found in the catalog once (then its offers are read for the negotiation); the
+    # EDR is reused for the next lookup.
     responses.replace(responses.POST, SEARCH, json=_page())
     assert explorer.legal_name(scenario.TIER2) is None
-    assert consumer.catalog_requests == [[]]
+    assert consumer.catalog_requests == [[], [equals(ASSET_ID_KEY, "bpdm-pool-members-read")]]
     assert consumer.negotiations == [(f"did:web:{EXPLORER_BPNL}", "bpdm-pool-members-read")]
+    assert consumer.contexts == [None]
 
 
 @responses.activate
@@ -187,9 +206,17 @@ def test_explorer_with_a_configured_asset_and_a_rejected_token():
         explorer.legal_name(NEW)
     responses.replace(responses.POST, SEARCH, json=_page({"bpnl": NEW, "legalName": "N"}))
     assert explorer.legal_name(NEW) == "N"
-    # No catalog request needed; a rejected token negotiates again.
-    assert consumer.catalog_requests == []
+    # The asset is not looked for; a rejected token negotiates again.
+    assert [] not in consumer.catalog_requests
     assert [asset for _, asset in consumer.negotiations] == ["b", "b"]
+
+
+@responses.activate
+def test_explorer_on_dsp_0_8_negotiates_with_the_jupiter_context():
+    consumer = FakeConsumer(protocol=DSP_0_8)
+    responses.post(SEARCH, json=_page({"bpnl": NEW, "legalName": "N"}))
+    assert BpExplorer(consumer, [POLICY], EXPLORER).legal_name(NEW) == "N"
+    assert consumer.contexts == [JUPITER_NEGOTIATION_CONTEXT]
 
 
 def test_explorer_asset_must_be_clear():
