@@ -1,0 +1,4 @@
+# Company certificates stay local.
+*
+!.gitignore
+!README.md

@@ -17,6 +17,7 @@ from catenax_simplified.dataspace.edc import (
     JUPITER_NEGOTIATION_CONTEXT,
     equals,
 )
+from catenax_simplified.trust import CERTIFICATE_HINT
 from catenax_simplified.wiring import build_partner_directory, central_auth
 
 POOL = "https://business-partners.example/pool/api"
@@ -273,3 +274,16 @@ def test_names_from_the_explorer_in_the_api():
             mock.post(SEARCH, json=_page({"bpnl": NEW, "legalName": "New Cells GmbH"}))
             entity = client.get(f"/api/partners/{NEW}/legal-entity").json()
         assert entity == {"bpnl": NEW, "legal_name": "New Cells GmbH"}
+
+
+class UntrustedConsumer(FakeConsumer):
+    def get_catalog_with_filter(self, *args, **kwargs):
+        raise ConnectionError("[SSL: CERTIFICATE_VERIFY_FAILED] self-signed certificate in chain")
+
+
+def test_explorer_connection_check_hints_at_a_private_ca():
+    settings = Settings(own_bpnl=scenario.TIER1, bp_explorer_address=EXPLORER)
+    explorer = BpExplorer(UntrustedConsumer(), [POLICY], EXPLORER)
+    check = {c.key: c for c in ConnectionTester(settings, bp_explorer=explorer).run()}
+    assert check["bp_explorer"].status == "failed"
+    assert check["bp_explorer"].detail.endswith(CERTIFICATE_HINT)

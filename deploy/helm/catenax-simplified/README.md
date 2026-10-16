@@ -28,6 +28,17 @@ existingSecret: traceability-secrets   # CXS_EDC_API_KEY, CXS_NOTIFICATION_API_K
 - Without `CXS_DATABASE_URL` the app uses SQLite on the chart's volume; for production point it to
   Postgres (`postgresql+psycopg://…`). Migrations run at startup.
 - One replica: syncs and the EDR cache run in the process.
+- Your EDC, DTR or IdP use HTTPS certificates from your company's own CA? Give the app the root CA
+  certificate with `caCertificates` (an existing ConfigMap or Secret, or the PEM inline); keys
+  ending in `.crt`, `.pem` or `.cer` are mounted into `/etc/catenax-simplified/ca-certificates` and
+  trusted next to the public CAs from the next start. Key names must be unique across the sources.
+  See [Private CA certificates](../../../backend/README.md#private-ca-certificates).
+
+  ```bash
+  kubectl -n traceability create configmap company-ca --from-file=company-root.crt
+  helm upgrade traceability deploy/helm/catenax-simplified --reuse-values \
+    --set caCertificates.existingConfigMap=company-ca
+  ```
 - The notification endpoints (`/api/qualitynotifications/*`) must only be reachable through your
   EDC's data plane; don't expose them through the ingress to the internet. Set
   `CXS_NOTIFICATION_API_KEY` — the app adds it to the assets it publishes.
