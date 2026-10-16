@@ -11,6 +11,7 @@ from .repository import (
 )
 from .tables import (
     Base,
+    ConfigValueRow,
     NotificationMessageRow,
     NotificationRow,
     PartnerCheckRow,
@@ -22,6 +23,7 @@ from .tables import (
 
 __all__ = [
     "Base",
+    "ConfigValueRow",
     "NotificationMessageRow",
     "NotificationRepository",
     "NotificationRow",

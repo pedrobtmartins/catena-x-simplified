@@ -70,6 +70,31 @@ started from. [`.env.example`](.env.example) lists them all with comments; see a
 | `CXS_DEV_DIRECT`                | **Development only.** Reach partners without EDCs: notifications are posted to the partner apps (`CXS_PARTNER_CONNECTORS` = their base URLs), partner twins read from `CXS_DEV_PARTNER_DTRS` (BPNL → DTR URL with API path). Never in a dataspace |
 | `CXS_SYNC_INTERVAL_SECONDS`     | Periodic sync (own twins, then partners); `0` (default) disables it   |
 | `CXS_WEB_DIST_DIR`              | Directory of the built UI, served at `/`                             |
+| `CXS_ADMIN_PASSWORD_HASH`       | Enables the admin login (with `CXS_SECRET_KEY`); create it with `uv run python -m catenax_simplified.admin hash-password`. `CXS_ADMIN_USERNAME` defaults to `admin` |
+| `CXS_SECRET_KEY`                | At least 32 characters (`uv run python -m catenax_simplified.admin secret-key`): signs admin sessions and encrypts the secrets entered in the UI. Keep it stable — another key cannot read them |
+| `CXS_ADMIN_SESSION_HOURS`       | Admin session lifetime, 1–24 hours (default 8)                        |
+
+## Admin and settings entered in the UI
+
+With `CXS_ADMIN_PASSWORD_HASH` and `CXS_SECRET_KEY` set, an admin signs in on the web UI
+(*Admin sign-in*) and can:
+
+- enter the connection settings on the Setup page — the DTR, the EDC management API, the
+  notification inbox and the dataspace services, with their OAuth clients and keys. They are stored
+  in the database (secrets encrypted with a key derived from `CXS_SECRET_KEY`), applied at once
+  without a restart, and tested right away;
+- add, change and remove partners (without the admin login anyone can, as before).
+
+A setting the deployment sets (an environment variable or `.env`) always wins and is shown locked;
+the UI only fills in what the deployment leaves out. Reading parts, partners and notifications needs
+no sign-in. After five failed sign-ins from one address, sign-in is refused for 15 minutes; behind a
+proxy that hides client addresses this applies to everyone at once. The session cookie is
+`HttpOnly`, `SameSite=Strict`, and `Secure` when the app is reached over HTTPS (the image runs
+uvicorn with `--proxy-headers`). Changes are logged with the admin and the setting names, never
+the values.
+
+If `CXS_SECRET_KEY` changes, the secrets entered in the UI can no longer be decrypted: they are
+ignored, and the Setup page asks for them again.
 
 ## API
 
@@ -87,6 +112,10 @@ started from. [`.env.example`](.env.example) lists them all with comments; see a
 | PUT    | `/api/partners/{bpnl}`       | Add a partner, or set its name and DSP connector address |
 | DELETE | `/api/partners/{bpnl}`       | Forget what was set for a partner; one found in own twins stays listed |
 | GET    | `/api/partners/{bpnl}/discovery` | DSP endpoints registered for a BPNL in the discovery services (nothing is stored) |
+| GET    | `/api/auth/me`               | Whether the admin login is set up and who is signed in |
+| POST   | `/api/auth/login`, `/api/auth/logout` | Admin sign-in (sets the session cookie) and sign-out |
+| GET    | `/api/setup/config`          | **Admin.** The settings that can be entered in the UI: source (deployment or UI), locked, value (never for secrets) |
+| PUT    | `/api/setup/config`          | **Admin.** Store settings (`null` removes one), apply them at once and return the connection tests |
 | POST   | `/api/setup/connection-tests` | Read-only calls to the own DTR and EDC and the core services with the configured credentials; one result each |
 | GET    | `/api/partners/{bpnl}/legal-entity` | A BPNL's legal name from the BPDM Pool (nothing is stored) |
 | POST   | `/api/partners/names`        | Name every unnamed partner after its legal name in the BPDM Pool |

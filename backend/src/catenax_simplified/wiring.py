@@ -8,6 +8,7 @@ from tractusx_sdk.dataspace.managers.connection.memory.memory_connection_manager
 from tractusx_sdk.dataspace.services.connector.service_factory import ServiceFactory
 from tractusx_sdk.industry.services import AasService
 
+from .admin import AdminAuth
 from .config import Settings
 from .dataspace.business_partners import BpdmPool
 from .dataspace.connections import ConnectionTester
@@ -185,4 +186,16 @@ def build_connection_tester(settings: Settings) -> ConnectionTester:
         dtr_auth=dtr_auth(settings),
         edc_auth=edc_auth(settings),
         central_auth=central_auth(settings),
+    )
+
+
+def build_admin_auth(settings: Settings) -> AdminAuth | None:
+    """The admin login; ``None`` unless both the password hash and the secret key are set."""
+    if not (settings.admin_password_hash and settings.secret_key):
+        return None
+    return AdminAuth(
+        settings.admin_username,
+        settings.admin_password_hash,
+        settings.secret_key,
+        settings.admin_session_hours,
     )

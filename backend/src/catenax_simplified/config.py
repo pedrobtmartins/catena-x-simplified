@@ -88,5 +88,17 @@ class Settings(BaseSettings):
     # (both can still be triggered through the API).
     sync_interval_seconds: int = 0
 
+    # Administration. With CXS_ADMIN_PASSWORD_HASH and CXS_SECRET_KEY set, an admin signs in to
+    # change the configuration and the partners; without them partners stay editable by anyone and
+    # the configuration only through the deployment.
+    admin_username: str = "admin"
+    # python -m catenax_simplified.admin hash-password
+    admin_password_hash: str | None = None
+    # Signs admin sessions and encrypts secrets entered in the UI (python -m
+    # catenax_simplified.admin secret-key). Keep it stable: another key cannot read the stored
+    # secrets.
+    secret_key: str | None = Field(default=None, min_length=32)
+    admin_session_hours: int = Field(default=8, ge=1, le=24)
+
     # Directory with the built web UI; served at "/" when set.
     web_dist_dir: str | None = None

@@ -27,6 +27,8 @@ config:
 
 # Secret settings → Secret created by the chart (e.g. CXS_EDC_API_KEY, CXS_NOTIFICATION_API_KEY,
 # CXS_OAUTH_CLIENT_SECRET, CXS_EDC_OAUTH_CLIENT_SECRET, CXS_CENTRAL_IDP_CLIENT_SECRET, CXS_DATABASE_URL with credentials).
+# The admin login of the Setup page: CXS_ADMIN_PASSWORD_HASH and CXS_SECRET_KEY (keep the key
+# stable; it encrypts the settings entered in the UI).
 secrets: {}
 # Or reference a Secret you manage; its keys become environment variables.
 existingSecret: ""
