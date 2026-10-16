@@ -105,3 +105,7 @@ class Settings(BaseSettings):
 
     # Directory with the built web UI; served at "/" when set.
     web_dist_dir: str | None = None
+
+    # Directory of extra CA certificates (a company's private root) trusted next to certifi's
+    # public CAs; the image sets /etc/catenax-simplified/ca-certificates. See trust.py.
+    extra_ca_dir: str | None = None

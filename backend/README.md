@@ -74,6 +74,31 @@ started from. [`.env.example`](.env.example) lists them all with comments; see a
 | `CXS_ADMIN_PASSWORD_HASH`       | Enables the admin login (with `CXS_SECRET_KEY`); create it with `uv run python -m catenax_simplified.admin hash-password`. `CXS_ADMIN_USERNAME` defaults to `admin` |
 | `CXS_SECRET_KEY`                | At least 32 characters (`uv run python -m catenax_simplified.admin secret-key`): signs admin sessions and encrypts the secrets entered in the UI. Keep it stable — another key cannot read them |
 | `CXS_ADMIN_SESSION_HOURS`       | Admin session lifetime, 1–24 hours (default 8)                        |
+| `CXS_EXTRA_CA_DIR`              | Directory of extra CA certificates trusted next to the public ones (see below); the image sets `/etc/catenax-simplified/ca-certificates` |
+
+## Private CA certificates
+
+The app only trusts the public CAs (certifi's bundle). When your EDC, DTR or IdP uses an HTTPS
+certificate issued by your company's own CA, calls to it fail with
+`CERTIFICATE_VERIFY_FAILED … self-signed certificate in certificate chain`; the connection test on
+the Setup page says so and points here.
+
+Put the root CA certificate (`*.crt`, `*.pem` or `*.cer`; PEM, a PEM chain, or DER) into the
+directory of `CXS_EXTRA_CA_DIR` and restart. At startup the app writes certifi's bundle plus those
+certificates to one file and points `REQUESTS_CA_BUNDLE` and `SSL_CERT_FILE` at it, so the public
+CAs stay trusted. The log names the certificates it added. Other and hidden files are ignored.
+
+- **Docker Compose:** drop the certificate into [`deploy/certs/`](../deploy/certs/README.md)
+  (git-ignored), or set `CXS_CA_CERTS_DIR` to another directory; `deploy/compose.yaml` mounts it.
+- **`docker run`:** `-v ./certs:/etc/catenax-simplified/ca-certificates:ro`.
+- **Helm:** `caCertificates` in the chart's values — an existing ConfigMap or Secret, or the PEM
+  inline (see the [chart's README](../deploy/helm/catenax-simplified/README.md)).
+- **Locally (`uv run`):** `CXS_EXTRA_CA_DIR=/path/to/certs`.
+
+If you set `REQUESTS_CA_BUNDLE` or `SSL_CERT_FILE` yourself, that bundle wins and the directory is
+not used (it must then contain the public CAs as well). This is about the services the app calls at
+runtime; a TLS-inspecting proxy during `docker build` is the build secret described in the
+[repository README](../README.md#container-image).
 
 ## Admin and settings entered in the UI
 

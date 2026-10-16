@@ -12,6 +12,7 @@ from typing import Any
 import requests
 
 from ..config import Settings
+from ..trust import certificate_hint
 from .health import scrub
 from .ports import DataspaceError
 
@@ -28,6 +29,11 @@ class ConnectionCheck:
 
 class _Failed(Exception):
     pass
+
+
+def _with_hint(detail: str, error: str) -> str:
+    hint = certificate_hint(error)
+    return f"{detail} {hint}" if hint else detail
 
 
 def _http_failure(response: requests.Response) -> str:
@@ -69,13 +75,14 @@ class ConnectionTester:
         try:
             return {"Authorization": f"Bearer {auth.token()}"}
         except DataspaceError as exc:
-            raise _Failed(scrub(str(exc))) from exc
+            raise _Failed(_with_hint(scrub(str(exc)), str(exc))) from exc
 
     def _call(self, method: str, url: str, **kwargs: Any) -> requests.Response:
         try:
             return requests.request(method, url, timeout=self._timeout, **kwargs)
         except requests.RequestException as exc:
-            raise _Failed(f"{url} is not reachable: {scrub(str(exc), 300)}") from exc
+            detail = f"{url} is not reachable: {scrub(str(exc), 300)}"
+            raise _Failed(_with_hint(detail, str(exc))) from exc
 
     def _check(self, key: str, name: str, test) -> ConnectionCheck:
         try:

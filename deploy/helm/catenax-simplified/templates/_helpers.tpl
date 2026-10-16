@@ -26,3 +26,9 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 app.kubernetes.io/name: {{ include "cxs.name" . }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
+
+{{- define "cxs.caCertificates.enabled" -}}
+{{- with .Values.caCertificates -}}
+{{- if or .existingConfigMap .existingSecret .certificates -}}true{{- end -}}
+{{- end -}}
+{{- end -}}
