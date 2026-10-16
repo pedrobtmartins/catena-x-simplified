@@ -1,3 +1,5 @@
+import json
+
 import pytest
 import responses
 import scenario
@@ -7,10 +9,17 @@ from fastapi.testclient import TestClient
 from catenax_simplified.api import create_app
 from catenax_simplified.config import Settings
 from catenax_simplified.dataspace import DataspaceError
-from catenax_simplified.dataspace.business_partners import BpdmPool
+from catenax_simplified.dataspace.business_partners import BpdmPool, BpExplorer
+from catenax_simplified.dataspace.connections import ConnectionTester
+from catenax_simplified.dataspace.edc import ASSET_ID_KEY
 from catenax_simplified.wiring import build_partner_directory, central_auth
 
 POOL = "https://business-partners.example/pool/api"
+EXPLORER = "https://business-partner-explorer-edc.example/api/v1/dsp"
+EXPLORER_BPNL = "BPNLCOFINITYEZFA"
+DATA_PLANE = "https://business-partner-explorer-edc.example/api/public"
+SEARCH = f"{DATA_PLANE}/legal-entities/search"
+POLICY = {"odrl:permission": {"odrl:action": "odrl:use"}}
 NEW = "BPNL0000000NEW1A"
 
 
@@ -20,6 +29,8 @@ class FakeOAuth:
 
 
 class FakeDirectory:
+    source = "BPDM Pool"
+
     def __init__(self, names, failing=()):
         self.names = names
         self.failing = set(failing)
@@ -115,3 +126,123 @@ def test_fill_the_names_of_unnamed_partners():
             scenario.OEM: None,
             NEW: "Our name for them",
         }
+
+
+class FakeConsumer:
+    """Our EDC: the explorer's catalog and negotiations, as the Tractus-X SDK returns them."""
+
+    def __init__(self, asset_ids=("bpdm-pool-members-read",)):
+        self.asset_ids = list(asset_ids)
+        self.catalog_requests = []
+        self.negotiations = []
+
+    def get_discovery_info(self, bpnl, counter_party_address=None):
+        return counter_party_address, f"did:web:{bpnl}", "dataspace-protocol-http:2025-1"
+
+    def get_catalog_with_filter(
+        self, counter_party_id, counter_party_address, filter_expression, timeout=None, **_
+    ):
+        self.catalog_requests.append(filter_expression)
+        wanted = {f["operandRight"] for f in filter_expression}
+        ids = [i for i in self.asset_ids if not wanted or i in wanted]
+        return {"@type": "dcat:Catalog", "dcat:dataset": [{"@id": i} for i in ids]}
+
+    def do_dsp(self, counter_party_id, counter_party_address, filter_expression, policies, **_):
+        assert filter_expression[0]["operandLeft"] == ASSET_ID_KEY
+        self.negotiations.append((counter_party_id, filter_expression[0]["operandRight"]))
+        return DATA_PLANE, "edr-token"
+
+
+def _page(*entities):
+    return {"totalElements": len(entities), "page": 0, "content": list(entities)}
+
+
+@responses.activate
+def test_explorer_reads_the_legal_name_through_the_edc():
+    consumer = FakeConsumer()
+    explorer = BpExplorer(consumer, [POLICY], EXPLORER)
+    responses.post(
+        SEARCH,
+        json=_page({"bpnl": NEW, "legalName": "New Cells GmbH", "isCatenaXMemberData": True}),
+    )
+    assert explorer.legal_name(NEW) == "New Cells GmbH"
+    request = responses.calls[0].request
+    assert request.headers["Authorization"] == "edr-token"
+    assert json.loads(request.body) == {"bpnLs": [NEW]}
+    assert "size=" in request.url
+
+    # The asset is found in the catalog once; the EDR is reused for the next lookup.
+    responses.replace(responses.POST, SEARCH, json=_page())
+    assert explorer.legal_name(scenario.TIER2) is None
+    assert consumer.catalog_requests == [[]]
+    assert consumer.negotiations == [(f"did:web:{EXPLORER_BPNL}", "bpdm-pool-members-read")]
+
+
+@responses.activate
+def test_explorer_with_a_configured_asset_and_a_rejected_token():
+    consumer = FakeConsumer(asset_ids=["a", "b"])
+    explorer = BpExplorer(consumer, [POLICY], EXPLORER, asset_id="b")
+    responses.post(SEARCH, status=403)
+    with pytest.raises(DataspaceError, match="HTTP 403"):
+        explorer.legal_name(NEW)
+    responses.replace(responses.POST, SEARCH, json=_page({"bpnl": NEW, "legalName": "N"}))
+    assert explorer.legal_name(NEW) == "N"
+    # No catalog request needed; a rejected token negotiates again.
+    assert consumer.catalog_requests == []
+    assert [asset for _, asset in consumer.negotiations] == ["b", "b"]
+
+
+def test_explorer_asset_must_be_clear():
+    with pytest.raises(DataspaceError, match="no asset: is the subscription active"):
+        BpExplorer(FakeConsumer([]), [POLICY], EXPLORER).legal_name(NEW)
+    with pytest.raises(DataspaceError, match="several assets .*CXS_BP_EXPLORER_ASSET_ID"):
+        BpExplorer(FakeConsumer(["a", "b"]), [POLICY], EXPLORER).legal_name(NEW)
+    with pytest.raises(DataspaceError, match="does not offer us c"):
+        BpExplorer(FakeConsumer(["a"]), [POLICY], EXPLORER, asset_id="c").find_offer()
+    with pytest.raises(DataspaceError, match="CXS_ACCEPTED_POLICIES"):
+        BpExplorer(FakeConsumer(), [], EXPLORER).legal_name(NEW)
+
+
+def test_explorer_wins_and_needs_an_edc():
+    central = "https://centralidp.example/auth/"
+
+    def build(consumer=None, **settings):
+        settings = Settings(own_bpnl=scenario.TIER1, central_idp_url=central, **settings)
+        return build_partner_directory(settings, central_auth(settings), consumer)
+
+    assert isinstance(build(bpdm_pool_url=POOL), BpdmPool)
+    assert isinstance(build(bpdm_pool_url=POOL, bp_explorer_address=EXPLORER), BpdmPool)
+    explorer = build(FakeConsumer(), bpdm_pool_url=POOL, bp_explorer_address=EXPLORER)
+    assert isinstance(explorer, BpExplorer)
+    assert (explorer.address, explorer.bpnl, explorer.source) == (
+        EXPLORER,
+        EXPLORER_BPNL,
+        "Business Partner Explorer",
+    )
+    assert build(FakeConsumer(), bp_explorer_address=EXPLORER, dev_direct=True) is None
+
+
+def test_explorer_connection_check_reads_only_the_catalog():
+    settings = Settings(own_bpnl=scenario.TIER1, bp_explorer_address=EXPLORER)
+    consumer = FakeConsumer()
+    tester = ConnectionTester(settings, bp_explorer=BpExplorer(consumer, [POLICY], EXPLORER))
+    check = {c.key: c for c in tester.run()}["bp_explorer"]
+    assert (check.status, check.detail) == (
+        "ok",
+        f"{EXPLORER_BPNL} offers bpdm-pool-members-read; names are read through your EDC.",
+    )
+    assert consumer.negotiations == []
+
+    tester = ConnectionTester(settings, bp_explorer=BpExplorer(FakeConsumer([]), None, EXPLORER))
+    check = {c.key: c for c in tester.run()}["bp_explorer"]
+    assert check.status == "failed" and "subscription" in check.detail
+
+
+def test_names_from_the_explorer_in_the_api():
+    with _client(BpExplorer(FakeConsumer(), [POLICY], EXPLORER)) as client:
+        health = client.get("/api/health").json()
+        assert health["names_source"] == "Business Partner Explorer"
+        with responses.RequestsMock() as mock:
+            mock.post(SEARCH, json=_page({"bpnl": NEW, "legalName": "New Cells GmbH"}))
+            entity = client.get(f"/api/partners/{NEW}/legal-entity").json()
+        assert entity == {"bpnl": NEW, "legal_name": "New Cells GmbH"}

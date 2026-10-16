@@ -130,7 +130,8 @@ class HealthOut(BaseModel):
     dev_direct: bool  # development mode: partners reached without EDCs
     can_check_partners: bool
     can_discover_connectors: bool  # a Discovery Finder is configured
-    can_look_up_names: bool  # a BPDM Pool is configured
+    can_look_up_names: bool  # a BPDM Pool or a Business Partner Explorer is configured
+    names_source: str | None  # where the names come from, e.g. "BPDM Pool"
     dtr_auth: str  # oauth | none
     edc_auth: list[str]  # oauth and/or api_key; empty: no credentials
     central_idp_url: str | None
@@ -199,7 +200,7 @@ class PartnerUpdate(BaseModel):
 class ConnectionCheckOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
-    key: str  # dtr | edc | central_idp | discovery | bpdm
+    key: str  # dtr | edc | central_idp | discovery | bpdm | bp_explorer
     name: str
     status: str  # ok | failed | skipped | not_configured
     detail: str
@@ -207,7 +208,7 @@ class ConnectionCheckOut(BaseModel):
 
 class LegalEntityOut(BaseModel):
     bpnl: str
-    legal_name: str | None  # None: the BPNL is not in the BPDM Pool
+    legal_name: str | None  # None: the BPNL is not in the golden record
 
 
 class PartnerNameOut(BaseModel):

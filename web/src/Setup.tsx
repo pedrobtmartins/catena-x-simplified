@@ -189,12 +189,14 @@ function Participant({
           check={checks?.discovery}
         />
         <Setting
-          label="Partner names (BPDM)"
+          label="Partner names"
           value={
-            health.can_look_up_names ? "BPDM Pool configured" : "Not configured (CXS_BPDM_POOL_URL and CXS_CENTRAL_IDP_*)"
+            health.names_source
+              ? `From the ${health.names_source}`
+              : "Not configured (CXS_BPDM_POOL_URL and CXS_CENTRAL_IDP_*, or CXS_BP_EXPLORER_ADDRESS and an EDC)"
           }
           configured={health.can_look_up_names}
-          check={checks?.bpdm}
+          check={health.names_source === "Business Partner Explorer" ? checks?.bp_explorer : checks?.bpdm}
         />
       </dl>
     </section>
@@ -251,13 +253,14 @@ function Candidates({
 function AddPartner({
   partners,
   canDiscover,
-  canLookUp,
+  namesSource,
   canEdit,
   onAdded,
 }: {
   partners: Partner[];
   canDiscover: boolean;
-  canLookUp: boolean;
+  /** Where legal names come from; null: no lookup. */
+  namesSource: string | null;
   canEdit: boolean;
   onAdded: () => void;
 }) {
@@ -272,9 +275,9 @@ function AddPartner({
   const existing = valid ? partners.find((p) => p.bpnl === trimmed) : undefined;
   const [lookup, setLookup] = useState<{ bpnl: string; text: string } | null>(null);
 
-  // A complete BPNL: fill an empty name with its legal name from the BPDM Pool.
+  // A complete BPNL: fill an empty name with its legal name from the BPDM Pool or the explorer.
   useEffect(() => {
-    if (!canLookUp || !valid) return;
+    if (!namesSource || !valid) return;
     let current = true;
     setLookup({ bpnl: trimmed, text: "Looking up the legal name…" });
     api.legalEntity(trimmed).then(
@@ -283,7 +286,9 @@ function AddPartner({
         if (legal_name) setName((name) => name || legal_name);
         setLookup({
           bpnl: trimmed,
-          text: legal_name ? `Legal name in BPDM: ${legal_name}` : "This BPNL is not in the BPDM Pool.",
+          text: legal_name
+            ? `Legal name in the ${namesSource}: ${legal_name}`
+            : `This BPNL is not in the ${namesSource}.`,
         });
       },
       (e) => current && setLookup({ bpnl: trimmed, text: `Name lookup failed: ${message(e)}` }),
@@ -291,7 +296,7 @@ function AddPartner({
     return () => {
       current = false;
     };
-  }, [canLookUp, valid, trimmed]);
+  }, [namesSource, valid, trimmed]);
 
   const add = async (event: React.FormEvent) => {
     event.preventDefault();
@@ -512,7 +517,10 @@ export function Setup({
   const [version, setVersion] = useState(0);
   const reload = () => setVersion((v) => v + 1);
   const canDiscover = Boolean(health?.can_discover_connectors);
-  const canLookUp = Boolean(health?.can_look_up_names);
+  const namesSource = health?.can_look_up_names ? (health.names_source ?? "BPDM Pool") : null;
+  const canLookUp = namesSource !== null;
+  // "BPDM Pool" → "BPDM"; the explorer keeps its name.
+  const sourceShort = namesSource === "BPDM Pool" ? "BPDM" : (namesSource ?? "BPDM");
   const missing = partners?.filter((p) => !p.connector_address).length ?? 0;
   const unnamed = partners?.filter((p) => !p.name).length ?? 0;
   const [naming, setNaming] = useState(false);
@@ -527,7 +535,7 @@ export function Setup({
       const count = (status: string) => results.filter((r) => r.status === status).length;
       const failed = results.filter((r) => r.status === "failed");
       setNamingSummary(
-        [`${count("named")} named`, count("not_found") && `${count("not_found")} not in BPDM`, failed.length && `${failed.length} failed`]
+        [`${count("named")} named`, count("not_found") && `${count("not_found")} not in ${sourceShort}`, failed.length && `${failed.length} failed`]
           .filter(Boolean)
           .join(", ") + ".",
       );
@@ -580,7 +588,7 @@ export function Setup({
         <AddPartner
           partners={partners}
           canDiscover={canDiscover}
-          canLookUp={canLookUp}
+          namesSource={namesSource}
           canEdit={canEdit}
           onAdded={reload}
         />
@@ -602,11 +610,13 @@ export function Setup({
                   className="btn btn-secondary"
                   disabled={!canLookUp || naming || !canEdit}
                   title={
-                    canLookUp ? "Name unnamed partners after their legal name in the BPDM Pool" : "No BPDM Pool configured"
+                    canLookUp
+                      ? `Name unnamed partners after their legal name in the ${namesSource}`
+                      : "No BPDM Pool or Business Partner Explorer configured"
                   }
                   onClick={fillNames}
                 >
-                  {naming ? "Looking up…" : `Fill ${unnamed} name${unnamed === 1 ? "" : "s"} from BPDM`}
+                  {naming ? "Looking up…" : `Fill ${unnamed} name${unnamed === 1 ? "" : "s"} from ${sourceShort}`}
                 </button>
               )}
             </div>

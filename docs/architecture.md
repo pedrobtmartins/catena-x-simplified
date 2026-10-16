@@ -341,6 +341,14 @@ Having one node on v3 ensures the mixed-version scenario is tested from day one.
   the Setup page can look them up in the dataspace's discovery services (Discovery Finder → EDC
   Discovery) by BPNL, and the user picks one. Partner names come from the BPDM Pool. Both use a
   technical user of the central IdP (`CXS_CENTRAL_IDP_*`), separate from the DTR's credentials.
+- **Partner names through an EDC**: where the operating company offers the golden record only
+  through its connector (Cofinity-X: the Business Partner Explorer, `CXS_BP_EXPLORER_*`), our EDC
+  negotiates for the explorer's asset like for a partner's registry (`BpExplorer` in
+  `dataspace/business_partners.py`): the asset is found in its catalog (or set as
+  `CXS_BP_EXPLORER_ASSET_ID`), the EDR is reused for a minute, and a BPNL is resolved with the
+  Pool's `/v6/members` search (`POST {endpoint}/legal-entities/search`, `{"bpnLs": [bpnl]}`; the
+  asset points at the versioned path already). It wins over a directly reached BPDM Pool. Its
+  connection test reads the catalog only; the first name lookup negotiates.
 - **Settings entered in the UI**: an admin (one local account, `CXS_ADMIN_PASSWORD_HASH`) can enter
   the connection settings on the Setup page. The deployment's settings win and are locked; the
   stored ones fill the gaps, secrets encrypted with a key derived from `CXS_SECRET_KEY`. A change

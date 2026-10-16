@@ -99,6 +99,8 @@ export interface Health {
   notification_assets: NotificationAssets;
   can_discover_connectors: boolean;
   can_look_up_names: boolean;
+  /** Where partner names come from: "BPDM Pool" or "Business Partner Explorer". */
+  names_source: string | null;
   dtr_auth: "oauth" | "none";
   edc_auth: ("oauth" | "api_key")[];
   central_idp_url: string | null;
@@ -124,7 +126,7 @@ export interface Partner {
 }
 
 export interface ConnectionCheck {
-  key: "dtr" | "edc" | "central_idp" | "discovery" | "bpdm";
+  key: "dtr" | "edc" | "central_idp" | "discovery" | "bpdm" | "bp_explorer";
   name: string;
   status: "ok" | "failed" | "skipped" | "not_configured";
   detail: string;
@@ -136,7 +138,7 @@ export interface Me {
   config_editable: boolean;
 }
 
-export type ConfigGroup = "registry" | "connector" | "notifications" | "services";
+export type ConfigGroup = "registry" | "connector" | "notifications" | "services" | "names";
 
 export interface ConfigField {
   key: string;

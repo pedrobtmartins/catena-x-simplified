@@ -128,6 +128,7 @@ def health(request: Request) -> HealthOut:
         can_check_partners=request.app.state.health_runner.configured,
         can_discover_connectors=request.app.state.discovery is not None,
         can_look_up_names=request.app.state.directory is not None,
+        names_source=getattr(request.app.state.directory, "source", None),
         dtr_auth="oauth" if dtr_auth(settings) else "none",
         edc_auth=[
             name
@@ -296,13 +297,18 @@ def remove_partner(bpnl: Bpnl, session: SessionDep, _: AdminIfEnabled) -> Respon
 def _directory(request: Request) -> BusinessPartnerDirectory:
     directory: BusinessPartnerDirectory | None = request.app.state.directory
     if directory is None:
-        raise HTTPException(status_code=503, detail="no BPDM Pool configured (CXS_BPDM_POOL_URL)")
+        raise HTTPException(
+            status_code=503,
+            detail="no source of partner names configured "
+            "(CXS_BPDM_POOL_URL, or CXS_BP_EXPLORER_ADDRESS with an EDC)",
+        )
     return directory
 
 
 @router.get("/partners/{bpnl}/legal-entity", response_model=LegalEntityOut)
 async def legal_entity(bpnl: Bpnl, request: Request) -> LegalEntityOut:
-    """A BPNL's legal name from the BPDM Pool. Nothing is stored."""
+    """A BPNL's legal name from the BPDM Pool or the Business Partner Explorer. Nothing is
+    stored."""
     directory = _directory(request)
     try:
         name = await run_in_threadpool(directory.legal_name, bpnl)
@@ -313,8 +319,8 @@ async def legal_entity(bpnl: Bpnl, request: Request) -> LegalEntityOut:
 
 @router.post("/partners/names", response_model=list[PartnerNameOut])
 async def fill_partner_names(request: Request, _: AdminIfEnabled) -> list[PartnerNameOut]:
-    """Name every partner without a name after its legal name in the BPDM Pool. Names set by
-    hand are kept."""
+    """Name every partner without a name after its legal name in the BPDM Pool or the Business
+    Partner Explorer. Names set by hand are kept."""
     directory = _directory(request)
     with request.app.state.session_factory() as session:
         unnamed = [p.bpnl for p in list_partners(session, request) if not p.name]
@@ -502,7 +508,10 @@ class Runtime:
             else None
         )
         injected = ("partner_client", "notification_sender", "health_checker")
-        consumer = None if all(o.get(k) for k in injected) else build_edc_consumer(settings)
+        needs_consumer = not all(o.get(k) for k in injected) or (
+            settings.bp_explorer_address and not o.get("directory")
+        )
+        consumer = build_edc_consumer(settings) if needs_consumer else None
         partner_client = o.get("partner_client") or build_partner_client(settings, consumer)
         sender = o.get("notification_sender") or build_notification_sender(settings, consumer)
         partner_sync = (
@@ -543,8 +552,10 @@ class Runtime:
             o.get("asset_publisher") or build_asset_publisher(settings)
         )
         state.discovery = o.get("discovery") or build_connector_discovery(settings, central)
-        state.directory = o.get("directory") or build_partner_directory(settings, central)
-        state.connection_tester = o.get("connection_tester") or build_connection_tester(settings)
+        state.directory = o.get("directory") or build_partner_directory(settings, central, consumer)
+        state.connection_tester = o.get("connection_tester") or build_connection_tester(
+            settings, consumer
+        )
 
     def start(self) -> None:
         """Background work for the current settings; call from the event loop."""

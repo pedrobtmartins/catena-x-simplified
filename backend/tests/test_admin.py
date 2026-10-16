@@ -168,6 +168,7 @@ def test_invalid_changes_are_refused(tmp_path):
             ({"dtr_base_url": "https://other"}, "set by the deployment (CXS_DTR_BASE_URL)"),
             ({"own_bpnl": "BPNL000000000XXX"}, "not a setting that can be entered here"),
             ({"edc_management_url": "edc.example.com"}, "must start with http"),
+            ({"bp_explorer_bpnl": "BPNLCOFINITY"}, "must be a BPNL"),
         ):
             response = client.put("/api/setup/config", json={"values": values})
             assert response.status_code == 422
@@ -237,3 +238,23 @@ def test_concurrent_reloads_leave_one_set_of_background_tasks(tmp_path):
         return len(alive)
 
     assert asyncio.run(scenario_()) == 1  # the periodic sync only
+
+
+def test_names_from_the_business_partner_explorer_entered_in_the_ui(tmp_path):
+    with TestClient(_app(tmp_path)) as client:
+        _login(client)
+        explorer = {"bp_explorer_address": "https://bpe.example/api/v1/dsp"}
+        saved = client.put("/api/setup/config", json={"values": explorer}).json()
+        checks = {c["key"]: c for c in saved["checks"]}
+        assert checks["bp_explorer"]["detail"] == "needs your EDC (CXS_EDC_MANAGEMENT_URL)"
+        assert client.get("/api/health").json()["can_look_up_names"] is False
+
+        client.put(
+            "/api/setup/config", json={"values": {"edc_management_url": "https://edc.example"}}
+        )
+        health = client.get("/api/health").json()
+        assert (health["can_look_up_names"], health["names_source"]) == (
+            True,
+            "Business Partner Explorer",
+        )
+        assert _fields(client)["bp_explorer_bpnl"]["value"] == "BPNLCOFINITYEZFA"

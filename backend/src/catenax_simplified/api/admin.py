@@ -22,6 +22,7 @@ log = logging.getLogger(__name__)
 
 COOKIE = "cxs_admin"
 URL = re.compile(r"^https?://\S+$")
+BPNL = re.compile(r"^BPNL[0-9A-Za-z]{12}$")
 
 router = APIRouter(prefix="/api")
 
@@ -200,6 +201,8 @@ def _validated(update: ConfigUpdate, request: Request) -> dict[str, str | None]:
                 errors.append(f"{field.label}: too long")
             elif field.url and not URL.match(value):
                 errors.append(f"{field.label}: must start with http:// or https://")
+            elif field.bpnl and not BPNL.match(value):
+                errors.append(f"{field.label}: must be a BPNL (BPNL and 12 letters or digits)")
         changes[key] = value
     if errors:
         raise HTTPException(status_code=422, detail="; ".join(errors))

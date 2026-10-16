@@ -21,10 +21,11 @@ from .security import SecretBox
 @dataclass(frozen=True)
 class ConfigField:
     key: str  # the Settings attribute; the variable is CXS_<KEY>
-    group: str  # registry | connector | notifications | services
+    group: str  # registry | connector | notifications | services | names
     label: str
     secret: bool = False
     url: bool = False
+    bpnl: bool = False
     hint: str = ""
     # Other settings that lock this one when the deployment sets them.
     locked_by: tuple[str, ...] = ()
@@ -84,6 +85,25 @@ FIELDS: tuple[ConfigField, ...] = (
     ConfigField("central_idp_client_secret", "services", "Client secret", secret=True),
     ConfigField("discovery_finder_url", "services", "Discovery Finder address", url=True),
     ConfigField("bpdm_pool_url", "services", "BPDM Pool address", url=True),
+    ConfigField(
+        "bp_explorer_address",
+        "names",
+        "Business Partner Explorer (DSP endpoint)",
+        url=True,
+        hint=(
+            "Cofinity-X: https://business-partner-explorer-edc.dataspaceos.svc.cofinity-x.com"
+            "/api/v1/dsp (pre-production: …dataspaceos.preprod.cofinity-x.com/api/v1/dsp)"
+        ),
+    ),
+    ConfigField(
+        "bp_explorer_bpnl", "names", "Its BPN", hint="Cofinity-X: BPNLCOFINITYEZFA", bpnl=True
+    ),
+    ConfigField(
+        "bp_explorer_asset_id",
+        "names",
+        "Asset ID",
+        hint="Only if its catalog offers you more than one asset",
+    ),
 )
 BY_KEY: dict[str, ConfigField] = {f.key: f for f in FIELDS}
 

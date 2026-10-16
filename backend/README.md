@@ -63,6 +63,9 @@ started from. [`.env.example`](.env.example) lists them all with comments; see a
 | `CXS_CENTRAL_IDP_*`             | Technical user of the dataspace's central IdP (`URL`, `REALM` (default `CX-Central`), `CLIENT_ID`, `CLIENT_SECRET`) for the core services below; independent of the DTR's `CXS_OAUTH_*` |
 | `CXS_DISCOVERY_FINDER_URL`      | Discovery Finder (`…/api/v1.0/administration/connectors/discovery/search`): finds partners' DSP endpoints by BPNL on the Setup page |
 | `CXS_BPDM_POOL_URL`             | BPDM Pool API up to the version segment (e.g. `https://business-partners.example/pool/api`): partners' legal names by BPNL (`/v7/legal-entities/{bpnl}`) |
+| `CXS_BP_EXPLORER_ADDRESS`       | Or a BPDM Pool offered through an EDC, such as the Cofinity-X Business Partner Explorer (subscribe to "BP Explorer" in their marketplace first): its DSP endpoint, e.g. `https://business-partner-explorer-edc.dataspaceos.svc.cofinity-x.com/api/v1/dsp` (pre-production `https://business-partner-explorer-edc.dataspaceos.preprod.cofinity-x.com/api/v1/dsp`). Our EDC negotiates for its asset and reads the Pool's `/v6/members` API (`POST /legal-entities/search` with `bpnLs`). Needs an EDC and an accepted policy matching the offer; wins over `CXS_BPDM_POOL_URL` |
+| `CXS_BP_EXPLORER_BPNL`          | BPN of the explorer's connector (default `BPNLCOFINITYEZFA`, Cofinity-X) |
+| `CXS_BP_EXPLORER_ASSET_ID`      | The asset to negotiate for; needed only if the explorer's catalog offers us more than one |
 | `CXS_NOTIFICATION_BASE_URL`     | Where our EDC's data plane reaches this app; with an EDC, the notification assets are published at startup |
 | `CXS_NOTIFICATION_API_KEY`      | Required as `X-Api-Key` on `/api/qualitynotifications/*`; also put in the assets' data address |
 | `CXS_NOTIFICATION_ACCESS_POLICY`, `CXS_NOTIFICATION_USAGE_POLICY` | JSON ODRL permissions of the notification assets; defaults: active membership / `DataExchangeGovernance:1.0` + `cx.core.qualityNotifications:1` |
@@ -116,9 +119,9 @@ ignored, and the Setup page asks for them again.
 | POST   | `/api/auth/login`, `/api/auth/logout` | Admin sign-in (sets the session cookie) and sign-out |
 | GET    | `/api/setup/config`          | **Admin.** The settings that can be entered in the UI: source (deployment or UI), locked, value (never for secrets) |
 | PUT    | `/api/setup/config`          | **Admin.** Store settings (`null` removes one), apply them at once and return the connection tests |
-| POST   | `/api/setup/connection-tests` | Read-only calls to the own DTR and EDC and the core services with the configured credentials; one result each |
-| GET    | `/api/partners/{bpnl}/legal-entity` | A BPNL's legal name from the BPDM Pool (nothing is stored) |
-| POST   | `/api/partners/names`        | Name every unnamed partner after its legal name in the BPDM Pool |
+| POST   | `/api/setup/connection-tests` | Read-only calls to the own DTR and EDC and the core services with the configured credentials; one result each (the Business Partner Explorer: its catalog only, no negotiation) |
+| GET    | `/api/partners/{bpnl}/legal-entity` | A BPNL's legal name from the BPDM Pool or the Business Partner Explorer (nothing is stored) |
+| POST   | `/api/partners/names`        | Name every unnamed partner after its legal name in the BPDM Pool or the Business Partner Explorer |
 | POST   | `/api/partners/sync`         | Cache direct partners' twins through the EDC (`bpnl` for one partner) |
 | GET    | `/api/partners/checks`       | Recorded partner health checks, newest first (`bpnl`, `limit`) |
 | POST   | `/api/partners/checks`       | Check all partners (`level`; `only_unhealthy` defaults to true) |
