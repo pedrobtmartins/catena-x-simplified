@@ -614,6 +614,7 @@ code,
 /* ---------- table ---------- */
 
 .table-box {
+  position: relative; /* keeps .sr-only headers inside the scroll box */
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: 12px;
