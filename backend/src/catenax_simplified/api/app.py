@@ -629,5 +629,18 @@ def create_app(
     app.include_router(notifications.kit_router)
 
     if settings.web_dist_dir:
-        app.mount("/", StaticFiles(directory=FsPath(settings.web_dist_dir), html=True), name="web")
+        app.mount("/", WebFiles(directory=FsPath(settings.web_dist_dir), html=True), name="web")
     return app
+
+
+class WebFiles(StaticFiles):
+    """The built UI. Vite names the files in assets/ by content hash, so they can be cached for
+    good; everything else (index.html) is revalidated, so an upgrade shows the new UI at once."""
+
+    def file_response(self, full_path, stat_result, scope, status_code=200) -> Response:
+        response = super().file_response(full_path, stat_result, scope, status_code)
+        if FsPath(full_path).parent.name == "assets":
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        else:
+            response.headers["Cache-Control"] = "no-cache"
+        return response

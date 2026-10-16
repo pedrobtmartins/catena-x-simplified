@@ -181,3 +181,15 @@ def test_partners_listing_update_and_sync(client):
 def test_cannot_register_own_bpnl_as_partner(client):
     response = client.put(f"/api/partners/{scenario.TIER1}", json={"name": "me"})
     assert response.status_code == 422
+
+
+def test_web_ui_cache_headers(tmp_path):
+    # Hashed assets are cached for good; index.html is revalidated so an upgrade shows at once.
+    (tmp_path / "assets").mkdir()
+    (tmp_path / "index.html").write_text("<!doctype html>")
+    (tmp_path / "assets" / "index-abc123.js").write_text("")
+    with TestClient(create_app(_settings(web_dist_dir=str(tmp_path)))) as client:
+        assert client.get("/").headers["cache-control"] == "no-cache"
+        asset = client.get("/assets/index-abc123.js")
+        assert asset.headers["cache-control"] == "public, max-age=31536000, immutable"
+        assert client.get("/api/health").status_code == 200
