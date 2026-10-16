@@ -106,6 +106,7 @@ export interface Health {
   central_idp_url: string | null;
   dtr_url: string | null;
   sync_interval_seconds: number;
+  sync_subset: number;
   supported_aspects: string[];
 }
 
@@ -148,6 +149,7 @@ export interface ConfigField {
   hint: string;
   secret: boolean;
   url: boolean;
+  twin_ids: boolean;
   source: "deploy" | "app" | null;
   locked: boolean;
   value: string | null;

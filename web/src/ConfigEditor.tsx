@@ -39,6 +39,15 @@ function message(e: unknown): string {
   return e instanceof ApiError ? e.message : String(e);
 }
 
+const UUID_URN = /urn:uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi;
+
+/** How many twin IDs the server will take from ``text`` (same rule as the backend). */
+function countTwinIds(text: string): number {
+  const urns = text.match(UUID_URN);
+  const ids = urns ?? text.split(/[\s,;]+/).filter(Boolean);
+  return new Set(ids.map((id) => (urns ? id.toLowerCase() : id))).size;
+}
+
 function FieldInput({
   field,
   value,
@@ -74,6 +83,27 @@ function FieldInput({
     );
   }
   const stored = field.secret && field.is_set && !field.unreadable && !changing && !removed;
+  if (field.twin_ids) {
+    const count = countTwinIds(value);
+    return (
+      <div className="config-field wide">
+        <label htmlFor={id}>{field.label}</label>
+        <textarea
+          id={id}
+          className="input mono twin-ids"
+          rows={5}
+          spellCheck={false}
+          placeholder={removed ? "Removed — saved on Save" : "urn:uuid:… (one per line, or paste a CSV)"}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+        <span className="sub">
+          {count > 0 ? `${count} twin${count === 1 ? "" : "s"} listed — only these and their own children are loaded. ` : ""}
+          {field.hint}
+        </span>
+      </div>
+    );
+  }
   return (
     <div className="config-field">
       <label htmlFor={id}>{field.label}</label>

@@ -16,12 +16,15 @@ from starlette.concurrency import run_in_threadpool
 
 from ..admin import FIELDS, AdminAuth, locked
 from ..admin.config_store import BY_KEY
+from ..traceability import parse_twin_ids
 from .schemas import ConnectionCheckOut, UtcDatetime
 
 log = logging.getLogger(__name__)
 
 COOKIE = "cxs_admin"
 URL = re.compile(r"^https?://\S+$")
+# A subset for a test, not a way to load a registry: beyond this, load the whole DTR.
+MAX_TWIN_IDS = 10_000
 BPNL = re.compile(r"^BPNL[0-9A-Za-z]{12}$")
 
 router = APIRouter(prefix="/api")
@@ -123,6 +126,7 @@ class ConfigFieldOut(BaseModel):
     hint: str
     secret: bool
     url: bool
+    twin_ids: bool = False  # a list of twin IDs, one per line
     # deploy: set by the deployment (locked); app: entered here; None: not set
     source: str | None
     locked: bool
@@ -166,6 +170,7 @@ def _fields(request: Request) -> list[ConfigFieldOut]:
                 hint=field.hint,
                 secret=field.secret,
                 url=field.url,
+                twin_ids=field.twin_ids,
                 source=source,
                 locked=is_locked,
                 value=None if field.secret else value,
@@ -196,7 +201,14 @@ def _validated(update: ConfigUpdate, request: Request) -> dict[str, str | None]:
             errors.append(f"{field.label}: set by the deployment ({field.variable})")
             continue
         value = (raw or "").strip() or None
-        if value is not None:
+        if value is not None and field.twin_ids:
+            ids = parse_twin_ids(value)
+            if len(ids) > MAX_TWIN_IDS:
+                errors.append(f"{field.label}: at most {MAX_TWIN_IDS} twins ({len(ids)} given)")
+            elif any(len(i) > 512 for i in ids):
+                errors.append(f"{field.label}: an ID is longer than 512 characters")
+            value = "\n".join(ids) or None
+        elif value is not None:
             if len(value) > 2048:
                 errors.append(f"{field.label}: too long")
             elif field.url and not URL.match(value):

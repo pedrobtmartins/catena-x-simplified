@@ -1,8 +1,15 @@
-"""Synchronizes the participant's own twins from its DTR into the local cache."""
+"""Synchronizes the participant's own twins from its DTR into the local cache.
+
+Either the whole DTR, or a subset (``CXS_SYNC_TWIN_IDS``, e.g. to test with a few vehicles of a
+registry with millions of twins): the listed twins and, through their bills of material, their
+own children.
+"""
 
 from __future__ import annotations
 
 import logging
+import re
+from collections import deque
 from collections.abc import Callable
 from dataclasses import asdict, dataclass, field
 from datetime import UTC, datetime
@@ -15,6 +22,19 @@ from ..dataspace import DataspaceError, SubmodelReader, TwinRef, TwinRegistry
 from ..storage import PartRepository, SyncRunRepository, SyncRunRow
 
 log = logging.getLogger(__name__)
+
+_UUID_URN = re.compile(
+    r"urn:uuid:[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", re.IGNORECASE
+)
+
+
+def parse_twin_ids(text: str | None) -> list[str]:
+    """The twin IDs in ``text``: every ``urn:uuid:…`` in it (so a pasted CSV works), else the
+    text split on whitespace, commas and semicolons. In order, without repeats."""
+    if not text or not text.strip():
+        return []
+    ids = _UUID_URN.findall(text) or [t for t in re.split(r"[\s,;]+", text) if t]
+    return list(dict.fromkeys(ids))
 
 
 @dataclass(frozen=True)
@@ -46,21 +66,32 @@ class OwnTwinSync:
         session_factory: sessionmaker[Session],
         own_bpnl: str,
         clock: Callable[[], datetime] = lambda: datetime.now(UTC),
+        twin_ids: list[str] | None = None,
     ):
+        """``twin_ids``: load only these twins (AAS IDs or globalAssetIds) and their own
+        children; None or empty loads the whole registry."""
         self._registry = registry
         self._reader = reader
         self._session_factory = session_factory
         self._own_bpnl = own_bpnl
         self._clock = clock
+        self._twin_ids = list(twin_ids or [])
+
+    @property
+    def subset(self) -> list[str]:
+        return list(self._twin_ids)
 
     def run(self) -> SyncReport:
         report = SyncReport(started_at=self._clock())
         seen: set[str] = set()
         try:
-            for twin in self._registry.iter_twins():
-                report.twins += 1
-                seen.add(normalize_global_asset_id(twin.global_asset_id))
-                self._sync_twin(twin, report)
+            if self._twin_ids:
+                self._sync_subset(report, seen)
+            else:
+                for twin in self._registry.iter_twins():
+                    report.twins += 1
+                    seen.add(normalize_global_asset_id(twin.global_asset_id))
+                    self._sync_twin(twin, report)
         except DataspaceError as exc:
             # The listing is incomplete: keep the cache as is instead of deleting unseen parts.
             log.warning("own twin sync aborted: %s", exc)
@@ -72,6 +103,46 @@ class OwnTwinSync:
         report.finished_at = self._clock()
         self._record(report)
         return report
+
+    def _sync_subset(self, report: SyncReport, seen: set[str]) -> None:
+        """The listed twins, then (breadth first) the own children in their bills of material.
+        A listed ID is an AAS ID, or else a globalAssetId; children are found by globalAssetId."""
+        pending: deque[tuple[str, bool]] = deque((i, True) for i in self._twin_ids)
+        loaded: set[str] = set()
+        while pending:
+            requested, listed = pending.popleft()
+            if not listed and normalize_global_asset_id(requested) in seen:
+                continue
+            twins = self._resolve(requested, listed)
+            if not twins:
+                what = "listed twin" if listed else "own child"
+                report.issues.append(
+                    SyncIssue(requested, None, f"{what} not found in the registry")
+                )
+                continue
+            for twin in twins:
+                twin_id = normalize_global_asset_id(twin.global_asset_id)
+                if twin.aas_id in loaded or twin_id in seen:
+                    continue
+                loaded.add(twin.aas_id)
+                seen.add(twin_id)
+                report.twins += 1
+                for result in self._sync_twin(twin, report):
+                    if isinstance(result, aspects.Relations) and result.source == "bom":
+                        pending.extend(
+                            (r.child_id, False)
+                            for r in result.items
+                            if r.business_partner == self._own_bpnl
+                            and normalize_global_asset_id(r.child_id) not in seen
+                        )
+
+    def _resolve(self, requested: str, listed: bool) -> list[TwinRef]:
+        if listed:
+            twin = self._registry.get_twin(requested)
+            if twin is not None:
+                return [twin]
+        twins = (self._registry.get_twin(i) for i in self._registry.find_aas_ids(requested))
+        return [t for t in twins if t is not None]
 
     def _record(self, report: SyncReport) -> None:
         with self._session_factory.begin() as session:
@@ -90,7 +161,9 @@ class OwnTwinSync:
             )
             report.id = row.id
 
-    def _sync_twin(self, twin: TwinRef, report: SyncReport) -> None:
+    def _sync_twin(
+        self, twin: TwinRef, report: SyncReport
+    ) -> list[aspects.Part | aspects.Relations]:
         twin_id = normalize_global_asset_id(twin.global_asset_id)
         parsed: list[aspects.Part | aspects.Relations] = []
         for ref in twin.submodels:
@@ -131,3 +204,4 @@ class OwnTwinSync:
                 else:
                     repository.replace_relations(result)
                     report.relation_sets += 1
+        return parsed

@@ -35,7 +35,7 @@ from ..storage import (
     make_engine,
     make_session_factory,
 )
-from ..traceability import OwnTwinSync, PartnerHealth, PartnerSync, part_tree
+from ..traceability import OwnTwinSync, PartnerHealth, PartnerSync, parse_twin_ids, part_tree
 from ..wiring import (
     build_admin_auth,
     build_asset_publisher,
@@ -142,6 +142,7 @@ def health(request: Request) -> HealthOut:
         notification_assets=request.app.state.asset_publishing.status,
         dtr_url=settings.dtr_base_url,
         sync_interval_seconds=settings.sync_interval_seconds,
+        sync_subset=len(parse_twin_ids(settings.sync_twin_ids)),
         supported_aspects=sorted(SUPPORTED),
     )
 
@@ -504,7 +505,13 @@ class Runtime:
         registry = o.get("registry") or build_twin_registry(settings)
         reader = o.get("reader") or build_submodel_reader(settings)
         sync = (
-            OwnTwinSync(registry, reader, session_factory, settings.own_bpnl)
+            OwnTwinSync(
+                registry,
+                reader,
+                session_factory,
+                settings.own_bpnl,
+                twin_ids=parse_twin_ids(settings.sync_twin_ids),
+            )
             if registry is not None
             else None
         )

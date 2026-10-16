@@ -258,3 +258,22 @@ def test_names_from_the_business_partner_explorer_entered_in_the_ui(tmp_path):
             "Business Partner Explorer",
         )
         assert _fields(client)["bp_explorer_bpnl"]["value"] == "BPNLCOFINITYEZFA"
+
+
+def test_a_twin_subset_pasted_as_csv(tmp_path):
+    csv = f"vehicle_aas_uuid,vehicle_serial\n{scenario.MODULE_B},SN2\n{scenario.MODULE_B},SN2\n"
+    with TestClient(_app(tmp_path)) as client:
+        _login(client)
+        response = client.put("/api/setup/config", json={"values": {"sync_twin_ids": csv}})
+        assert response.status_code == 200
+        field = _fields(client)["sync_twin_ids"]
+        assert (field["value"], field["twin_ids"]) == (scenario.MODULE_B, True)
+        assert client.get("/api/health").json()["sync_subset"] == 1
+        # Found by its globalAssetId; MODULE_A is not loaded.
+        report = client.post("/api/sync").json()
+        assert (report["twins"], report["parts"]) == (1, 1)
+
+        too_many = "\n".join(f"aas-{i}" for i in range(10_001))
+        response = client.put("/api/setup/config", json={"values": {"sync_twin_ids": too_many}})
+        assert response.status_code == 422
+        assert "at most 10000 twins" in response.json()["detail"]

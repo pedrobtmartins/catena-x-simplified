@@ -72,6 +72,7 @@ started from. [`.env.example`](.env.example) lists them all with comments; see a
 | `CXS_NOTIFICATION_ACCESS_POLICY`, `CXS_NOTIFICATION_USAGE_POLICY` | JSON ODRL permissions of the notification assets; defaults: active membership / `DataExchangeGovernance:1.0` + `cx.core.qualityNotifications:1` |
 | `CXS_NOTIFICATION_ASSET_PREFIX` | Prefix of the asset, policy and contract IDs (default `cxs-qualitynotification`) |
 | `CXS_DEV_DIRECT`                | **Development only.** Reach partners without EDCs: notifications are posted to the partner apps (`CXS_PARTNER_CONNECTORS` = their base URLs), partner twins read from `CXS_DEV_PARTNER_DTRS` (BPNL → DTR URL with API path). Never in a dataspace |
+| `CXS_SYNC_TWIN_IDS`             | Load only these own twins, e.g. to test with a few vehicles of a registry with millions of twins: AAS IDs (or globalAssetIds) one per line, or any text containing them — every `urn:uuid:…` is taken, so a CSV can be pasted (also on the Setup page, at most 10,000). Own children in their bills of material are loaded too; the cache then holds only this subset. Empty: the whole DTR |
 | `CXS_SYNC_INTERVAL_SECONDS`     | Periodic sync (own twins, then partners); `0` (default) disables it   |
 | `CXS_WEB_DIST_DIR`              | Directory of the built UI, served at `/`                             |
 | `CXS_ADMIN_PASSWORD_HASH`       | Enables the admin login (with `CXS_SECRET_KEY`); create it with `uv run python -m catenax_simplified.admin hash-password`. `CXS_ADMIN_USERNAME` defaults to `admin` |

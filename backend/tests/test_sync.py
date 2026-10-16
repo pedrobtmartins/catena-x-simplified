@@ -126,3 +126,102 @@ def test_submodel_describing_another_twin_is_rejected(session_factory):
         assert PartRepository(session).get_part(scenario.MODULE_A).name_at_manufacturer == (
             "Battery module"
         )
+
+
+# --- a subset of the registry (CXS_SYNC_TWIN_IDS) ------------------------------------------
+
+VEHICLE_1 = "urn:uuid:11111111-0000-4000-8000-000000000011"
+VEHICLE_2 = "urn:uuid:11111111-0000-4000-8000-000000000012"
+BATTERY = "urn:uuid:22222222-0000-4000-8000-000000000021"
+PENTHOUSE = "urn:uuid:33333333-0000-4000-8000-000000000031"
+SUPPLIER_PART = "urn:uuid:44444444-0000-4000-8000-000000000041"
+UNKNOWN = "urn:uuid:99999999-0000-4000-8000-000000000091"
+
+
+def _subset_registry():
+    from builders import BOM_V4, SERIAL_PART_V4, bom_v4, part_v4, shell_descriptor
+
+    def href(gid, aspect):
+        return f"https://dtr.example/{gid}/{aspect}"
+
+    def bom(gid, own, supplied):
+        items = bom_v4(gid, own, scenario.TIER1)["childItems"]
+        items += bom_v4(gid, supplied, scenario.TIER2)["childItems"]
+        return {"globalAssetId": gid, "childItems": items}
+
+    parts = {
+        VEHICLE_1: ([BATTERY], [SUPPLIER_PART]),
+        VEHICLE_2: ([], []),
+        BATTERY: ([PENTHOUSE], [scenario.CELL_1]),
+        PENTHOUSE: None,
+    }
+    shells, payloads = [], {}
+    for gid, children in parts.items():
+        submodels = {SERIAL_PART_V4: href(gid, "part")}
+        payloads[href(gid, "part") + "/$value"] = part_v4(gid, "Part", "P-1")
+        if children:
+            submodels[BOM_V4] = href(gid, "bom")
+            payloads[href(gid, "bom") + "/$value"] = bom(gid, *children)
+        shells.append(shell_descriptor(gid, submodels, manufacturer_id=scenario.TIER1))
+    return shells, payloads
+
+
+def _aas_id(gid):
+    return f"urn:uuid:aas-{gid[-12:]}"
+
+
+def test_subset_loads_the_listed_twins_and_their_own_children(session_factory):
+    shells, payloads = _subset_registry()
+    _sync(session_factory).run()  # a full sync before: MODULE_A and MODULE_B are cached
+    registry = FakeRegistry(shells, fail_after=0)  # listing the registry would fail
+    sync = OwnTwinSync(
+        registry,
+        FakeReader(payloads),
+        session_factory,
+        own_bpnl=scenario.TIER1,
+        twin_ids=[_aas_id(VEHICLE_1), UNKNOWN],
+    )
+    report = sync.run()
+
+    assert report.complete
+    assert (report.twins, report.parts) == (3, 3)  # vehicle, battery, penthouse
+    assert [(i.global_asset_id, i.message) for i in report.issues] == [
+        (UNKNOWN, "listed twin not found in the registry")
+    ]
+    # Suppliers' parts are not looked up in the own registry.
+    looked_up = [value for kind, value in registry.requests if kind == "lookup"]
+    assert looked_up == [UNKNOWN, BATTERY, PENTHOUSE]
+    with session_factory() as session:
+        repo = PartRepository(session)
+        assert {p.global_asset_id for p in repo.list_parts(own_only=True)[0]} == {
+            VEHICLE_1,
+            BATTERY,
+            PENTHOUSE,
+        }
+        tree = part_tree(repo, BATTERY)
+        assert {c.global_asset_id for c in tree.children} == {PENTHOUSE, scenario.CELL_1}
+
+
+def test_a_listed_global_asset_id_is_looked_up(session_factory):
+    shells, payloads = _subset_registry()
+    report = OwnTwinSync(
+        FakeRegistry(shells),
+        FakeReader(payloads),
+        session_factory,
+        own_bpnl=scenario.TIER1,
+        twin_ids=[VEHICLE_2],
+    ).run()
+    assert (report.twins, report.issues) == (1, [])
+
+
+def test_parse_twin_ids():
+    from catenax_simplified.traceability import parse_twin_ids
+
+    csv = (
+        "vehicle_aas_uuid,vehicle_serial,battery_gen6_aas_uuid,children\n"
+        f"{VEHICLE_1},AAIe/x+=,{BATTERY},HELLA:LIGHT x2\n"
+        f"{VEHICLE_1.upper()},AAO5,{PENTHOUSE},\n"
+    )
+    assert parse_twin_ids(csv) == [VEHICLE_1, BATTERY, VEHICLE_1.upper(), PENTHOUSE]
+    assert parse_twin_ids(" aas-1, aas-2;aas-1\naas-3 ") == ["aas-1", "aas-2", "aas-3"]
+    assert parse_twin_ids("") == parse_twin_ids(None) == []

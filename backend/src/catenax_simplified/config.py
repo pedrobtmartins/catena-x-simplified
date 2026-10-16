@@ -93,6 +93,11 @@ class Settings(BaseSettings):
     dev_direct: bool = False
     dev_partner_dtrs: dict[str, str] = {}
 
+    # Load only these own twins (for a test with a subset of a large DTR): AAS IDs, or text
+    # containing them, e.g. a pasted CSV — every urn:uuid:… in it is taken; without any, the text
+    # is split on whitespace, commas and semicolons. Own children in their bills of material are
+    # followed. Empty: the whole DTR.
+    sync_twin_ids: str | None = None
     # Periodic sync of own twins (and partners, when an EDC is configured); 0 disables it
     # (both can still be triggered through the API).
     sync_interval_seconds: int = 0

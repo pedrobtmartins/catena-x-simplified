@@ -138,6 +138,7 @@ class HealthOut(BaseModel):
     notification_assets: NotificationAssetsOut
     dtr_url: str | None
     sync_interval_seconds: int
+    sync_subset: int = 0  # own twins listed in CXS_SYNC_TWIN_IDS; 0: the whole registry
     supported_aspects: list[str]
 
 
