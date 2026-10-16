@@ -22,12 +22,14 @@ DCT_TYPE_KEYS = (DCT_TYPE_KEY, "'https://purl.org/dc/terms/type'.'@id'")
 ASSET_ID_KEY = "https://w3id.org/edc/v0.0.1/ns/id"
 # Jupiter's DSP. Negotiations over it need Jupiter's JSON-LD context: the Saturn one (Catena-X
 # 2025-9) does not define the ``cx-policy:`` prefix of their offers, and the provider then sees
-# another policy than it offered and terminates the negotiation.
+# another policy than it offered and terminates the negotiation. Their offers also use ``edc:``
+# operands (e.g. ``edc:BusinessPartnerNumber``, ``edc:inForceDate``), so the prefix is declared:
+# without it the own EDC rejects the request (HTTP 400).
 DSP_0_8 = "dataspace-protocol-http"
 JUPITER_NEGOTIATION_CONTEXT = [
     "https://w3id.org/tractusx/policy/v1.0.0",
     "http://www.w3.org/ns/odrl.jsonld",
-    {"@vocab": "https://w3id.org/edc/v0.0.1/ns/"},
+    {"@vocab": "https://w3id.org/edc/v0.0.1/ns/", "edc": "https://w3id.org/edc/v0.0.1/ns/"},
 ]
 
 
@@ -132,9 +134,9 @@ class EdcNegotiator:
         if self._policies is not None and not self._policies:
             raise DataspaceError("no accepted usage policies configured (CXS_ACCEPTED_POLICIES)")
         dsp_address, counter_party_id, protocol = self.counter_party(bpnl, address)
-        policies, offered = self._policies, []
+        policies, offered, matched = self._policies, [], True
         if policies is not None:
-            filter_expression, policies, offered = self._equivalent_offers(
+            filter_expression, policies, offered, matched = self._equivalent_offers(
                 bpnl, address, filter_expression
             )
         jupiter = (
@@ -151,7 +153,7 @@ class EdcNegotiator:
             )
         except Exception as exc:
             message = f"negotiation with {bpnl} failed: {exc}"
-            if offered and len(policies) == len(self._policies or []):
+            if offered and not matched:
                 accepted = "; ".join(describe(p) for p in self._policies or [])
                 message += f" Offered: {'; '.join(offered)}. Accepted: {accepted}."
             raise DataspaceError(message) from exc
@@ -161,10 +163,11 @@ class EdcNegotiator:
 
     def _equivalent_offers(
         self, bpnl: str, address: str, filter_expression: list[dict]
-    ) -> tuple[list[dict], list[dict], list[str]]:
+    ) -> tuple[list[dict], list[dict], list[str], bool]:
         """(filter, accepted policies plus the offers equivalent to one of them, every offer
-        described). Uses the other Dublin Core namespace for ``dct:type`` if only that one
-        finds the asset; a catalog that cannot be read changes nothing."""
+        described, whether any offer is accepted). Uses the other Dublin Core namespace for
+        ``dct:type`` if only that one finds the asset; a catalog that cannot be read changes
+        nothing."""
         policies = list(self._policies or [])
         found: list[dict] = []
         try:
@@ -177,10 +180,13 @@ class EdcNegotiator:
         except DataspaceError:
             pass
         offered: list[str] = []
+        matched = False
         for dataset in found:
             for offer in offers_of(dataset):
                 body = {k: v for k, v in offer.items() if k not in ("@id", "@type")}
                 offered.append(describe(body))
-                if body not in policies and any(same_policy(body, p) for p in self._policies or []):
-                    policies.append(body)
-        return filter_expression, policies, list(dict.fromkeys(offered))
+                if any(same_policy(body, p) for p in self._policies or []):
+                    matched = True
+                    if body not in policies:
+                        policies.append(body)
+        return filter_expression, policies, list(dict.fromkeys(offered)), matched

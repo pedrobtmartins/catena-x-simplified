@@ -127,8 +127,9 @@ class Consumer:
     """A Jupiter partner's catalog; ``do_dsp`` succeeds only with the offered policy itself, as
     the SDK compares literally."""
 
-    def __init__(self, offer=JUPITER_OFFER):
+    def __init__(self, offer=JUPITER_OFFER, start_fails=False):
         self.offer = offer
+        self.start_fails = start_fails
         self.negotiations = []
 
     def get_discovery_info(self, bpnl, counter_party_address=None):
@@ -158,6 +159,8 @@ class Consumer:
         body = {k: v for k, v in self.offer.items() if k not in ("@id", "@type")}
         if body not in policies:
             raise RuntimeError("PolicyMismatchError: no valid policy")
+        if self.start_fails:
+            raise RuntimeError("It was not possible to start the EDR Negotiation!")
         return "https://dtr.partner/api/v3", "token"
 
 
@@ -187,3 +190,18 @@ def test_a_policy_mismatch_lists_what_is_offered_and_accepted():
         "UsagePurpose=cx.core.digitalTwinRegistry:1." in message
     )
     assert "Accepted: FrameworkAgreement=DataExchangeGovernance:1.0, Membership=active, " in message
+
+
+def test_a_failure_after_a_matching_policy_does_not_list_the_offers():
+    edc = EdcNegotiator(Consumer(start_fails=True), [_accepted(FRAMEWORK, DTR_PURPOSE)])
+    with pytest.raises(DataspaceError) as error:
+        edc.negotiate(*PARTNER, [equals(DCT_TYPE_KEY, DTR_TYPE)])
+    assert "not possible to start the EDR Negotiation" in str(error.value)
+    assert "Offered:" not in str(error.value)
+
+
+def test_the_jupiter_context_declares_the_edc_prefix():
+    # Jupiter offers use edc: operands (edc:BusinessPartnerNumber, edc:inForceDate).
+    assert {"edc": "https://w3id.org/edc/v0.0.1/ns/"}.items() <= JUPITER_NEGOTIATION_CONTEXT[
+        -1
+    ].items()
