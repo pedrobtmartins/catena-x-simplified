@@ -108,8 +108,10 @@ def test_send_negotiates_the_best_offer_and_posts_that_version():
     version = sender.send(PARTNER, RECEIVE_ALERT, lambda v: {"version": v})
 
     assert version == "2.0.0"
+    # The offers by type, then the chosen asset's policies before negotiating.
     assert consumer.catalog_requests == [
-        ("did:web:BPNL000000000T1A", DCT_TYPE_KEYS[0], RECEIVE_ALERT)
+        ("did:web:BPNL000000000T1A", DCT_TYPE_KEYS[0], RECEIVE_ALERT),
+        ("did:web:BPNL000000000T1A", ASSET_ID_KEY, "alert-2"),
     ]
     assert consumer.negotiations == [
         [{"operandLeft": ASSET_ID_KEY, "operator": "=", "operandRight": "alert-2"}]
@@ -122,7 +124,7 @@ def test_send_falls_back_to_the_https_dct_namespace():
     responses.post(ENDPOINT, status=201)
     sender = EdcNotificationSender(consumer, accepted_policies=[POLICY])
     assert sender.send(PARTNER, RECEIVE_ALERT, lambda v: {}) == "1.2.1"
-    assert [key for _, key, _ in consumer.catalog_requests] == list(DCT_TYPE_KEYS)
+    assert [key for _, key, _ in consumer.catalog_requests][:2] == list(DCT_TYPE_KEYS)
 
 
 def test_no_compatible_version_means_no_negotiation():

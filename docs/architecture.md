@@ -328,7 +328,12 @@ Having one node on v3 ensures the mixed-version scenario is tested from day one.
 
 - **Wallet**: Tractus-X releases do not include a complete FOSS identity wallet; in production this
   depends on the participant's identity solution (out of scope). In dev the wallet stub is used.
-- **Partners on Jupiter until the end of 2026**: not reachable by the app until they migrate.
+- **Partners on Jupiter until the end of 2026**: reached over DSP 0.8 through the own (Saturn) EDC;
+  connector discovery falls back to `dataspace-protocol-http` with the BPNL as counter-party ID.
+  Their catalogs spell policies the Jupiter way (`cx-policy:` operands, `odrl:eq`), so accepted
+  policies are compared by meaning and the equivalent offer is handed to the SDK, which compares
+  literally. Jupiter partners often offer different constraints (e.g. the DTR without
+  `Membership`); those still need their own accepted policy.
 - **Tractus-X SDK and EDC 0.12.0**: partner consumption uses the SDK's Saturn consumer
   (`/v3/catalog`, `/v3/contractnegotiations`, `/v3/edrs`, `/v4alpha/connectordiscovery`). It is
   tested against a mocked SDK and mocked data planes, not yet against a real EDC; that happens on
@@ -339,7 +344,8 @@ Having one node on v3 ensures the mixed-version scenario is tested from day one.
   hardening step.
 - **Connector addresses**: partners' DSP endpoints come from `CXS_PARTNER_CONNECTORS` or the API;
   the Setup page can look them up in the dataspace's discovery services (Discovery Finder → EDC
-  Discovery) by BPNL, and the user picks one. Partner names come from the BPDM Pool. Both use a
+  Discovery, or the EDC Discovery directly when only its address is published) by BPNL, and the
+  user picks one. Partner names come from the BPDM Pool. Both use a
   technical user of the central IdP (`CXS_CENTRAL_IDP_*`), separate from the DTR's credentials.
 - **Partner names through an EDC**: where the operating company offers the golden record only
   through its connector (Cofinity-X: the Business Partner Explorer, `CXS_BP_EXPLORER_*`), our EDC

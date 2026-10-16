@@ -22,6 +22,7 @@ config:
   # CXS_PARTNER_CONNECTORS: '{"BPNL…": "https://edc.partner/api/v1/dsp"}'
   # CXS_CENTRAL_IDP_URL: https://centralidp.example/auth/          # + CXS_CENTRAL_IDP_CLIENT_ID; secret below
   # CXS_DISCOVERY_FINDER_URL: https://discoveryfinder.example/api/v1.0/administration/connectors/discovery/search
+  # CXS_EDC_DISCOVERY_URL: https://portal-backend.example/api/administration/connectors/discovery  # instead of the finder
   # CXS_BPDM_POOL_URL: https://business-partners.example/pool/api
   # Or partner names through our EDC from the Cofinity-X Business Partner Explorer (wins over BPDM):
   # CXS_BP_EXPLORER_ADDRESS: https://business-partner-explorer-edc.dataspaceos.svc.cofinity-x.com/api/v1/dsp

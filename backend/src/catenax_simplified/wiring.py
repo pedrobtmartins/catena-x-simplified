@@ -13,7 +13,7 @@ from .config import Settings
 from .dataspace.business_partners import BpdmPool, BpExplorer, BusinessPartnerDirectory
 from .dataspace.connections import ConnectionTester
 from .dataspace.direct import DirectNotificationSender, DirectPartnerClient
-from .dataspace.discovery import SdkConnectorDiscovery
+from .dataspace.discovery import ConnectorDiscovery, EdcDiscovery, SdkConnectorDiscovery
 from .dataspace.dtr import SdkTwinRegistry
 from .dataspace.health import DirectHealthChecker, EdcHealthChecker
 from .dataspace.notification_assets import NotificationAssetPublisher
@@ -144,10 +144,15 @@ def build_health_checker(settings: Settings, consumer=None):
 
 def build_connector_discovery(
     settings: Settings, auth: ClientCredentials | None
-) -> SdkConnectorDiscovery | None:
-    if settings.dev_direct or not settings.discovery_finder_url or auth is None:
+) -> ConnectorDiscovery | None:
+    """The EDC Discovery directly when its address is set, else through the Discovery Finder."""
+    if settings.dev_direct or auth is None:
         return None
-    return SdkConnectorDiscovery(settings.discovery_finder_url, auth)
+    if settings.edc_discovery_url:
+        return EdcDiscovery(settings.edc_discovery_url, auth)
+    if settings.discovery_finder_url:
+        return SdkConnectorDiscovery(settings.discovery_finder_url, auth)
+    return None
 
 
 def build_bp_explorer(settings: Settings, consumer=None) -> BpExplorer | None:

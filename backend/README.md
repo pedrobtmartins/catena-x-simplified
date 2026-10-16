@@ -57,11 +57,12 @@ started from. [`.env.example`](.env.example) lists them all with comments; see a
 | `CXS_EDC_MANAGEMENT_URL`        | Own EDC management API (Saturn); with `CXS_EDC_MANAGEMENT_PATH`. Enables partner sync |
 | `CXS_EDC_API_KEY`               | Sent as `X-Api-Key` to the management API |
 | `CXS_EDC_OAUTH_*`               | Or OAuth 2.0 client credentials for the management API (`TOKEN_URL`, `CLIENT_ID`, `CLIENT_SECRET`, optional `SCOPE`); a fresh token is sent with every call. Both can be set |
-| `CXS_ACCEPTED_POLICIES`         | JSON list of usage policies accepted in partners' catalogs; empty = no negotiation |
+| `CXS_ACCEPTED_POLICIES`         | JSON list of usage policies accepted in partners' catalogs; empty = no negotiation. Compared by meaning: Jupiter (`cx-policy:FrameworkAgreement`, `odrl:eq`) and Saturn spellings (`FrameworkAgreement` or its `https://w3id.org/catenax/policy/` IRI, `eq`) match, the order of constraints does not matter; the constraints themselves must be the same |
 | `CXS_ACCEPT_ANY_POLICY`         | Accept any offered policy — development only                         |
 | `CXS_PARTNER_CONNECTORS`        | JSON object BPNL → partner DSP endpoint (addresses set through the API win) |
 | `CXS_CENTRAL_IDP_*`             | Technical user of the dataspace's central IdP (`URL`, `REALM` (default `CX-Central`), `CLIENT_ID`, `CLIENT_SECRET`) for the core services below; independent of the DTR's `CXS_OAUTH_*` |
 | `CXS_DISCOVERY_FINDER_URL`      | Discovery Finder (`…/api/v1.0/administration/connectors/discovery/search`): finds partners' DSP endpoints by BPNL on the Setup page |
+| `CXS_EDC_DISCOVERY_URL`         | EDC Discovery (`…/api/administration/connectors/discovery`), asked directly instead of through the Discovery Finder; wins when both are set |
 | `CXS_BPDM_POOL_URL`             | BPDM Pool API up to the version segment (e.g. `https://business-partners.example/pool/api`): partners' legal names by BPNL (`/v7/legal-entities/{bpnl}`) |
 | `CXS_BP_EXPLORER_ADDRESS`       | Or a BPDM Pool offered through an EDC, such as the Cofinity-X Business Partner Explorer (subscribe to "BP Explorer" in their marketplace first): its DSP endpoint, e.g. `https://business-partner-explorer-edc.dataspaceos.svc.cofinity-x.com/api/v1/dsp` (pre-production `https://business-partner-explorer-edc.dataspaceos.preprod.cofinity-x.com/api/v1/dsp`). Our EDC negotiates for its asset and reads the Pool's `/v6/members` API (`POST /legal-entities/search` with `bpnLs`). Needs an EDC and an accepted policy matching the offer; wins over `CXS_BPDM_POOL_URL` |
 | `CXS_BP_EXPLORER_BPNL`          | BPN of the explorer's connector (default `BPNLCOFINITYEZFA`, Cofinity-X) |

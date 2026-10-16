@@ -16,6 +16,7 @@ CENTRAL_TOKEN = (
 )
 FINDER = "https://discoveryfinder.example.com/api/v1.0/administration/connectors/discovery/search"
 POOL = "https://business-partners.example.com/pool/api"
+EDC_DISCOVERY = "https://portal-backend.example.com/api/administration/connectors/discovery"
 
 
 def _settings(**overrides):
@@ -107,6 +108,37 @@ def test_unreachable_service():
     checks = _run(_settings(central_idp_url=None))
     assert checks["dtr"].status == "failed"
     assert checks["dtr"].detail.startswith(f"{DTR}/api/v3/shell-descriptors is not reachable")
+
+
+@responses.activate
+def test_edc_discovery_without_the_finder():
+    _mock_all(responses)
+    responses.post(
+        EDC_DISCOVERY,
+        json=[{"bpn": scenario.TIER1, "connectorEndpoint": ["https://edc/api/v1/dsp"]}],
+        match=[responses.matchers.json_params_matcher([scenario.TIER1])],
+    )
+    checks = _run(_settings(discovery_finder_url=None, edc_discovery_url=EDC_DISCOVERY))
+    assert checks["discovery"].status == "ok"
+    assert checks["discovery"].detail == (
+        f"EDC Discovery at {EDC_DISCOVERY} answered: "
+        f"1 connector(s) registered for {scenario.TIER1}."
+    )
+    assert not any(call.request.url == FINDER for call in responses.calls)
+
+
+@responses.activate
+def test_the_edc_discovery_entered_as_the_finder():
+    # The EDC Discovery expects a list of BPNLs, not the Discovery Finder's request.
+    _mock_all(responses)
+    responses.post(EDC_DISCOVERY, status=400, json={"errors": {"$": ["Invalid input data"]}})
+    checks = _run(_settings(discovery_finder_url=EDC_DISCOVERY))
+    assert checks["discovery"].status == "failed"
+    assert checks["discovery"].detail.startswith("HTTP 400")
+    assert (
+        "enter it as the EDC Discovery address (CXS_EDC_DISCOVERY_URL)"
+        in checks["discovery"].detail
+    )
 
 
 def test_nothing_configured():

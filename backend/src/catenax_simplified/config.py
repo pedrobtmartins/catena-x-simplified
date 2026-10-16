@@ -61,6 +61,9 @@ class Settings(BaseSettings):
     # Discovery Finder (…/api/v1.0/administration/connectors/discovery/search): finds partners'
     # DSP endpoints by BPNL.
     discovery_finder_url: str | None = None
+    # EDC Discovery (…/api/administration/connectors/discovery): when set, asked directly, without
+    # the Discovery Finder. Some operators publish only this address.
+    edc_discovery_url: str | None = None
     # BPDM Pool API, up to the version segment (e.g. https://business-partners.example/pool/api):
     # partners' legal names by BPNL.
     bpdm_pool_url: str | None = None

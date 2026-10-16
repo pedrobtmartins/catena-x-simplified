@@ -84,6 +84,13 @@ FIELDS: tuple[ConfigField, ...] = (
     ConfigField("central_idp_client_id", "services", "Technical user (client ID)"),
     ConfigField("central_idp_client_secret", "services", "Client secret", secret=True),
     ConfigField("discovery_finder_url", "services", "Discovery Finder address", url=True),
+    ConfigField(
+        "edc_discovery_url",
+        "services",
+        "EDC Discovery address",
+        url=True,
+        hint="Instead of the Discovery Finder, e.g. …/api/administration/connectors/discovery",
+    ),
     ConfigField("bpdm_pool_url", "services", "BPDM Pool address", url=True),
     ConfigField(
         "bp_explorer_address",

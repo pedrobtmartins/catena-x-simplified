@@ -1,20 +1,34 @@
 """Consumer-side EDC access shared by partner reads and notification sending.
 
 Wraps the Tractus-X SDK's Saturn ``ConnectorConsumerService``: connector discovery (cached per
-connector) and contract negotiation against the company's accepted usage policies.
+connector) and contract negotiation against the company's accepted usage policies. The SDK
+compares policies literally; before negotiating, the offers that mean the same as an accepted
+policy (``policies.same_policy``) are added in their offered spelling, so partners still on
+Jupiter (DSP 0.8, ``cx-policy:``/``odrl:`` terms) match the same accepted policies.
 """
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Any, Protocol
 
+from .policies import describe, offers_of, same_policy
 from .ports import DataspaceError
 
 DCT_TYPE_KEY = "'http://purl.org/dc/terms/type'.'@id'"
 # The KIT's asset examples use the https form of the Dublin Core namespace; partners publish both.
 DCT_TYPE_KEYS = (DCT_TYPE_KEY, "'https://purl.org/dc/terms/type'.'@id'")
 ASSET_ID_KEY = "https://w3id.org/edc/v0.0.1/ns/id"
+# Jupiter's DSP. Negotiations over it need Jupiter's JSON-LD context: the Saturn one (Catena-X
+# 2025-9) does not define the ``cx-policy:`` prefix of their offers, and the provider then sees
+# another policy than it offered and terminates the negotiation.
+DSP_0_8 = "dataspace-protocol-http"
+JUPITER_NEGOTIATION_CONTEXT = [
+    "https://w3id.org/tractusx/policy/v1.0.0",
+    "http://www.w3.org/ns/odrl.jsonld",
+    {"@vocab": "https://w3id.org/edc/v0.0.1/ns/"},
+]
 
 
 @dataclass(frozen=True)
@@ -51,6 +65,31 @@ class ConnectorConsumer(Protocol):
 
 def equals(key: str, value: str) -> dict:
     return {"operandLeft": key, "operator": "=", "operandRight": value}
+
+
+def datasets(catalog: Any) -> Iterator[dict]:
+    """Every dataset of a (possibly nested or federated) DCAT catalog."""
+    if isinstance(catalog, list):
+        for item in catalog:
+            yield from datasets(item)
+    elif isinstance(catalog, dict):
+        for key, value in catalog.items():
+            name = key.split(":")[-1].split("#")[-1]
+            if name == "dataset":
+                yield from (d for d in (value if isinstance(value, list) else [value]) if d)
+            elif name == "catalog":
+                yield from datasets(value)
+
+
+def _with_other_dct_namespace(filter_expression: list[dict]) -> list[dict] | None:
+    """The filter with the other Dublin Core namespace for ``dct:type``, if it has one."""
+    swapped = [
+        {**f, "operandLeft": DCT_TYPE_KEYS[1 - DCT_TYPE_KEYS.index(f["operandLeft"])]}
+        if f.get("operandLeft") in DCT_TYPE_KEYS
+        else f
+        for f in filter_expression
+    ]
+    return swapped if swapped != filter_expression else None
 
 
 class EdcNegotiator:
@@ -93,16 +132,55 @@ class EdcNegotiator:
         if self._policies is not None and not self._policies:
             raise DataspaceError("no accepted usage policies configured (CXS_ACCEPTED_POLICIES)")
         dsp_address, counter_party_id, protocol = self.counter_party(bpnl, address)
+        policies, offered = self._policies, []
+        if policies is not None:
+            filter_expression, policies, offered = self._equivalent_offers(
+                bpnl, address, filter_expression
+            )
+        jupiter = (
+            {"negotiation_context": JUPITER_NEGOTIATION_CONTEXT} if protocol == DSP_0_8 else {}
+        )
         try:
             endpoint, token = self.consumer.do_dsp(
                 counter_party_id=counter_party_id,
                 counter_party_address=dsp_address,
                 filter_expression=filter_expression,
-                policies=self._policies,
+                policies=policies,
                 protocol=protocol,
+                **jupiter,
             )
         except Exception as exc:
-            raise DataspaceError(f"negotiation with {bpnl} failed: {exc}") from exc
+            message = f"negotiation with {bpnl} failed: {exc}"
+            if offered and len(policies) == len(self._policies or []):
+                accepted = "; ".join(describe(p) for p in self._policies or [])
+                message += f" Offered: {'; '.join(offered)}. Accepted: {accepted}."
+            raise DataspaceError(message) from exc
         if not endpoint or not token:
             raise DataspaceError(f"negotiation with {bpnl} returned no endpoint or token")
         return endpoint, token
+
+    def _equivalent_offers(
+        self, bpnl: str, address: str, filter_expression: list[dict]
+    ) -> tuple[list[dict], list[dict], list[str]]:
+        """(filter, accepted policies plus the offers equivalent to one of them, every offer
+        described). Uses the other Dublin Core namespace for ``dct:type`` if only that one
+        finds the asset; a catalog that cannot be read changes nothing."""
+        policies = list(self._policies or [])
+        found: list[dict] = []
+        try:
+            found = list(datasets(self.catalog(bpnl, address, filter_expression)))
+            other = _with_other_dct_namespace(filter_expression)
+            if not found and other:
+                found = list(datasets(self.catalog(bpnl, address, other)))
+                if found:
+                    filter_expression = other
+        except DataspaceError:
+            pass
+        offered: list[str] = []
+        for dataset in found:
+            for offer in offers_of(dataset):
+                body = {k: v for k, v in offer.items() if k not in ("@id", "@type")}
+                offered.append(describe(body))
+                if body not in policies and any(same_policy(body, p) for p in self._policies or []):
+                    policies.append(body)
+        return filter_expression, policies, list(dict.fromkeys(offered))
