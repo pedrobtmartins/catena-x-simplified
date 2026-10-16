@@ -97,6 +97,11 @@ export interface Health {
   can_check_partners: boolean;
   dev_direct: boolean;
   notification_assets: NotificationAssets;
+  can_discover_connectors: boolean;
+  can_look_up_names: boolean;
+  dtr_auth: "oauth" | "none";
+  edc_auth: ("oauth" | "api_key")[];
+  central_idp_url: string | null;
   dtr_url: string | null;
   sync_interval_seconds: number;
   supported_aspects: string[];
@@ -116,6 +121,38 @@ export interface Partner {
   twins_found: number;
   twins_missing: number;
   last_check: PartnerCheck | null;
+}
+
+export interface ConnectionCheck {
+  key: "dtr" | "edc" | "central_idp" | "discovery" | "bpdm";
+  name: string;
+  status: "ok" | "failed" | "skipped" | "not_configured";
+  detail: string;
+}
+
+export interface Me {
+  login_enabled: boolean;
+  admin: string | null;
+  config_editable: boolean;
+}
+
+export type ConfigGroup = "registry" | "connector" | "notifications" | "services";
+
+export interface ConfigField {
+  key: string;
+  variable: string;
+  group: ConfigGroup;
+  label: string;
+  hint: string;
+  secret: boolean;
+  url: boolean;
+  source: "deploy" | "app" | null;
+  locked: boolean;
+  value: string | null;
+  is_set: boolean;
+  unreadable: boolean;
+  updated_at: string | null;
+  updated_by: string | null;
 }
 
 export type CheckLevel = "discovery" | "catalog" | "full";
@@ -289,6 +326,26 @@ export const api = {
   partners: () => request<Partner[]>("/api/partners"),
   updatePartner: (bpnl: string, update: { name?: string | null; connector_address?: string | null }) =>
     request<Partner>(`/api/partners/${encodeURIComponent(bpnl)}`, json("PUT", update)),
+  removePartner: async (bpnl: string) => {
+    const response = await fetch(`/api/partners/${encodeURIComponent(bpnl)}`, { method: "DELETE" });
+    if (!response.ok) throw new ApiError(response.status, response.statusText);
+  },
+  me: () => request<Me>("/api/auth/me"),
+  login: (username: string, password: string) => request<Me>("/api/auth/login", json("POST", { username, password })),
+  logout: () => request<Me>("/api/auth/logout", { method: "POST" }),
+  config: () => request<ConfigField[]>("/api/setup/config"),
+  saveConfig: (values: Record<string, string | null>) =>
+    request<{ fields: ConfigField[]; checks: ConnectionCheck[] }>("/api/setup/config", json("PUT", { values })),
+  testConnections: () => request<ConnectionCheck[]>("/api/setup/connection-tests", { method: "POST" }),
+  legalEntity: (bpnl: string) =>
+    request<{ bpnl: string; legal_name: string | null }>(`/api/partners/${encodeURIComponent(bpnl)}/legal-entity`),
+  fillPartnerNames: () =>
+    request<{ bpnl: string; status: "named" | "not_found" | "failed"; name: string | null; message: string | null }[]>(
+      "/api/partners/names",
+      { method: "POST" },
+    ),
+  discoverConnectors: (bpnl: string) =>
+    request<{ bpnl: string; endpoints: string[] }>(`/api/partners/${encodeURIComponent(bpnl)}/discovery`),
   syncPartners: (bpnl?: string) =>
     request<PartnerSyncReport>(`/api/partners/sync${bpnl ? `?bpnl=${encodeURIComponent(bpnl)}` : ""}`, {
       method: "POST",
@@ -353,6 +410,8 @@ export function parseSemanticId(semanticId: string): { name: string; version: st
   const name = match[4] ?? semanticId.split(":").slice(-2, -1)[0] ?? semanticId;
   return { name, version: `${match[1]}.${match[2]}.${match[3]}`, major: Number(match[1]) };
 }
+
+export const BPNL_PATTERN = /^BPNL[0-9A-Za-z]{12}$/;
 
 export function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });

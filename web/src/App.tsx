@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from "react";
-import { api, ApiError, formatTime, syncState, type Health, type NotificationSummary, type SyncReport } from "./api";
+import { api, ApiError, formatTime, syncState, type Health, type Me, type NotificationSummary, type SyncReport } from "./api";
 import { Compose } from "./Compose";
-import { BellIcon, ClockIcon, LogoMark, PartnersIcon, PartsIcon, SyncIcon } from "./icons";
+import { Login } from "./Login";
+import { BellIcon, ClockIcon, LogoMark, PartnersIcon, PartsIcon, SettingsIcon, SyncIcon } from "./icons";
 import { NotificationDetail } from "./NotificationDetail";
 import { Notifications } from "./Notifications";
 import { PartDetail } from "./PartDetail";
 import { PartList } from "./PartList";
 import { Partners } from "./Partners";
+import { Setup } from "./Setup";
 import { SyncHistory } from "./SyncHistory";
 
 type Route =
@@ -14,6 +16,8 @@ type Route =
   | { page: "part"; id: string }
   | { page: "sync" }
   | { page: "partners" }
+  | { page: "setup" }
+  | { page: "login" }
   | { page: "notifications" }
   | { page: "notification"; id: number }
   | { page: "compose"; query: string };
@@ -27,14 +31,18 @@ function parseRoute(hash: string): Route {
   if (hash.startsWith("#/compose?")) return { page: "compose", query: hash.slice("#/compose?".length) };
   if (hash === "#/sync") return { page: "sync" };
   if (hash === "#/partners") return { page: "partners" };
+  if (hash === "#/setup") return { page: "setup" };
+  if (hash === "#/login") return { page: "login" };
   return { page: "parts" };
 }
 
-const SECTION: Record<Route["page"], "parts" | "sync" | "partners" | "notifications"> = {
+const SECTION: Record<Route["page"], "parts" | "sync" | "partners" | "notifications" | "setup"> = {
   parts: "parts",
   part: "parts",
   sync: "sync",
   partners: "partners",
+  setup: "setup",
+  login: "setup",
   notifications: "notifications",
   notification: "notifications",
   compose: "notifications",
@@ -63,9 +71,25 @@ export function App() {
   const [dataVersion, setDataVersion] = useState(0);
 
   const [summary, setSummary] = useState<NotificationSummary | null>(null);
+  const [me, setMe] = useState<Me | null>(null);
+  const loadHealth = useCallback(() => api.health().then(setHealth, (e: Error) => setError(e.message)), []);
 
   useEffect(() => {
-    api.health().then(setHealth, (e: Error) => setError(e.message));
+    api.me().then(setMe, () => setMe(null));
+  }, [route]);
+
+  const signOut = async () => {
+    setMe(await api.logout());
+  };
+  // Changing partners needs an admin once the admin login is set up.
+  const canEdit = !me?.login_enabled || Boolean(me.admin);
+
+  useEffect(() => {
+    api.health().then((h) => {
+      setHealth(h);
+      // First run: without a registry the app has nothing to show yet, so start with the setup.
+      if (!h.dtr_configured && ["", "#", "#/"].includes(window.location.hash)) window.location.hash = "#/setup";
+    }, (e: Error) => setError(e.message));
     api.lastSync().then(setLastRun, () => setLastRun(null));
   }, []);
 
@@ -76,6 +100,11 @@ export function App() {
     const timer = setInterval(load, 30_000);
     return () => clearInterval(timer);
   }, [route, dataVersion]);
+
+  // Core connections still missing; the Setup page explains them.
+  const unconfigured = health
+    ? [health.dtr_configured, health.dev_direct || health.edc_configured].filter((ok) => !ok).length
+    : 0;
 
   const sync = useCallback(async () => {
     setSyncing(true);
@@ -102,6 +131,19 @@ export function App() {
         </a>
         {health && <span className="bpnl-chip">{health.own_bpnl}</span>}
         <div className="spacer" />
+        {me?.login_enabled &&
+          (me.admin ? (
+            <span className="admin-chip">
+              <span className="sub">Signed in as</span> {me.admin}
+              <button type="button" className="link-btn" onClick={signOut}>
+                Sign out
+              </button>
+            </span>
+          ) : (
+            <a className="link-btn admin-chip" href="#/login">
+              Admin sign-in
+            </a>
+          ))}
         <span className="sync-status" aria-live="polite">
           {lastRun ? (
             <>
@@ -142,6 +184,7 @@ export function App() {
               ["notifications", "#/notifications", <BellIcon key="i" />, "Notifications"],
               ["partners", "#/partners", <PartnersIcon key="i" />, "Partners"],
               ["sync", "#/sync", <ClockIcon key="i" />, "Sync history"],
+              ["setup", "#/setup", <SettingsIcon key="i" />, "Setup"],
             ] as const
           ).map(([section, href, icon, label]) => (
             <a
@@ -152,6 +195,11 @@ export function App() {
             >
               {icon}
               {label}
+              {section === "setup" && unconfigured > 0 && (
+                <span className="badge badge-count" aria-label={`${unconfigured} to set up`}>
+                  {unconfigured}
+                </span>
+              )}
               {section === "notifications" && summary && summary.inbound_new > 0 && (
                 <span className="badge badge-count" aria-label={`${summary.inbound_new} new`}>
                   {summary.inbound_new}
@@ -170,9 +218,21 @@ export function App() {
           {route.page === "parts" && <PartList dataVersion={dataVersion} />}
           {route.page === "part" && <PartDetail id={route.id} dataVersion={dataVersion} />}
           {route.page === "sync" && <SyncHistory health={health} dataVersion={dataVersion} />}
-          {route.page === "partners" && <Partners health={health} dataVersion={dataVersion} />}
+          {route.page === "partners" && <Partners health={health} dataVersion={dataVersion} canEdit={canEdit} />}
+          {route.page === "setup" && (
+            <Setup
+              health={health}
+              me={me}
+              dataVersion={dataVersion}
+              lastRun={lastRun}
+              syncing={syncing}
+              onSync={sync}
+              onHealthChange={loadHealth}
+            />
+          )}
           {route.page === "notifications" && <Notifications key={window.location.hash} dataVersion={dataVersion} />}
           {route.page === "notification" && <NotificationDetail id={route.id} health={health} />}
+          {route.page === "login" && <Login me={me} onSignedIn={setMe} />}
           {route.page === "compose" && <Compose key={route.query} query={route.query} health={health} />}
         </main>
       </div>

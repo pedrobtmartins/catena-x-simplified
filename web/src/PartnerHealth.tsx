@@ -44,6 +44,65 @@ export const LEVELS: { level: CheckLevel; label: string; hint: string }[] = [
 export const FULL_CHECK_WARNING =
   "A full check negotiates a contract and opens a transfer process in your connector and the partner's. Continue?";
 
+/** A plain-text report of a check for the partner's connector team, with UTC timestamps so
+ * they can find the calls in their logs. */
+export function partnerReport(check: PartnerCheck, partner: Partner, ownBpnl: string | null): string {
+  const outcome = check.status === "failed" ? "failed" : "showed problems";
+  const lines = [
+    `Hello${partner.name ? ` ${partner.name}` : ""},`,
+    "",
+    `A connectivity check from our connector to yours ${outcome}. Could you have a look on your side?`,
+    "",
+    `From (our BPNL):     ${ownBpnl ?? "—"}`,
+    `To (your BPNL):      ${partner.bpnl}`,
+    `Connector address:   ${check.connector_address ?? "none set"}`,
+    `Check:               ${check.level} (#${check.id})`,
+    `Started:             ${utc(check.started_at)}`,
+    `Finished:            ${utc(check.finished_at)}`,
+    "",
+    "Steps:",
+    ...check.steps.map((step) => `- ${step.name}: ${STEP[step.status].label}${step.detail ? ` — ${step.detail}` : ""}`),
+    "",
+    "Thank you.",
+  ];
+  return lines.join("\n");
+}
+
+/** "2026-10-16T09:17:51.284086Z" → "2026-10-16 09:17:51 UTC" */
+function utc(iso: string): string {
+  return new Date(iso).toISOString().replace("T", " ").replace(/\.\d+Z$/, " UTC");
+}
+
+function CopyReport({ check, partner, ownBpnl }: { check: PartnerCheck; partner: Partner; ownBpnl: string | null }) {
+  const [copied, setCopied] = useState<"ok" | "failed" | null>(null);
+  const text = partnerReport(check, partner, ownBpnl);
+
+  useEffect(() => setCopied(null), [check.id]);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied("ok");
+    } catch {
+      setCopied("failed");
+    }
+  };
+
+  return (
+    <>
+      <button type="button" className="btn btn-secondary" onClick={copy}>
+        {copied === "ok" ? "Copied" : "Copy report for partner"}
+      </button>
+      {copied === "failed" && (
+        <div className="alert alert-error" role="alert">
+          The browser did not allow copying. Select the text below and copy it yourself.
+          <pre className="request-text">{text}</pre>
+        </div>
+      )}
+    </>
+  );
+}
+
 export function HealthBadge({ check }: { check: PartnerCheck | null }) {
   if (!check) return <span className="muted">Not checked</span>;
   const status = STATUS[check.status];
@@ -76,12 +135,14 @@ function Steps({ check }: { check: PartnerCheck }) {
 
 export function HealthPanel({
   partner,
+  ownBpnl,
   canCheck,
   busy,
   onBusy,
   onChecked,
 }: {
   partner: Partner;
+  ownBpnl: string | null;
   canCheck: boolean;
   busy: CheckLevel | null;
   onBusy: (level: CheckLevel | null) => void;
@@ -147,6 +208,11 @@ export function HealthPanel({
       {latest ? (
         <>
           <Steps check={latest} />
+          {(latest.status === "failed" || latest.status === "degraded") && (
+            <div className="check-report">
+              <CopyReport check={latest} partner={partner} ownBpnl={ownBpnl} />
+            </div>
+          )}
           {older.length > 0 && (
             <details className="check-history">
               <summary>Earlier checks ({older.length})</summary>

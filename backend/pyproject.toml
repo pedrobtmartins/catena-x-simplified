@@ -15,6 +15,8 @@ dependencies = [
     "sqlalchemy>=2.0.38,<3",
     "requests>=2.33,<3",
     "alembic>=1.13,<2",
+    # Encrypts the secrets an admin enters in the UI (already required by the SDK).
+    "cryptography>=44,<51",
 ]
 
 [project.optional-dependencies]

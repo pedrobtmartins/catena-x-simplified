@@ -129,6 +129,11 @@ class HealthOut(BaseModel):
     can_send_notifications: bool
     dev_direct: bool  # development mode: partners reached without EDCs
     can_check_partners: bool
+    can_discover_connectors: bool  # a Discovery Finder is configured
+    can_look_up_names: bool  # a BPDM Pool is configured
+    dtr_auth: str  # oauth | none
+    edc_auth: list[str]  # oauth and/or api_key; empty: no credentials
+    central_idp_url: str | None
     notification_assets: NotificationAssetsOut
     dtr_url: str | None
     sync_interval_seconds: int
@@ -187,8 +192,34 @@ class PartnerOut(BaseModel):
 
 
 class PartnerUpdate(BaseModel):
+    name: str | None = Field(default=None, max_length=255)
+    connector_address: str | None = Field(default=None, max_length=512, pattern=r"^https?://\S+$")
+
+
+class ConnectionCheckOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    key: str  # dtr | edc | central_idp | discovery | bpdm
+    name: str
+    status: str  # ok | failed | skipped | not_configured
+    detail: str
+
+
+class LegalEntityOut(BaseModel):
+    bpnl: str
+    legal_name: str | None  # None: the BPNL is not in the BPDM Pool
+
+
+class PartnerNameOut(BaseModel):
+    bpnl: str
+    status: str  # named | not_found | failed
     name: str | None = None
-    connector_address: str | None = Field(default=None, max_length=512)
+    message: str | None = None
+
+
+class ConnectorDiscoveryOut(BaseModel):
+    bpnl: str
+    endpoints: list[str]  # DSP endpoints registered for the BPNL, in the service's order
 
 
 class PartnerSyncResultOut(BaseModel):

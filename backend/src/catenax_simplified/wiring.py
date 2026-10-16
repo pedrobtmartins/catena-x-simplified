@@ -2,39 +2,75 @@
 
 from __future__ import annotations
 
-from tractusx_sdk.dataspace.managers import OAuth2Manager
 from tractusx_sdk.dataspace.managers.connection.memory.memory_connection_manager import (
     MemoryConnectionManager,
 )
 from tractusx_sdk.dataspace.services.connector.service_factory import ServiceFactory
 from tractusx_sdk.industry.services import AasService
 
+from .admin import AdminAuth
 from .config import Settings
+from .dataspace.business_partners import BpdmPool
+from .dataspace.connections import ConnectionTester
 from .dataspace.direct import DirectNotificationSender, DirectPartnerClient
+from .dataspace.discovery import SdkConnectorDiscovery
 from .dataspace.dtr import SdkTwinRegistry
 from .dataspace.health import DirectHealthChecker, EdcHealthChecker
 from .dataspace.notification_assets import NotificationAssetPublisher
 from .dataspace.notifications import EdcNotificationSender
+from .dataspace.oauth import ClientCredentials, authenticate_sdk_service, keycloak_token_url
 from .dataspace.partners import EdcPartnerClient
 from .dataspace.submodels import HttpSubmodelReader
+
+
+def dtr_auth(settings: Settings) -> ClientCredentials | None:
+    """OAuth 2.0 client of the own DTR, if configured."""
+    token_url = settings.oauth_token_url or (
+        keycloak_token_url(settings.oauth_url, settings.oauth_realm or "")
+        if settings.oauth_url
+        else None
+    )
+    if not token_url:
+        return None
+    return ClientCredentials(
+        token_url,
+        settings.oauth_client_id or "",
+        settings.oauth_client_secret or "",
+        scope=settings.oauth_scope,
+    )
+
+
+def edc_auth(settings: Settings) -> ClientCredentials | None:
+    """OAuth 2.0 client of the own EDC's management API, if configured."""
+    if not settings.edc_oauth_token_url:
+        return None
+    return ClientCredentials(
+        settings.edc_oauth_token_url,
+        settings.edc_oauth_client_id or "",
+        settings.edc_oauth_client_secret or "",
+        scope=settings.edc_oauth_scope,
+    )
+
+
+def central_auth(settings: Settings) -> ClientCredentials | None:
+    """The technical user of the central IdP, shared by the core services (discovery, BPDM)."""
+    if not settings.central_idp_url:
+        return None
+    return ClientCredentials(
+        keycloak_token_url(settings.central_idp_url, settings.central_idp_realm),
+        settings.central_idp_client_id or "",
+        settings.central_idp_client_secret or "",
+    )
 
 
 def build_twin_registry(settings: Settings) -> SdkTwinRegistry | None:
     if not settings.dtr_base_url:
         return None
-    auth = None
-    if settings.oauth_url:
-        auth = OAuth2Manager(
-            auth_url=settings.oauth_url,
-            realm=settings.oauth_realm,
-            clientid=settings.oauth_client_id,
-            clientsecret=settings.oauth_client_secret,
-        )
     service = AasService(
         base_url=settings.dtr_base_url,
         base_lookup_url=settings.dtr_lookup_url or settings.dtr_base_url,
         api_path=settings.dtr_api_path,
-        auth_service=auth,
+        auth_service=dtr_auth(settings),
     )
     # Sent as Edc-Bpn: the DTR shows a shell's globalAssetId and specific asset IDs to its owner
     # and to the BPNs they are shared with; an anonymous call sees no shells at all.
@@ -60,7 +96,7 @@ def build_edc_consumer(settings: Settings):
     is shared by partner reads and notification sending."""
     if not settings.edc_management_url or settings.dev_direct:
         return None
-    return ServiceFactory.get_connector_consumer_service(
+    consumer = ServiceFactory.get_connector_consumer_service(
         dataspace_version="saturn",
         base_url=settings.edc_management_url,
         dma_path=settings.edc_management_path,
@@ -69,6 +105,14 @@ def build_edc_consumer(settings: Settings):
         connection_manager=MemoryConnectionManager(),
         verbose=False,
     )
+    return _with_edc_auth(consumer, settings)
+
+
+def _with_edc_auth(service, settings: Settings):
+    auth = edc_auth(settings)
+    if auth is not None:
+        authenticate_sdk_service(service, auth)
+    return service
 
 
 def build_partner_client(settings: Settings, consumer=None):
@@ -98,6 +142,20 @@ def build_health_checker(settings: Settings, consumer=None):
     return EdcHealthChecker(consumer, accepted_policies=_accepted_policies(settings))
 
 
+def build_connector_discovery(
+    settings: Settings, auth: ClientCredentials | None
+) -> SdkConnectorDiscovery | None:
+    if settings.dev_direct or not settings.discovery_finder_url or auth is None:
+        return None
+    return SdkConnectorDiscovery(settings.discovery_finder_url, auth)
+
+
+def build_partner_directory(settings: Settings, auth: ClientCredentials | None) -> BpdmPool | None:
+    if not settings.bpdm_pool_url or auth is None:
+        return None
+    return BpdmPool(settings.bpdm_pool_url, auth)
+
+
 def build_asset_publisher(settings: Settings) -> NotificationAssetPublisher | None:
     if settings.dev_direct or not (settings.edc_management_url and settings.notification_base_url):
         return None
@@ -108,6 +166,7 @@ def build_asset_publisher(settings: Settings) -> NotificationAssetPublisher | No
         headers=_edc_headers(settings),
         verbose=False,
     )
+    _with_edc_auth(provider, settings)
     return NotificationAssetPublisher(
         provider,
         settings.notification_base_url,
@@ -117,4 +176,26 @@ def build_asset_publisher(settings: Settings) -> NotificationAssetPublisher | No
         else None,
         access_permissions=settings.notification_access_policy or None,
         usage_permissions=settings.notification_usage_policy or None,
+    )
+
+
+def build_connection_tester(settings: Settings) -> ConnectionTester:
+    # Own OAuth clients, so a test always asks the IdPs for a fresh token.
+    return ConnectionTester(
+        settings,
+        dtr_auth=dtr_auth(settings),
+        edc_auth=edc_auth(settings),
+        central_auth=central_auth(settings),
+    )
+
+
+def build_admin_auth(settings: Settings) -> AdminAuth | None:
+    """The admin login; ``None`` unless both the password hash and the secret key are set."""
+    if not (settings.admin_password_hash and settings.secret_key):
+        return None
+    return AdminAuth(
+        settings.admin_username,
+        settings.admin_password_hash,
+        settings.secret_key,
+        settings.admin_session_hours,
     )

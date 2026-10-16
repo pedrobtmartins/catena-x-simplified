@@ -51,13 +51,18 @@ started from. [`.env.example`](.env.example) lists them all with comments; see a
 | `CXS_OWN_BPNL`                  | The participant's BPNL (required)                                    |
 | `CXS_DATABASE_URL`              | SQLAlchemy URL, e.g. `postgresql+psycopg://…` (install the `postgres` extra) |
 | `CXS_DTR_BASE_URL`              | Own DTR base URL; `CXS_DTR_API_PATH` defaults to `/api/v3`           |
-| `CXS_OAUTH_*`                   | Keycloak client credentials for the DTR (`URL`, `REALM`, `CLIENT_ID`, `CLIENT_SECRET`) |
+| `CXS_OAUTH_*`                   | OAuth 2.0 client credentials for the own DTR: `CLIENT_ID`, `CLIENT_SECRET`, optional `SCOPE`, and either a Keycloak `URL` + `REALM` or any `TOKEN_URL` (wins) |
 | `CXS_SUBMODEL_HREF_REWRITES`    | JSON list of `[public_prefix, internal_prefix]`: reads own submodels from the backend instead of the public data plane |
 | `CXS_SUBMODEL_HEADERS`          | JSON object of extra headers for the submodel backend (e.g. an API key) |
-| `CXS_EDC_MANAGEMENT_URL`        | Own EDC management API (Saturn); with `CXS_EDC_MANAGEMENT_PATH` and `CXS_EDC_API_KEY`. Enables partner sync |
+| `CXS_EDC_MANAGEMENT_URL`        | Own EDC management API (Saturn); with `CXS_EDC_MANAGEMENT_PATH`. Enables partner sync |
+| `CXS_EDC_API_KEY`               | Sent as `X-Api-Key` to the management API |
+| `CXS_EDC_OAUTH_*`               | Or OAuth 2.0 client credentials for the management API (`TOKEN_URL`, `CLIENT_ID`, `CLIENT_SECRET`, optional `SCOPE`); a fresh token is sent with every call. Both can be set |
 | `CXS_ACCEPTED_POLICIES`         | JSON list of usage policies accepted in partners' catalogs; empty = no negotiation |
 | `CXS_ACCEPT_ANY_POLICY`         | Accept any offered policy — development only                         |
 | `CXS_PARTNER_CONNECTORS`        | JSON object BPNL → partner DSP endpoint (addresses set through the API win) |
+| `CXS_CENTRAL_IDP_*`             | Technical user of the dataspace's central IdP (`URL`, `REALM` (default `CX-Central`), `CLIENT_ID`, `CLIENT_SECRET`) for the core services below; independent of the DTR's `CXS_OAUTH_*` |
+| `CXS_DISCOVERY_FINDER_URL`      | Discovery Finder (`…/api/v1.0/administration/connectors/discovery/search`): finds partners' DSP endpoints by BPNL on the Setup page |
+| `CXS_BPDM_POOL_URL`             | BPDM Pool API up to the version segment (e.g. `https://business-partners.example/pool/api`): partners' legal names by BPNL (`/v7/legal-entities/{bpnl}`) |
 | `CXS_NOTIFICATION_BASE_URL`     | Where our EDC's data plane reaches this app; with an EDC, the notification assets are published at startup |
 | `CXS_NOTIFICATION_API_KEY`      | Required as `X-Api-Key` on `/api/qualitynotifications/*`; also put in the assets' data address |
 | `CXS_NOTIFICATION_ACCESS_POLICY`, `CXS_NOTIFICATION_USAGE_POLICY` | JSON ODRL permissions of the notification assets; defaults: active membership / `DataExchangeGovernance:1.0` + `cx.core.qualityNotifications:1` |
@@ -65,6 +70,31 @@ started from. [`.env.example`](.env.example) lists them all with comments; see a
 | `CXS_DEV_DIRECT`                | **Development only.** Reach partners without EDCs: notifications are posted to the partner apps (`CXS_PARTNER_CONNECTORS` = their base URLs), partner twins read from `CXS_DEV_PARTNER_DTRS` (BPNL → DTR URL with API path). Never in a dataspace |
 | `CXS_SYNC_INTERVAL_SECONDS`     | Periodic sync (own twins, then partners); `0` (default) disables it   |
 | `CXS_WEB_DIST_DIR`              | Directory of the built UI, served at `/`                             |
+| `CXS_ADMIN_PASSWORD_HASH`       | Enables the admin login (with `CXS_SECRET_KEY`); create it with `uv run python -m catenax_simplified.admin hash-password`. `CXS_ADMIN_USERNAME` defaults to `admin` |
+| `CXS_SECRET_KEY`                | At least 32 characters (`uv run python -m catenax_simplified.admin secret-key`): signs admin sessions and encrypts the secrets entered in the UI. Keep it stable — another key cannot read them |
+| `CXS_ADMIN_SESSION_HOURS`       | Admin session lifetime, 1–24 hours (default 8)                        |
+
+## Admin and settings entered in the UI
+
+With `CXS_ADMIN_PASSWORD_HASH` and `CXS_SECRET_KEY` set, an admin signs in on the web UI
+(*Admin sign-in*) and can:
+
+- enter the connection settings on the Setup page — the DTR, the EDC management API, the
+  notification inbox and the dataspace services, with their OAuth clients and keys. They are stored
+  in the database (secrets encrypted with a key derived from `CXS_SECRET_KEY`), applied at once
+  without a restart, and tested right away;
+- add, change and remove partners (without the admin login anyone can, as before).
+
+A setting the deployment sets (an environment variable or `.env`) always wins and is shown locked;
+the UI only fills in what the deployment leaves out. Reading parts, partners and notifications needs
+no sign-in. After five failed sign-ins from one address, sign-in is refused for 15 minutes; behind a
+proxy that hides client addresses this applies to everyone at once. The session cookie is
+`HttpOnly`, `SameSite=Strict`, and `Secure` when the app is reached over HTTPS (the image runs
+uvicorn with `--proxy-headers`). Changes are logged with the admin and the setting names, never
+the values.
+
+If `CXS_SECRET_KEY` changes, the secrets entered in the UI can no longer be decrypted: they are
+ignored, and the Setup page asks for them again.
 
 ## API
 
@@ -79,7 +109,16 @@ started from. [`.env.example`](.env.example) lists them all with comments; see a
 | GET    | `/api/sync/last`             | Report of the last sync                       |
 | GET    | `/api/sync/runs`             | Recorded sync runs, newest first (`limit`)    |
 | GET    | `/api/partners`              | Direct partners (from own BoM/usage relations): roles, linked twins, cached parts, connector, last sync |
-| PUT    | `/api/partners/{bpnl}`       | Set a partner's name and DSP connector address |
+| PUT    | `/api/partners/{bpnl}`       | Add a partner, or set its name and DSP connector address |
+| DELETE | `/api/partners/{bpnl}`       | Forget what was set for a partner; one found in own twins stays listed |
+| GET    | `/api/partners/{bpnl}/discovery` | DSP endpoints registered for a BPNL in the discovery services (nothing is stored) |
+| GET    | `/api/auth/me`               | Whether the admin login is set up and who is signed in |
+| POST   | `/api/auth/login`, `/api/auth/logout` | Admin sign-in (sets the session cookie) and sign-out |
+| GET    | `/api/setup/config`          | **Admin.** The settings that can be entered in the UI: source (deployment or UI), locked, value (never for secrets) |
+| PUT    | `/api/setup/config`          | **Admin.** Store settings (`null` removes one), apply them at once and return the connection tests |
+| POST   | `/api/setup/connection-tests` | Read-only calls to the own DTR and EDC and the core services with the configured credentials; one result each |
+| GET    | `/api/partners/{bpnl}/legal-entity` | A BPNL's legal name from the BPDM Pool (nothing is stored) |
+| POST   | `/api/partners/names`        | Name every unnamed partner after its legal name in the BPDM Pool |
 | POST   | `/api/partners/sync`         | Cache direct partners' twins through the EDC (`bpnl` for one partner) |
 | GET    | `/api/partners/checks`       | Recorded partner health checks, newest first (`bpnl`, `limit`) |
 | POST   | `/api/partners/checks`       | Check all partners (`level`; `only_unhealthy` defaults to true) |

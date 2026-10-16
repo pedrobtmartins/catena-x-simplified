@@ -6,17 +6,21 @@ import logging
 import threading
 from collections.abc import AsyncIterator, Callable, Iterator
 from datetime import UTC, datetime
-from pathlib import Path
+from pathlib import Path as FsPath
 from typing import Annotated, Any
 
-from fastapi import APIRouter, Depends, FastAPI, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, FastAPI, HTTPException, Path, Query, Request, Response
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session, sessionmaker
 from starlette.concurrency import run_in_threadpool
 
+from ..admin import ConfigStore, SecretBox, effective_settings
 from ..aspects.registry import SUPPORTED
 from ..config import Settings
-from ..dataspace import SubmodelReader, TwinRegistry
+from ..dataspace import DataspaceError, SubmodelReader, TwinRegistry
+from ..dataspace.business_partners import BusinessPartnerDirectory
+from ..dataspace.connections import ConnectionTester
+from ..dataspace.discovery import ConnectorDiscovery
 from ..dataspace.health import PartnerHealthChecker
 from ..dataspace.notification_assets import NotificationAssetPublisher
 from ..dataspace.notifications import NotificationSender
@@ -33,23 +37,33 @@ from ..storage import (
 )
 from ..traceability import OwnTwinSync, PartnerHealth, PartnerSync, part_tree
 from ..wiring import (
+    build_admin_auth,
     build_asset_publisher,
+    build_connection_tester,
+    build_connector_discovery,
     build_edc_consumer,
     build_health_checker,
     build_notification_sender,
     build_partner_client,
+    build_partner_directory,
     build_submodel_reader,
     build_twin_registry,
+    central_auth,
+    dtr_auth,
 )
-from . import notifications
+from . import admin, notifications
 from .schemas import (
+    ConnectionCheckOut,
+    ConnectorDiscoveryOut,
     HealthOut,
+    LegalEntityOut,
     NotificationAssetsOut,
     PartListItem,
     PartnerBatchCheckRequest,
     PartnerCheckOut,
     PartnerCheckPage,
     PartnerCheckRequest,
+    PartnerNameOut,
     PartnerOut,
     PartnerSyncReportOut,
     PartnerUpdate,
@@ -94,6 +108,9 @@ def _session(request: Request) -> Iterator[Session]:
 
 
 SessionDep = Annotated[Session, Depends(_session)]
+Bpnl = Annotated[str, Path(pattern=r"^BPNL[0-9A-Za-z]{12}$")]
+# Changing partners needs an admin session once the admin login is set up.
+AdminIfEnabled = Annotated[str | None, Depends(admin.admin_if_enabled)]
 
 router = APIRouter(prefix="/api")
 
@@ -109,11 +126,32 @@ def health(request: Request) -> HealthOut:
         can_send_notifications=request.app.state.notifications.can_send,
         dev_direct=settings.dev_direct,
         can_check_partners=request.app.state.health_runner.configured,
+        can_discover_connectors=request.app.state.discovery is not None,
+        can_look_up_names=request.app.state.directory is not None,
+        dtr_auth="oauth" if dtr_auth(settings) else "none",
+        edc_auth=[
+            name
+            for name, used in (
+                ("oauth", settings.edc_oauth_token_url),
+                ("api_key", settings.edc_api_key),
+            )
+            if used
+        ],
+        central_idp_url=settings.central_idp_url,
         notification_assets=request.app.state.asset_publishing.status,
         dtr_url=settings.dtr_base_url,
         sync_interval_seconds=settings.sync_interval_seconds,
         supported_aspects=sorted(SUPPORTED),
     )
+
+
+@router.post("/setup/connection-tests", response_model=list[ConnectionCheckOut])
+async def test_connections(request: Request) -> list[ConnectionCheckOut]:
+    """Read-only calls to the own DTR and EDC and to the core services, with the configured
+    credentials."""
+    tester: ConnectionTester = request.app.state.connection_tester
+    checks = await run_in_threadpool(tester.run)
+    return [ConnectionCheckOut.model_validate(c) for c in checks]
 
 
 @router.get("/stats", response_model=StatsOut)
@@ -228,7 +266,7 @@ def list_partners(session: SessionDep, request: Request) -> list[PartnerOut]:
 
 @router.put("/partners/{bpnl}", response_model=PartnerOut)
 def update_partner(
-    bpnl: str, update: PartnerUpdate, session: SessionDep, request: Request
+    bpnl: Bpnl, update: PartnerUpdate, session: SessionDep, request: Request, _: AdminIfEnabled
 ) -> PartnerOut:
     if bpnl == request.app.state.settings.own_bpnl:
         raise HTTPException(status_code=422, detail="that is your own BPNL")
@@ -240,6 +278,78 @@ def update_partner(
         row.connector_address = fields["connector_address"]
     session.commit()
     return next(p for p in list_partners(session, request) if p.bpnl == bpnl)
+
+
+@router.delete("/partners/{bpnl}", status_code=204)
+def remove_partner(bpnl: Bpnl, session: SessionDep, _: AdminIfEnabled) -> Response:
+    """Forget what was set for a partner (name, address, last sync). A partner found in your
+    own twins stays listed; one added by hand disappears. Its check history is kept."""
+    repository = PartnerRepository(session)
+    row = repository.get(bpnl)
+    if row is None:
+        raise HTTPException(status_code=404, detail="partner not found")
+    repository.delete(row)
+    session.commit()
+    return Response(status_code=204)
+
+
+def _directory(request: Request) -> BusinessPartnerDirectory:
+    directory: BusinessPartnerDirectory | None = request.app.state.directory
+    if directory is None:
+        raise HTTPException(status_code=503, detail="no BPDM Pool configured (CXS_BPDM_POOL_URL)")
+    return directory
+
+
+@router.get("/partners/{bpnl}/legal-entity", response_model=LegalEntityOut)
+async def legal_entity(bpnl: Bpnl, request: Request) -> LegalEntityOut:
+    """A BPNL's legal name from the BPDM Pool. Nothing is stored."""
+    directory = _directory(request)
+    try:
+        name = await run_in_threadpool(directory.legal_name, bpnl)
+    except DataspaceError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return LegalEntityOut(bpnl=bpnl, legal_name=name)
+
+
+@router.post("/partners/names", response_model=list[PartnerNameOut])
+async def fill_partner_names(request: Request, _: AdminIfEnabled) -> list[PartnerNameOut]:
+    """Name every partner without a name after its legal name in the BPDM Pool. Names set by
+    hand are kept."""
+    directory = _directory(request)
+    with request.app.state.session_factory() as session:
+        unnamed = [p.bpnl for p in list_partners(session, request) if not p.name]
+    results = []
+    for bpnl in unnamed:
+        try:
+            name = await run_in_threadpool(directory.legal_name, bpnl)
+        except DataspaceError as exc:
+            results.append(PartnerNameOut(bpnl=bpnl, status="failed", message=str(exc)))
+            continue
+        if name is None:
+            results.append(PartnerNameOut(bpnl=bpnl, status="not_found"))
+            continue
+        with request.app.state.session_factory() as session:
+            row = PartnerRepository(session).get_or_create(bpnl)
+            row.name = name[:255]
+            session.commit()
+        results.append(PartnerNameOut(bpnl=bpnl, status="named", name=name))
+    return results
+
+
+@router.get("/partners/{bpnl}/discovery", response_model=ConnectorDiscoveryOut)
+async def discover_connectors(bpnl: Bpnl, request: Request) -> ConnectorDiscoveryOut:
+    """Ask the dataspace's discovery services for the DSP endpoints registered for a BPNL. Nothing
+    is stored: pick one and set it with PUT /api/partners/{bpnl}."""
+    discovery: ConnectorDiscovery | None = request.app.state.discovery
+    if discovery is None:
+        raise HTTPException(
+            status_code=503, detail="no Discovery Finder configured (CXS_DISCOVERY_FINDER_URL)"
+        )
+    try:
+        endpoints = await run_in_threadpool(discovery.find, bpnl)
+    except DataspaceError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return ConnectorDiscoveryOut(bpnl=bpnl, endpoints=endpoints)
 
 
 @router.post("/partners/sync", response_model=PartnerSyncReportOut)
@@ -345,6 +455,124 @@ async def _periodic_sync(runners: list[ExclusiveRunner], interval: int) -> None:
         await asyncio.sleep(interval)
 
 
+class Runtime:
+    """Everything built from the effective settings (the deployment's, completed by what an admin
+    entered in the UI). An admin's change rebuilds it in place: the runners keep their locks, so
+    a sync that is running finishes and the next one uses the new adapters."""
+
+    def __init__(
+        self,
+        app: FastAPI,
+        base: Settings,
+        session_factory: sessionmaker[Session],
+        store: ConfigStore,
+        overrides: dict[str, Any],
+    ):
+        self.app = app
+        self.base = base
+        self.session_factory = session_factory
+        self.store = store
+        self.overrides = overrides
+        self.sync_runner = ExclusiveRunner(None)
+        self.partner_runner = ExclusiveRunner(None)
+        # One check at a time, so a batch does not flood our own connector.
+        self.health_runner = ExclusiveRunner(None)
+        self._tasks: list[asyncio.Task] = []
+        # Two admins saving at once must not leave the first rebuild's background tasks running.
+        self._reload_lock = asyncio.Lock()
+
+    def settings(self) -> Settings:
+        values, unreadable = self.store.values()
+        if unreadable:
+            log.warning(
+                "stored secrets %s cannot be decrypted with the current CXS_SECRET_KEY",
+                ", ".join(sorted(unreadable)),
+            )
+        return effective_settings(self.base, values)
+
+    def build(self) -> None:
+        settings = self.settings()
+        o = self.overrides
+        session_factory = self.session_factory
+        registry = o.get("registry") or build_twin_registry(settings)
+        reader = o.get("reader") or build_submodel_reader(settings)
+        sync = (
+            OwnTwinSync(registry, reader, session_factory, settings.own_bpnl)
+            if registry is not None
+            else None
+        )
+        injected = ("partner_client", "notification_sender", "health_checker")
+        consumer = None if all(o.get(k) for k in injected) else build_edc_consumer(settings)
+        partner_client = o.get("partner_client") or build_partner_client(settings, consumer)
+        sender = o.get("notification_sender") or build_notification_sender(settings, consumer)
+        partner_sync = (
+            PartnerSync(
+                partner_client,
+                session_factory,
+                settings.own_bpnl,
+                configured_connectors=settings.partner_connectors,
+            )
+            if partner_client is not None
+            else None
+        )
+        health_checker = o.get("health_checker") or build_health_checker(settings, consumer)
+        partner_health = (
+            PartnerHealth(
+                health_checker,
+                session_factory,
+                settings.own_bpnl,
+                configured_connectors=settings.partner_connectors,
+            )
+            if health_checker is not None
+            else None
+        )
+        central = central_auth(settings)
+
+        state = self.app.state
+        state.settings = settings
+        self.sync_runner.job = sync.run if sync is not None else None
+        self.partner_runner.job = partner_sync.run if partner_sync is not None else None
+        self.health_runner.job = partner_health.run if partner_health is not None else None
+        state.notifications = NotificationService(
+            session_factory,
+            settings.own_bpnl,
+            sender,
+            configured_connectors=settings.partner_connectors,
+        )
+        state.asset_publishing = AssetPublishing(
+            o.get("asset_publisher") or build_asset_publisher(settings)
+        )
+        state.discovery = o.get("discovery") or build_connector_discovery(settings, central)
+        state.directory = o.get("directory") or build_partner_directory(settings, central)
+        state.connection_tester = o.get("connection_tester") or build_connection_tester(settings)
+
+    def start(self) -> None:
+        """Background work for the current settings; call from the event loop."""
+        settings: Settings = self.app.state.settings
+        publishing: AssetPublishing = self.app.state.asset_publishing
+        if publishing.publisher is not None:
+            # In the background: the app serves while the EDC is still unreachable.
+            self._tasks.append(asyncio.create_task(run_in_threadpool(publishing.run)))
+        periodic = [r for r in (self.sync_runner, self.partner_runner) if r.configured]
+        if periodic and settings.sync_interval_seconds > 0:
+            self._tasks.append(
+                asyncio.create_task(_periodic_sync(periodic, settings.sync_interval_seconds))
+            )
+
+    async def stop(self) -> None:
+        tasks, self._tasks = self._tasks, []
+        for task in tasks:
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+
+    async def reload(self) -> None:
+        async with self._reload_lock:
+            await self.stop()
+            await run_in_threadpool(self.build)
+            self.start()
+
+
 def create_app(
     settings: Settings,
     *,
@@ -354,91 +582,65 @@ def create_app(
     notification_sender: NotificationSender | None = None,
     asset_publisher: NotificationAssetPublisher | None = None,
     health_checker: PartnerHealthChecker | None = None,
+    discovery: ConnectorDiscovery | None = None,
+    directory: BusinessPartnerDirectory | None = None,
+    connection_tester: ConnectionTester | None = None,
 ) -> FastAPI:
     """Create the application. The keyword arguments override the configured adapters (tests)."""
     engine = make_engine(settings.database_url)
     init_schema(engine)
     session_factory = make_session_factory(engine)
-
-    registry = registry or build_twin_registry(settings)
-    reader = reader or build_submodel_reader(settings)
-    sync = (
-        OwnTwinSync(registry, reader, session_factory, settings.own_bpnl)
-        if registry is not None
-        else None
-    )
-    runner = ExclusiveRunner(sync.run if sync is not None else None)
     if settings.dev_direct:
         log.warning("CXS_DEV_DIRECT is on: partners are reached without EDCs (development only)")
-    consumer = (
-        build_edc_consumer(settings)
-        if partner_client is None or notification_sender is None or health_checker is None
-        else None
-    )
-    partner_client = partner_client or build_partner_client(settings, consumer)
-    notification_sender = notification_sender or build_notification_sender(settings, consumer)
-    notification_service = NotificationService(
-        session_factory,
-        settings.own_bpnl,
-        notification_sender,
-        configured_connectors=settings.partner_connectors,
-    )
-    asset_publishing = AssetPublishing(asset_publisher or build_asset_publisher(settings))
-    partner_sync = (
-        PartnerSync(
-            partner_client,
-            session_factory,
-            settings.own_bpnl,
-            configured_connectors=settings.partner_connectors,
-        )
-        if partner_client is not None
-        else None
-    )
-    partner_runner = ExclusiveRunner(partner_sync.run if partner_sync is not None else None)
-    health_checker = health_checker or build_health_checker(settings, consumer)
-    partner_health = (
-        PartnerHealth(
-            health_checker,
-            session_factory,
-            settings.own_bpnl,
-            configured_connectors=settings.partner_connectors,
-        )
-        if health_checker is not None
-        else None
-    )
-    # One check at a time, so a batch does not flood our own connector.
-    health_runner = ExclusiveRunner(partner_health.run if partner_health is not None else None)
 
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        task = None
-        publish = None
-        if asset_publishing.publisher is not None:
-            # In the background: the app serves while the EDC is still unreachable.
-            publish = asyncio.create_task(run_in_threadpool(asset_publishing.run))
-        periodic = [r for r in (runner, partner_runner) if r.configured]
-        if periodic and settings.sync_interval_seconds > 0:
-            task = asyncio.create_task(_periodic_sync(periodic, settings.sync_interval_seconds))
+        runtime.start()
         yield
-        for background in (task, publish):
-            if background is not None:
-                background.cancel()
-                with contextlib.suppress(asyncio.CancelledError):
-                    await background
+        await runtime.stop()
         engine.dispose()
 
     app = FastAPI(title="catena-x-simplified", version="0.1.0", lifespan=lifespan)
-    app.state.settings = settings
     app.state.session_factory = session_factory
-    app.state.sync_runner = runner
-    app.state.partner_runner = partner_runner
-    app.state.health_runner = health_runner
-    app.state.notifications = notification_service
-    app.state.asset_publishing = asset_publishing
+    app.state.admin = build_admin_auth(settings)
+    store = ConfigStore(
+        session_factory, SecretBox(settings.secret_key) if settings.secret_key else None
+    )
+    overrides = {
+        "registry": registry,
+        "reader": reader,
+        "partner_client": partner_client,
+        "notification_sender": notification_sender,
+        "asset_publisher": asset_publisher,
+        "health_checker": health_checker,
+        "discovery": discovery,
+        "directory": directory,
+        "connection_tester": connection_tester,
+    }
+    runtime = Runtime(app, settings, session_factory, store, overrides)
+    runtime.build()
+    app.state.runtime = runtime
+    app.state.sync_runner = runtime.sync_runner
+    app.state.partner_runner = runtime.partner_runner
+    app.state.health_runner = runtime.health_runner
     app.include_router(router)
+    app.include_router(admin.router)
     app.include_router(notifications.router)
     app.include_router(notifications.kit_router)
 
     if settings.web_dist_dir:
-        app.mount("/", StaticFiles(directory=Path(settings.web_dist_dir), html=True), name="web")
+        app.mount("/", WebFiles(directory=FsPath(settings.web_dist_dir), html=True), name="web")
     return app
+
+
+class WebFiles(StaticFiles):
+    """The built UI. Vite names the files in assets/ by content hash, so they can be cached for
+    good; everything else (index.html) is revalidated, so an upgrade shows the new UI at once."""
+
+    def file_response(self, full_path, stat_result, scope, status_code=200) -> Response:
+        response = super().file_response(full_path, stat_result, scope, status_code)
+        if FsPath(full_path).parent.name == "assets":
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        else:
+            response.headers["Cache-Control"] = "no-cache"
+        return response

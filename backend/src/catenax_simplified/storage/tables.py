@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, Boolean, DateTime, Float, Index, String, UniqueConstraint
+from sqlalchemy import JSON, Boolean, DateTime, Float, Index, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -141,3 +141,16 @@ class NotificationMessageRow(Base):
     information: Mapped[str | None] = mapped_column(String(1000))
     at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     payload: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+
+
+class ConfigValueRow(Base):
+    """A setting entered in the UI by an admin. Settings from the deployment win over these;
+    secret values are encrypted with a key derived from CXS_SECRET_KEY."""
+
+    __tablename__ = "config_values"
+
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    value: Mapped[str] = mapped_column(Text)
+    secret: Mapped[bool] = mapped_column(Boolean, default=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_by: Mapped[str] = mapped_column(String(64))
