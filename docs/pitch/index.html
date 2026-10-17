@@ -224,7 +224,7 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 </div>
 <div style="display:flex;flex-direction:column;gap:16px;background:#FFFFFF;border:1px solid #DCDCDC;border-left:6px solid #0F71CB;border-radius:16px;padding:36px 40px">
 <h3 style="font-size:36px;font-weight:600;line-height:1.2">Negotiate once, reuse</h3>
-<p style="font-size:28px;line-height:1.45;color:#4A5563">Contract agreements and access tokens are kept per partner; partner twins live in a local cache.</p>
+<p style="font-size:28px;line-height:1.45;color:#4A5563">Contract agreements and access tokens are kept per partner and asset; twins live in a local cache.</p>
 </div>
 <div style="display:flex;flex-direction:column;gap:16px;background:#FFFFFF;border:1px solid #DCDCDC;border-left:6px solid #0F71CB;border-radius:16px;padding:36px 40px">
 <h3 style="font-size:36px;font-weight:600;line-height:1.2">Read every version in use</h3>
@@ -232,7 +232,7 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 </div>
 </div>
 <p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6A7480">Catena-X Traceability · 7</p>
-<aside>Each choice answers one of the reasons Trace-X stalled. Prerequisite infrastructure answers the heavy bundled stack. One level answers the recursive walk. Negotiate-once answers the per-request round trips. Tolerant reading answers version churn: the network does not upgrade in lockstep.</aside>
+<aside>Each choice answers one of the reasons Trace-X stalled. Prerequisite infrastructure answers the heavy bundled stack. One level answers the recursive walk. Negotiate-once answers the per-request round trips: in a local test against a production EDC, 303 twins sharing a handful of assets synced in 7.5 minutes through the EDC. Tolerant reading answers version churn: the network does not upgrade in lockstep.</aside>
 </section>
 </div></div>
 <div class="frame"><div class="slide">
@@ -248,7 +248,7 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 <p style="font-size:26px;background:#0D55AF;padding:10px 18px;border-radius:8px">Aspect adapters: v3 · v4 · industry_core</p>
 <p style="font-size:26px;background:#0D55AF;padding:10px 18px;border-radius:8px">Notifications: KIT API 1.2.1 + 2.0.0</p>
 <p style="font-size:26px;background:#0D55AF;padding:10px 18px;border-radius:8px">Dataspace client: Tractus-X SDK</p>
-<p style="font-size:26px;background:#0D55AF;padding:10px 18px;border-radius:8px">Local cache · web UI</p>
+<p style="font-size:26px;background:#0D55AF;padding:10px 18px;border-radius:8px">Local cache · web UI · guided setup</p>
 </div>
 <div style="width:96px;display:flex;flex-direction:column;align-items:center;gap:8px">
 <x-shape kind="arrow-right" style="width:88px;height:44px;background:#B6B6B6"></x-shape>
@@ -271,9 +271,9 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 <p style="font-size:26px;line-height:1.4;color:#4A5563">Customers and suppliers, through their own connectors</p>
 </div>
 </div>
-<p style="font-size:28px;color:#4A5563">Python · FastAPI · Tractus-X SDK · PostgreSQL · React — configured by environment variables.</p>
+<p style="font-size:28px;color:#4A5563">Python · FastAPI · Tractus-X SDK · PostgreSQL · React — one container, on Docker Compose or Helm, configured in the browser.</p>
 <p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6A7480">Catena-X Traceability · 8</p>
-<aside>The app is the only new component. The EDC, the registry, the submodel server and the identity are what every participant runs anyway. All dataspace access goes through the official Tractus-X SDK behind our own interfaces, so moving to the next release (26.09: EDC 0.13) is a configuration and adapter change, not a rewrite.</aside>
+<aside>The app is the only new component. The EDC, the registry, the submodel server and the identity are what every participant runs anyway. All dataspace access goes through the official Tractus-X SDK behind our own interfaces, so moving to the next release (26.09: EDC 0.13) is a configuration and adapter change, not a rewrite. Setting it up takes an admin sign-in and a guided checklist on the Setup page: connector, registry, IdP, discovery and the company's own root CA, each with a connection test.</aside>
 </section>
 </div></div>
 <div class="frame"><div class="slide">
@@ -285,13 +285,13 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 <table style="font-size:28px;color:#14181D;background:#FFFFFF;border:1px solid #DCDCDC;border-radius:16px">
 <tr style="background:#10212F"><th style="width:50%;color:#F4F6F8;padding:18px 28px">What we see</th><th style="width:50%;color:#F4F6F8">How the app handles it</th></tr>
 <tr><td>Most partners still publish SerialPart 3</td><td>Reads v3 and v4 into one internal model</td></tr>
-<tr style="background:#F9F9F9"><td>Jupiter policies end with 2026</td><td>Saturn-only (DSP 2025-1) from day one</td></tr>
+<tr style="background:#F9F9F9"><td>Jupiter policies end with 2026</td><td>Saturn (DSP 2025-1) first; Jupiter (DSP 0.8) for partners still on it</td></tr>
 <tr><td>The KIT mandates Notification API 1.2.1; 2.0.0 is newer</td><td>Receives both; sends the highest version the partner offers</td></tr>
 <tr style="background:#F9F9F9"><td>26.09 moves models to <span style="color:#0D55AF">industry_core</span></td><td>Already reads them; model IDs live in one registry</td></tr>
 <tr><td>IRS is not compatible with Saturn policies</td><td>No IRS dependency</td></tr>
 </table>
 <p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6A7480">Sources: Traceability KIT 8.0.0 · sldt-semantic-models · tractus-x-release CHANGELOG · Catena-X Traceability · 9</p>
-<aside>The network does not upgrade in lockstep. SerialPart 3.0.x is still in release status in the official models repository, so tolerating it is correct, not a workaround. The end of Jupiter support at the end of 2026 is why we start Saturn-only. The KIT itself says 1.2.1 is mandatory and 2.0.0 optional; 2.0.0 is a superset, so we receive both.</aside>
+<aside>The network does not upgrade in lockstep. SerialPart 3.0.x is still in release status in the official models repository, so tolerating it is correct, not a workaround. The end of Jupiter support at the end of 2026 is why Saturn comes first; in practice some partners have not moved yet, so the app still negotiates with them over DSP 0.8. The KIT itself says 1.2.1 is mandatory and 2.0.0 optional; 2.0.0 is a superset, so we receive both.</aside>
 </section>
 </div></div>
 <div class="frame"><div class="slide">
@@ -305,9 +305,9 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 <tr><td style="color:#B9C6D2">Cross-company tree</td><td>Recursive walk through IRS</td><td>One level; notifications hop by hop</td></tr>
 <tr style="background:#152A3B"><td style="color:#B9C6D2">Infrastructure</td><td>Bundled stack, IRS included</td><td>Uses the EDC and DTR you already run</td></tr>
 <tr><td style="color:#B9C6D2">Answers from</td><td>Asynchronous jobs per request</td><td>Local cache, refreshed by sync</td></tr>
-<tr style="background:#152A3B"><td style="color:#B9C6D2">Connector policies</td><td>IRS not ready for Saturn</td><td>Saturn-only</td></tr>
+<tr style="background:#152A3B"><td style="color:#B9C6D2">Connector policies</td><td>IRS not ready for Saturn</td><td>Saturn, and Jupiter for partners not yet moved</td></tr>
 <tr><td style="color:#B9C6D2">Aspect versions</td><td>Tied to its release</td><td>v3 and v4 side by side</td></tr>
-<tr style="background:#152A3B"><td style="color:#B9C6D2">Status</td><td>Not in Tractus-X since 25.09</td><td>Phase 1 delivered, October 2026</td></tr>
+<tr style="background:#152A3B"><td style="color:#B9C6D2">Status</td><td>Not in Tractus-X since 25.09</td><td>Tested against a production connector, October 2026</td></tr>
 </table>
 <p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#8FA1B3">Catena-X Traceability · 10</p>
 <aside>Keep this factual, not a takedown. The notification model is the same — it is the KIT standard and Trace-X helped define it. What differs is where the work happens: in a recursive walk through the network, or locally at each company. [Check the "Aspect versions" row against your own experience with Trace-X before presenting.]</aside>
@@ -317,37 +317,41 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 <section id="today" data-section="Where we are, what comes next and what we need" style="background:#F7F7F5;color:#14181D;font-family:'Libre Franklin', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
 <div style="display:flex;flex-direction:column;gap:20px">
 <p style="font-size:24px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#0F71CB">Where we are</p>
-<h2 style="font-size:64px;font-weight:600;line-height:1.15">Phases 1 and 2 are built</h2>
+<h2 style="font-size:64px;font-weight:600;line-height:1.15">Tested on real connectors</h2>
 </div>
 <div style="display:flex;flex-direction:row;gap:56px;align-items:start">
 <div style="width:640px;display:flex;flex-direction:column;gap:28px">
 <div style="display:flex;flex-direction:column;gap:4px;border-left:6px solid #B3CB2D;padding:0 0 0 24px">
-<p style="font-size:56px;font-weight:700;line-height:1.1">14</p>
-<p style="font-size:28px;line-height:1.35;color:#4A5563">official aspect payload versions read, v3 to industry_core v4</p>
+<p style="font-size:56px;font-weight:700;line-height:1.1">303 twins · 0 issues</p>
+<p style="font-size:28px;line-height:1.35;color:#4A5563">synced in a local test against a production registry and EDC, in 7.5 minutes</p>
 </div>
 <div style="display:flex;flex-direction:column;gap:4px;border-left:6px solid #B3CB2D;padding:0 0 0 24px">
-<p style="font-size:56px;font-weight:700;line-height:1.1">135</p>
-<p style="font-size:28px;line-height:1.35;color:#4A5563">automated tests, run on every change</p>
+<p style="font-size:56px;font-weight:700;line-height:1.1">2,192 · 204</p>
+<p style="font-size:28px;line-height:1.35;color:#4A5563">links to 9 suppliers and 1 customer, from bills of material and usage</p>
 </div>
 <div style="display:flex;flex-direction:column;gap:4px;border-left:6px solid #B3CB2D;padding:0 0 0 24px">
-<p style="font-size:36px;font-weight:600;line-height:1.2">Alerts and investigations</p>
-<p style="font-size:28px;line-height:1.35;color:#4A5563">Notification API 1.2.1 + 2.0.0, forwarded hop by hop</p>
+<p style="font-size:36px;font-weight:600;line-height:1.2">Three companies, real EDCs</p>
+<p style="font-size:28px;line-height:1.35;color:#4A5563">An alert travels Tier-2 → Tier-1 → OEM on the Tractus-X umbrella, and back</p>
+</div>
+<div style="display:flex;flex-direction:column;gap:4px;border-left:6px solid #B3CB2D;padding:0 0 0 24px">
+<p style="font-size:36px;font-weight:600;line-height:1.2">252 automated tests</p>
+<p style="font-size:28px;line-height:1.35;color:#4A5563">14 official aspect payload versions, v3 to industry_core v4</p>
 </div>
 </div>
 <div style="flex:1;display:flex;flex-direction:column;gap:12px">
-<img src="notification-detail.png" alt="A received quality alert in the app: status path with accept and decline, and the next hop computed from the local tree" style="width:960px;height:560px;object-fit:contain;background:#E9ECEF;border:1px solid #DCDCDC;border-radius:16px">
-<p style="font-size:24px;color:#6A7480">A received alert and its next hop — running against a mock participant</p>
+<img src="parts-production.jpg" alt="The app's parts page after a local test sync: 302 own parts, 2192 supplier links, 204 customer links, 0 issues" style="width:960px;height:600px;object-fit:contain;background:#E9ECEF;border:1px solid #DCDCDC;border-radius:16px">
+<p style="font-size:24px;color:#6A7480">A local test against a production connector — names, serials and BPNL blurred</p>
 </div>
 </div>
 <p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6A7480">Catena-X Traceability · 11</p>
-<aside>Be precise about what is proven: the app reads every official example payload, syncs its own registry through the SDK, reads direct partners' twins and sends and receives alerts and investigations in both Notification API versions, following the KIT state model. A test runs an alert through three companies, each with its own database, and back. All of this runs against mocks; it has not yet run against real EDCs — that is phase 3, on the Tractus-X umbrella environment.</aside>
+<aside>Be precise about what is proven. In a one-off local test against a production EDC and registry (a local instance, not a production deployment), the app synced a selection of 200 vehicles (303 twins with their children) from a real Digital Twin Registry; the data plane wanted an EDR, so every submodel was read through the company's own EDC — one negotiation per shared asset, then plain reads — and nothing failed. In the Tractus-X umbrella lab: three companies, each with its own EDC, registry and app, read their direct partners and pass a quality alert Tier-2 → Tier-1 → OEM with the acceptance coming back. Not yet proven: notifications with a real partner in production — that is the pilot.</aside>
 </section>
 </div></div>
 <div class="frame"><div class="slide">
 <section id="roadmap" style="background:#F7F7F5;color:#14181D;font-family:'Libre Franklin', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:56px">
 <div style="display:flex;flex-direction:column;gap:20px">
 <p style="font-size:24px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#0F71CB">Roadmap</p>
-<h2 style="font-size:64px;font-weight:600;line-height:1.15">Next: a three-company demo on real connectors</h2>
+<h2 style="font-size:64px;font-weight:600;line-height:1.15">Next: a pilot with real partners</h2>
 </div>
 <div style="display:flex;flex-direction:row;gap:24px">
 <div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#F0F5D5;border:1px solid #B3CB2D;border-radius:16px;padding:36px">
@@ -360,20 +364,20 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 <h3 style="font-size:36px;font-weight:600;line-height:1.2">Partners and notifications</h3>
 <p style="font-size:28px;line-height:1.4;color:#3F4A10">Direct partners via EDC; alerts, investigations, forwarding</p>
 </div>
-<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#FFFFFF;border:2px solid #0F71CB;border-radius:16px;padding:36px">
-<p style="font-size:24px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#0D55AF">Phase 3 · next</p>
-<h3 style="font-size:36px;font-weight:600;line-height:1.2">Demo</h3>
-<p style="font-size:28px;line-height:1.4;color:#4A5563">Tier-2 on v3, Tier-1 and OEM on the Tractus-X umbrella</p>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#F0F5D5;border:1px solid #B3CB2D;border-radius:16px;padding:36px">
+<p style="font-size:24px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#4F5A12">Phase 3 · done</p>
+<h3 style="font-size:36px;font-weight:600;line-height:1.2">Real connectors</h3>
+<p style="font-size:28px;line-height:1.4;color:#3F4A10">Three-company umbrella lab; local test against a production EDC</p>
 </div>
-<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#FFFFFF;border:1px solid #DCDCDC;border-radius:16px;padding:36px">
-<p style="font-size:24px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#6A7480">Phase 4</p>
-<h3 style="font-size:36px;font-weight:600;line-height:1.2">Extensions</h3>
-<p style="font-size:28px;line-height:1.4;color:#4A5563">Block notifications, ZeroKmFailure, release 26.09</p>
+<div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#FFFFFF;border:2px solid #0F71CB;border-radius:16px;padding:36px">
+<p style="font-size:24px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#0D55AF">Phase 4 · next</p>
+<h3 style="font-size:36px;font-weight:600;line-height:1.2">Pilot and extensions</h3>
+<p style="font-size:28px;line-height:1.4;color:#4A5563">Alerts with real partners; block notifications, ZeroKmFailure, 26.09</p>
 </div>
 </div>
 <p style="font-size:28px;line-height:1.4;color:#4A5563">Timeline: [weeks per phase] · Team: [people]</p>
 <p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6A7480">Catena-X Traceability · 12</p>
-<aside>Phase 3 is the proof point: three participants in the reference environment, one of them deliberately still on SerialPart 3, and an alert that travels Tier-2 to Tier-1 to OEM while each company only looks at its own level. Fill in the timeline and team before presenting.</aside>
+<aside>Phase 3 was the proof point and it is done: three participants in the Tractus-X umbrella environment, one of them deliberately still on SerialPart 3, pass an alert Tier-2 to Tier-1 to OEM while each company only looks at its own level; and, in a local test, the app has synced twins from a production registry through a real EDC. What is left is the pilot: the same alerts with real partners. Fill in the timeline and team before presenting.</aside>
 </section>
 </div></div>
 <div class="frame"><div class="slide">
@@ -393,20 +397,20 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 <div style="display:flex;flex-direction:row;gap:32px;align-items:center;background:#FFFFFF;border:1px solid #DCDCDC;border-radius:16px;padding:32px 40px">
 <p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:44px;color:#0F71CB">02</p>
 <div style="flex:1;display:flex;flex-direction:column;gap:8px">
-<h3 style="font-size:36px;font-weight:600">A test environment</h3>
-<p style="font-size:28px;color:#4A5563">[Access to a Catena-X test or integration environment with EDC and DTR]</p>
+<h3 style="font-size:36px;font-weight:600">Contracts for the pilot</h3>
+<p style="font-size:28px;color:#4A5563">[Notification offers and usage policies agreed with the pilot partners' connectors]</p>
 </div>
 </div>
 <div style="display:flex;flex-direction:row;gap:32px;align-items:center;background:#FFFFFF;border:1px solid #DCDCDC;border-radius:16px;padding:32px 40px">
 <p style="font-family:'IBM Plex Mono', 'Courier New', monospace;font-size:44px;color:#0F71CB">03</p>
 <div style="flex:1;display:flex;flex-direction:column;gap:8px">
 <h3 style="font-size:36px;font-weight:600">A decision</h3>
-<p style="font-size:28px;color:#4A5563">[Sponsor and budget] to run phase 3 and the pilot</p>
+<p style="font-size:28px;color:#4A5563">[Sponsor and budget] to run the pilot and phase 4</p>
 </div>
 </div>
 </div>
 <p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6A7480">Catena-X Traceability · 13</p>
-<aside>Replace the bracketed items with the concrete ask for this audience. Pilot partners matter most: the whole point is that the app works with partners as they are today, including those still on SerialPart 3.</aside>
+<aside>Replace the bracketed items with the concrete ask for this audience. Pilot partners matter most: the whole point is that the app works with partners as they are today, including those still on SerialPart 3 or on Jupiter. The connectors and the registry are no longer the open question: the app has already been tested locally against production ones.</aside>
 </section>
 </div></div>
 <div class="frame"><div class="slide">
