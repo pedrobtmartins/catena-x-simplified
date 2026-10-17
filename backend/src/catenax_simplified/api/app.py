@@ -157,8 +157,8 @@ async def test_connections(request: Request) -> list[ConnectionCheckOut]:
 
 
 @router.get("/stats", response_model=StatsOut)
-def stats(session: SessionDep) -> StatsOut:
-    return StatsOut(**PartRepository(session).stats())
+def stats(session: SessionDep, request: Request) -> StatsOut:
+    return StatsOut(**PartRepository(session).stats(request.app.state.settings.own_bpnl))
 
 
 @router.get("/parts", response_model=PartPage)
