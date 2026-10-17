@@ -10,15 +10,15 @@ function quantity(node: TreeNode): string | null {
   return `${n} ${unit}${unit === "piece" && node.quantity !== 1 ? "s" : ""}`.trim();
 }
 
-function NodeCard({ node, from }: { node: TreeNode; from: string }) {
-  const facts = [node.business_partner, quantity(node), `from ${node.declared_in.join(" + ") || from}`]
+function NodeCard({ node, from, partnerName }: { node: TreeNode; from: string; partnerName?: string | null }) {
+  const facts = [partnerName ?? node.business_partner, quantity(node), `from ${node.declared_in.join(" + ") || from}`]
     .filter(Boolean)
     .join(" · ");
   const content = (
     <>
       {node.part && <strong style={{ fontWeight: 600 }}>{node.part.name_at_manufacturer ?? "Unnamed part"}</strong>}
       <span className="node-id">{node.global_asset_id}</span>
-      <span className="sub">
+      <span className="sub" title={partnerName ? node.business_partner ?? undefined : undefined}>
         {facts}
         {node.is_only_potential_parent && " · potential parent"}
       </span>
@@ -71,6 +71,16 @@ export function PartDetail({ id, dataVersion }: { id: string; dataVersion: numbe
   const [tree, setTree] = useState<PartTree | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  // Partner names for the tree; the BPNL stays the fallback (and the tooltip).
+  const [names, setNames] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    api.partners().then(
+      (partners) =>
+        setNames(Object.fromEntries(partners.filter((p) => p.name).map((p) => [p.bpnl, p.name as string]))),
+      () => setNames({}),
+    );
+  }, [dataVersion]);
 
   useEffect(() => {
     setError(null);
@@ -99,6 +109,12 @@ export function PartDetail({ id, dataVersion }: { id: string; dataVersion: numbe
     : tree.part.is_own
       ? tree.children.filter((n) => n.business_partner).map((n) => n.global_asset_id)
       : [tree.part.global_asset_id];
+  const canAlert = Boolean(part?.is_own && tree?.parents.some((n) => n.business_partner));
+  // Why an action is unavailable, said next to it rather than only in a tooltip.
+  const unavailable = [
+    investigate.length === 0 && "No supplier parts to investigate in this part's bill of material.",
+    !canAlert && (part?.is_own ? "No direct customer known for this part, so no alert can be sent." : "Alerts are about own parts."),
+  ].filter(Boolean) as string[];
   const partnerMissing = tree ? [...tree.parents, ...tree.children].some((n) => !n.part) : false;
   const sources = tree
     ? [
@@ -150,6 +166,7 @@ export function PartDetail({ id, dataVersion }: { id: string; dataVersion: numbe
                 </span>
               </div>
             </div>
+            <div className="detail-actions">
             <div className="actions">
               {investigate.length > 0 ? (
                 <a className="btn btn-secondary" href={composeHref("investigation", investigate)}>
@@ -160,7 +177,7 @@ export function PartDetail({ id, dataVersion }: { id: string; dataVersion: numbe
                   Start investigation
                 </button>
               )}
-              {part.is_own && tree.parents.some((n) => n.business_partner) ? (
+              {canAlert ? (
                 <a className="btn btn-primary" href={composeHref("alert", [part.global_asset_id])}>
                   Send quality alert
                 </a>
@@ -174,6 +191,12 @@ export function PartDetail({ id, dataVersion }: { id: string; dataVersion: numbe
                   Send quality alert
                 </button>
               )}
+            </div>
+            {unavailable.map((reason) => (
+              <p key={reason} className="action-note">
+                {reason}
+              </p>
+            ))}
             </div>
           </div>
 
@@ -193,7 +216,7 @@ export function PartDetail({ id, dataVersion }: { id: string; dataVersion: numbe
                 ) : (
                   tree.parents.map((node) => (
                     <div className="leaf" key={node.global_asset_id}>
-                      <NodeCard node={node} from="usage" />
+                      <NodeCard node={node} from="usage" partnerName={node.business_partner ? names[node.business_partner] : null} />
                       <div className="leaf-line out" />
                     </div>
                   ))
@@ -229,7 +252,7 @@ export function PartDetail({ id, dataVersion }: { id: string; dataVersion: numbe
                       {tree.children.map((node) => (
                         <div className="leaf" key={node.global_asset_id}>
                           <div className="leaf-line" />
-                          <NodeCard node={node} from="bom" />
+                          <NodeCard node={node} from="bom" partnerName={node.business_partner ? names[node.business_partner] : null} />
                         </div>
                       ))}
                     </div>

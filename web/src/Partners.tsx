@@ -9,7 +9,7 @@ const STATUS: Record<NonNullable<Partner["last_status"]>, { label: string; badge
   ok: { label: "Synced", badge: "badge-ok" },
   partial: { label: "Partial", badge: "badge-warn" },
   failed: { label: "Failed", badge: "badge-error" },
-  no_connector: { label: "No connector", badge: "badge-outline" },
+  no_connector: { label: "No connector", badge: "badge-warn" },
 };
 
 function PartnerRow({
@@ -64,8 +64,17 @@ function PartnerRow({
       <tr className={expanded ? "row-expanded" : undefined}>
         <td>
           <div className="part-link">
-            <strong>{partner.name ?? "Unnamed partner"}</strong>
-            <span className="cell-id">{partner.bpnl}</span>
+            {partner.name ? (
+              <>
+                <strong>{partner.name}</strong>
+                <span className="cell-id">{partner.bpnl}</span>
+              </>
+            ) : (
+              <>
+                <strong className="mono">{partner.bpnl}</strong>
+                <span className="sub">No name yet</span>
+              </>
+            )}
           </div>
         </td>
         <td>
@@ -147,7 +156,7 @@ function PartnerRow({
               <>
                 <button
                   type="button"
-                  className="btn btn-secondary"
+                  className="btn btn-secondary btn-sm"
                   disabled={!canEdit}
                   title={canEdit ? undefined : "Sign in as admin to change partners"}
                   onClick={() => setEditing(true)}

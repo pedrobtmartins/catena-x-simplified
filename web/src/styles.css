@@ -1954,3 +1954,212 @@ a.btn-secondary:hover {
   color: var(--text-2);
   font-size: 13px;
 }
+
+/* ---------- redesign, phase 1: focus, figures, density, shapes ---------- */
+
+/* Keyboard focus is visible everywhere; mouse clicks stay quiet. */
+:where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* Figures line up in columns. */
+table,
+.stat-value {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Calmer labels: sentence case instead of tracked capitals. */
+th,
+.overline {
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 13px;
+  color: var(--text-2);
+}
+
+/* Denser tables: more rows on screen, same reading comfort. */
+th {
+  padding: 10px 12px;
+}
+
+td {
+  padding: 9px 12px;
+}
+
+
+/* Buttons: one radius family, quiet motion, a pressed state. */
+.btn {
+  min-height: 40px;
+  border-radius: 10px;
+  transition: background-color 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--text-3);
+}
+
+/* Status and version labels are labels, not buttons. */
+.badge {
+  border-radius: 6px;
+  padding: 3px 8px;
+}
+
+/* Surfaces: lighter borders, tighter radii. */
+.card {
+  border-radius: 12px;
+  border-color: var(--divider);
+}
+
+.stat,
+.table-box {
+  border-radius: 10px;
+  border-color: var(--divider);
+}
+
+.stat-value {
+  font-size: 28px;
+  letter-spacing: -0.01em;
+}
+
+/* ---------- redesign, phase 2: components ---------- */
+
+/* Filters and severity: one segmented control per choice, not loose pills. */
+.chip-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-self: flex-start;
+  width: fit-content;
+  max-width: 100%;
+  gap: 2px;
+  padding: 3px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.chip {
+  min-height: 30px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--text-2);
+  font-size: 13px;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.chip:hover {
+  color: var(--text);
+}
+
+.chip[aria-pressed="true"] {
+  background: var(--surface);
+  color: var(--primary-dark);
+  box-shadow: 0 1px 2px rgba(17, 17, 17, 0.08), 0 0 0 1px var(--border);
+}
+
+/* Row and inline actions share the button's shape and size. */
+.btn-sm {
+  min-height: 36px;
+  padding: 0 14px;
+}
+
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border-color: var(--border);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+}
+
+.icon-btn:hover:not(:disabled) {
+  border-color: var(--text-3);
+  background: var(--surface-subtle);
+}
+
+.health-toggle .chevron {
+  border: 0;
+  background: transparent;
+}
+
+/* An unavailable action says why, next to it. */
+.detail-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.action-note {
+  max-width: 400px;
+  text-align: right;
+  text-wrap: balance;
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+@media (max-width: 760px) {
+  .detail-actions {
+    align-items: flex-start;
+  }
+
+  .action-note {
+    text-align: left;
+  }
+}
+
+/* Tree: the part in focus is marked, not shouted. */
+.node-focus {
+  background: var(--surface);
+  color: var(--text);
+  border: 2px solid var(--primary);
+  box-shadow: none;
+}
+
+.node-focus .light {
+  color: var(--text-2);
+}
+
+/* Sync history: a row of figures instead of cards inside a card. */
+.metric {
+  border: 0;
+  border-left: 1px solid var(--divider);
+  border-radius: 0;
+  background: none;
+  padding: 2px 0 2px 16px;
+}
+
+.metric:first-child {
+  border-left: 0;
+  padding-left: 0;
+}
+
+.metric strong {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Parts: links in words. */
+.cell-links {
+  white-space: nowrap;
+}
+
+.cell-links span {
+  display: block;
+}
+
+/* Labels keep their own width inside stacked cells. */
+.part-link .badge {
+  align-self: flex-start;
+}
+
+/* One label style: tinted, no border. */
+.badge-outline {
+  background: var(--divider);
+  border: 0;
+  color: var(--text-2);
+}
