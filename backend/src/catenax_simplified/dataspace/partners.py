@@ -9,7 +9,10 @@ Flow per the Industry Core / Digital Twin KITs:
    ``dspEndpoint`` it names, and read ``{href}/$value`` with the access token.
 
 Contract negotiations and access tokens are reused through the Tractus-X SDK's connection
-manager; a negotiation happens only once per partner, asset and accepted policy set.
+manager; a negotiation happens only once per partner, asset and accepted policy set. On top of
+that, the endpoint and token of an asset (the registry, or a submodel asset shared by many twins)
+are kept for ``token_ttl_seconds``: reading the next submodel of that asset is then a plain GET,
+without the catalog request and EDR lookup that even a reused negotiation costs.
 """
 
 from __future__ import annotations
@@ -87,19 +90,24 @@ class EdcPartnerClient:
         self._timeout = timeout
         self._token_ttl = token_ttl_seconds
         self._clock = clock
-        self._dtr_access: dict[str, tuple[float, str, str]] = {}
+        self._access: dict[tuple[str, str, str, str], tuple[float, str, str]] = {}
 
     # -- dataspace -----------------------------------------------------------------------
 
-    def _dtr(self, partner: Partner) -> tuple[str, str]:
-        cached = self._dtr_access.get(partner.bpnl)
+    def _negotiated(self, bpnl: str, address: str, key: str, value: str) -> tuple[str, str]:
+        """(endpoint, token) for the asset with ``key`` = ``value``, reused within the TTL."""
+        cache_key = (bpnl, address, key, value)
+        cached = self._access.get(cache_key)
         if cached and self._clock() - cached[0] < self._token_ttl:
             return cached[1], cached[2]
-        endpoint, token = self._edc.negotiate(
-            partner.bpnl, partner.connector_address, [equals(DCT_TYPE_KEY, DTR_ASSET_TYPE)]
-        )
-        self._dtr_access[partner.bpnl] = (self._clock(), endpoint, token)
+        endpoint, token = self._edc.negotiate(bpnl, address, [equals(key, value)])
+        self._access[cache_key] = (self._clock(), endpoint, token)
         return endpoint, token
+
+    def _dtr(self, partner: Partner) -> tuple[str, str]:
+        return self._negotiated(
+            partner.bpnl, partner.connector_address, DCT_TYPE_KEY, DTR_ASSET_TYPE
+        )
 
     def _get_json(self, url: str, token: str, params: Any = None) -> Any:
         try:
@@ -151,7 +159,7 @@ class EdcPartnerClient:
         if "id" not in body:
             raise DataspaceError(f"submodel descriptor at {ref.href} names no asset id")
         address = body.get("dspEndpoint") or partner.connector_address
-        _, token = self._edc.negotiate(partner.bpnl, address, [equals(ASSET_ID_KEY, body["id"])])
+        _, token = self._negotiated(partner.bpnl, address, ASSET_ID_KEY, body["id"])
         payload = self._get_json(value_url(ref), token)
         if not isinstance(payload, dict):
             raise DataspaceError(f"submodel at {ref.href} is missing or not a JSON object")

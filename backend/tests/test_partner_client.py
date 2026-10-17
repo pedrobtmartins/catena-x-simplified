@@ -163,6 +163,30 @@ def test_read_submodel_negotiates_for_its_asset_at_its_dsp_endpoint():
     ]
 
 
+@responses.activate
+def test_submodels_of_a_shared_asset_reuse_its_access_within_the_ttl():
+    for n in (1, 2, 3):
+        responses.get(f"{HREF}{n}/$value", json={"n": n})
+    consumer, clock = FakeConsumer(), Clock()
+    client = EdcPartnerClient(
+        consumer, accepted_policies=[POLICY], clock=clock, token_ttl_seconds=60
+    )
+
+    def ref(n, asset="cells-bundle"):
+        body = f"dspEndpoint=https://edc2.tier2/api/v1/dsp;id={asset}"
+        return SubmodelRef(SERIAL_PART_V3, f"{HREF}{n}", "SUBMODEL-3.0", body)
+
+    assert client.read_submodel(PARTNER, ref(1)) == {"n": 1}
+    clock.now = 59
+    assert client.read_submodel(PARTNER, ref(2)) == {"n": 2}
+    assert len(consumer.negotiations) == 1
+    client.read_submodel(PARTNER, ref(3, asset="other-asset"))
+    assert len(consumer.negotiations) == 2
+    clock.now = 61
+    client.read_submodel(PARTNER, ref(1))
+    assert len(consumer.negotiations) == 3
+
+
 def test_no_accepted_policies_means_no_negotiation():
     consumer = FakeConsumer()
     with pytest.raises(DataspaceError, match="no accepted usage policies"):
