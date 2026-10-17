@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, formatDateTime, formatTime, syncState, type Health, type SyncReport } from "./api";
 import { CheckIcon } from "./icons";
+import { Skeleton } from "./ui";
 
 function duration(run: SyncReport): string | null {
   if (!run.finished_at) return null;
@@ -82,8 +83,8 @@ export function SyncHistory({ health, dataVersion }: { health: Health | null; da
       <div className="two-col">
         <div className="main-col">
           <section className="card" aria-labelledby="latest-title">
-            <div className="card-head" style={{ alignItems: "center" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
+            <div className="card-head center">
+              <div className="stack-tight">
                 <h2 id="latest-title">Latest run</h2>
                 {latest && (
                   <span className="sub">
@@ -109,8 +110,19 @@ export function SyncHistory({ health, dataVersion }: { health: Health | null; da
                   </div>
                 ))}
               </div>
+            ) : runs ? (
+              <p className="muted card-gap">No sync has run yet. Choose Sync own twins to start the first one.</p>
             ) : (
-              runs && <p className="muted" style={{ marginTop: 12 }}>No sync has run yet.</p>
+              !error && (
+                <div className="metrics" aria-busy="true">
+                  {[0, 1, 2, 3, 4].map((i) => (
+                    <div className="metric" key={i}>
+                      <Skeleton width={40} height={26} />
+                      <Skeleton width="70%" />
+                    </div>
+                  ))}
+                </div>
+              )
             )}
           </section>
 
@@ -127,10 +139,10 @@ export function SyncHistory({ health, dataVersion }: { health: Health | null; da
                         <span className="run-line" />
                       </div>
                       <div className="run-body">
-                        <strong style={{ fontWeight: 600 }}>
+                        <strong className="semibold">
                           {formatTime(run.started_at)} · {STATE_LABEL[state].toLowerCase()}
                         </strong>
-                        <span style={{ color: "var(--text-2)" }}>
+                        <span className="text-2">
                           {run.twins} twins · {run.parts} parts · {run.relation_sets} relation sets ·{" "}
                           {run.issues.length} {run.issues.length === 1 ? "issue" : "issues"}
                           {run.removed_parts > 0 && ` · ${run.removed_parts} removed`}
@@ -177,7 +189,7 @@ export function SyncHistory({ health, dataVersion }: { health: Health | null; da
                 <ul className="aspect-list">
                   {aspects.map((a) => (
                     <li key={a.name}>
-                      <strong style={{ fontWeight: 600 }}>{a.name}</strong>
+                      <strong className="semibold">{a.name}</strong>
                       <span className="sub">{a.versions}</span>
                     </li>
                   ))}

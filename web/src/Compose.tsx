@@ -118,7 +118,7 @@ export function Compose({ query, health }: { query: string; health: Health | nul
 
           <section className="card form" aria-labelledby="details-title">
             <h2 id="details-title">Details</h2>
-            <div className="field" style={{ maxWidth: "none" }}>
+            <div className="field wide">
               <label id="severity-label">Severity</label>
               <ChipGroup<Severity>
                 label="Severity"
@@ -127,7 +127,7 @@ export function Compose({ query, health }: { query: string; health: Health | nul
                 options={SEVERITIES.map((s) => ({ label: severityLabel(s), value: s }))}
               />
             </div>
-            <div className="field" style={{ maxWidth: "none" }}>
+            <div className="field wide">
               <label htmlFor="description">Description</label>
               <textarea
                 id="description"
@@ -158,7 +158,7 @@ export function Compose({ query, health }: { query: string; health: Health | nul
         <aside className="card" aria-labelledby="recipients-title">
           <h2 id="recipients-title">Recipients</h2>
           {recipients.length === 0 ? (
-            <p className="muted" style={{ marginTop: 12 }}>
+            <p className="muted card-gap">
               {items.length === 0
                 ? "Select at least one part."
                 : `Nothing to send yet: none of the selected parts has a direct ${alert ? "customer" : "supplier"} in your data.`}

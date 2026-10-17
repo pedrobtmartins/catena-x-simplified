@@ -36,6 +36,19 @@ function parseRoute(hash: string): Route {
   return { page: "parts" };
 }
 
+// The browser tab says where you are; detail pages add what they show once it is known.
+const TITLE: Record<Route["page"], string> = {
+  parts: "Parts",
+  part: "Part",
+  sync: "Sync history",
+  partners: "Partners",
+  setup: "Setup",
+  login: "Admin sign-in",
+  notifications: "Notifications",
+  notification: "Notification",
+  compose: "New notification",
+};
+
 const SECTION: Record<Route["page"], "parts" | "sync" | "partners" | "notifications" | "setup"> = {
   parts: "parts",
   part: "parts",
@@ -76,6 +89,10 @@ export function App() {
 
   useEffect(() => {
     api.me().then(setMe, () => setMe(null));
+  }, [route]);
+
+  useEffect(() => {
+    document.title = `${TITLE[route.page]} · Traceability`;
   }, [route]);
 
   const signOut = async () => {

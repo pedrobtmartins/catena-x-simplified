@@ -2163,3 +2163,129 @@ td {
   border: 0;
   color: var(--text-2);
 }
+
+/* ---------- redesign, phase 3: states and finish ---------- */
+
+/* Loading: grey bars in the shape of what is coming. */
+.skeleton {
+  display: block;
+  height: 12px;
+  max-width: 100%;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--divider) 0%, var(--surface-subtle) 50%, var(--divider) 100%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+
+@keyframes skeleton-shimmer {
+  from {
+    background-position: 100% 0;
+  }
+  to {
+    background-position: -100% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton {
+    animation: none;
+  }
+}
+
+.skeleton-row td {
+  padding-top: 16px;
+  padding-bottom: 16px;
+}
+
+.skeleton-row:hover {
+  background: none;
+}
+
+.stat .skeleton + .skeleton {
+  margin-top: 4px;
+}
+
+.detail-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* Empty: what the list is for and how it fills up. */
+.empty-row:hover {
+  background: none;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 28px 8px 32px;
+  max-width: 62ch;
+}
+
+.empty-state strong {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.empty-body {
+  color: var(--text-2);
+  line-height: 1.5;
+}
+
+.empty-body strong {
+  font-size: inherit;
+}
+
+/* Small utilities that replace one-off inline styles. */
+.card-head.center {
+  align-items: center;
+}
+
+.actions.nowrap {
+  flex-wrap: nowrap;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.semibold {
+  font-weight: 600;
+}
+
+.contents {
+  display: contents;
+}
+
+.small {
+  font-size: 12px;
+}
+
+.empty-node.indent {
+  padding-left: 38px;
+}
+
+.field.wide {
+  max-width: none;
+}
+
+.card-gap {
+  margin-top: 12px;
+}
+
+.stack-tight {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.text-2 {
+  color: var(--text-2);
+}
+
+.tag-note {
+  margin-left: 8px;
+}

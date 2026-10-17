@@ -274,7 +274,7 @@ export function Checklist({
 
   return (
     <section className="card checklist" aria-labelledby="checklist-title">
-      <div className="card-head" style={{ alignItems: "center" }}>
+      <div className="card-head center">
         <div>
           <h2 id="checklist-title">{complete ? "Setup complete" : "Get started"}</h2>
           <p className="sub card-note">

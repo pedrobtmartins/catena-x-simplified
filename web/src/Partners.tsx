@@ -3,7 +3,7 @@ import { api, ApiError, formatDateTime, type CheckLevel, type CheckStatus, type 
 import { ConnectorOverview, healthOf, type HealthFilter } from "./ConnectorOverview";
 import { CheckIcon, ChevronIcon, SyncIcon } from "./icons";
 import { HealthBadge, HealthPanel, STATUS as CHECK_STATUS } from "./PartnerHealth";
-import { ErrorAlert } from "./ui";
+import { EmptyState, ErrorAlert, SkeletonRows } from "./ui";
 
 const STATUS: Record<NonNullable<Partner["last_status"]>, { label: string; badge: string }> = {
   ok: { label: "Synced", badge: "badge-ok" },
@@ -142,7 +142,7 @@ function PartnerRow({
           </button>
         </td>
         <td>
-          <div className="actions" style={{ flexWrap: "nowrap" }}>
+          <div className="actions nowrap">
             {editing ? (
               <>
                 <button type="button" className="btn btn-primary" onClick={save}>
@@ -340,12 +340,14 @@ export function Partners({
                 onChecked={() => setVersion((v) => v + 1)}
               />
             ))}
+            {!partners && !error && <SkeletonRows rows={3} cols={7} />}
             {partners && partners.length === 0 && (
-              <tr>
-                <td colSpan={7} className="muted">
-                  No partners yet. Sync your own twins: partners come from your BoM and usage aspects.
-                </td>
-              </tr>
+              <EmptyState cols={7} title="No partners yet">
+                <p>
+                  Partners are found in your own data: the suppliers in your parts' bills of material and the customers
+                  in their usage. Sync your own twins in <a href="#/">Parts</a> and they appear here.
+                </p>
+              </EmptyState>
             )}
             {partners && partners.length > 0 && visible?.length === 0 && (
               <tr>

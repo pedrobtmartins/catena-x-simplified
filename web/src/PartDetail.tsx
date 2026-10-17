@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { api, formatDateTime, parseSemanticId, type Part, type PartTree, type TreeNode } from "./api";
 import { composeHref } from "./Compose";
 import { CopyIcon, InfoIcon } from "./icons";
+import { Skeleton } from "./ui";
 
 function quantity(node: TreeNode): string | null {
   if (node.quantity === null) return null;
@@ -16,7 +17,7 @@ function NodeCard({ node, from, partnerName }: { node: TreeNode; from: string; p
     .join(" · ");
   const content = (
     <>
-      {node.part && <strong style={{ fontWeight: 600 }}>{node.part.name_at_manufacturer ?? "Unnamed part"}</strong>}
+      {node.part && <strong className="semibold">{node.part.name_at_manufacturer ?? "Unnamed part"}</strong>}
       <span className="node-id">{node.global_asset_id}</span>
       <span className="sub" title={partnerName ? node.business_partner ?? undefined : undefined}>
         {facts}
@@ -58,7 +59,7 @@ function Attributes({ part }: { part: Part }) {
   return (
     <dl className="attrs">
       {rows.map(([label, value, mono]) => (
-        <div key={label} style={{ display: "contents" }}>
+        <div key={label} className="contents">
           <dt>{label}</dt>
           <dd className={mono && value ? "cell-mono" : undefined}>{value ?? "—"}</dd>
         </div>
@@ -141,6 +142,17 @@ export function PartDetail({ id, dataVersion }: { id: string; dataVersion: numbe
       {error && (
         <div className="alert alert-error" role="alert">
           {error}
+        </div>
+      )}
+
+      {!tree && !error && (
+        <div className="detail-skeleton" aria-busy="true">
+          <Skeleton width={220} />
+          <Skeleton width="45%" height={36} />
+          <Skeleton width={360} />
+          <div className="card">
+            <Skeleton width="100%" height={240} />
+          </div>
         </div>
       )}
 
@@ -227,7 +239,7 @@ export function PartDetail({ id, dataVersion }: { id: string; dataVersion: numbe
                 <span className="overline">This part</span>
                 <div className="node-focus">
                   <strong>{part.name_at_manufacturer ?? "Unnamed part"}</strong>
-                  <span className="mono" style={{ fontSize: 12 }}>
+                  <span className="mono small">
                     {[serial, part.manufacturer_part_id].filter(Boolean).join(" · ")}
                   </span>
                   <span className="light">
@@ -241,7 +253,7 @@ export function PartDetail({ id, dataVersion }: { id: string; dataVersion: numbe
               <div className="tree-col children">
                 <span className="overline">Built from · supplier</span>
                 {tree.children.length === 0 ? (
-                  <span className="empty-node" style={{ paddingLeft: 38 }}>
+                  <span className="empty-node indent">
                     No children published
                   </span>
                 ) : (
@@ -279,7 +291,7 @@ export function PartDetail({ id, dataVersion }: { id: string; dataVersion: numbe
               <div className="source-list">
                 {sources.map((s) => (
                   <div className="source" key={s.name}>
-                    <strong style={{ fontWeight: 600 }}>{s.name}</strong>
+                    <strong className="semibold">{s.name}</strong>
                     <span className="cell-id">{s.detail}</span>
                   </div>
                 ))}

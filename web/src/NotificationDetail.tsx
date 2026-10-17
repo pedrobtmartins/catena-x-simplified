@@ -98,7 +98,7 @@ function Actions({ notification, health, onChange }: { notification: Detail; hea
   return (
     <div className="action-box">
       {(decision || closing) && (
-        <div className="field" style={{ maxWidth: "none" }}>
+        <div className="field wide">
           <label htmlFor="information">
             {decision ? "Answer to the initiator (optional)" : "Closing note (optional)"}
           </label>
@@ -153,7 +153,7 @@ function Forwarding({ notification }: { notification: Detail }) {
     return notification.forwarded_from ? (
       <section className="card" aria-labelledby="fwd-title">
         <h2 id="fwd-title">Previous hop</h2>
-        <p style={{ marginTop: 12 }}>
+        <p className="card-gap">
           Forwarded from{" "}
           <a href={`#/notifications/${notification.forwarded_from.id}`}>
             {TYPE_LABEL[notification.forwarded_from.type].toLowerCase()} received from{" "}
@@ -341,7 +341,7 @@ export function NotificationDetail({ id, health }: { id: number; health: Health 
             <section className="card" aria-labelledby="log-title">
               <h2 id="log-title">Messages</h2>
               {n.messages.length === 0 ? (
-                <p className="muted" style={{ marginTop: 12 }}>
+                <p className="muted card-gap">
                   <InfoIcon /> Not sent yet.
                 </p>
               ) : (
@@ -353,7 +353,7 @@ export function NotificationDetail({ id, health }: { id: number; health: Health 
                         <span className="run-line" />
                       </div>
                       <div className="run-body">
-                        <strong style={{ fontWeight: 600 }}>
+                        <strong className="semibold">
                           {m.direction === "inbound" ? `From ${n.partner_bpnl}` : `To ${n.partner_bpnl}`} ·{" "}
                           {m.operation === "receive" ? "new notification" : m.status && STATUS_LABEL[m.status].toLowerCase()}
                         </strong>

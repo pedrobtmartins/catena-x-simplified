@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, localIdentifiers, parseSemanticId, shortId, type PartPage, type Stats } from "./api";
 import { SearchIcon } from "./icons";
-import { ChipGroup } from "./ui";
+import { ChipGroup, EmptyState, Skeleton, SkeletonRows } from "./ui";
 
 const PAGE_SIZE = 50;
 
@@ -58,6 +58,18 @@ export function PartList({ dataVersion }: { dataVersion: number }) {
         <h1>Parts</h1>
         <p>Twins from your Digital Twin Registry, cached locally. Aspect models v3 and v4 side by side.</p>
       </div>
+
+      {!stats && !error && (
+        <div className="stats" aria-busy="true">
+          {[0, 1, 2, 3].map((i) => (
+            <div className="stat" key={i}>
+              <Skeleton width="45%" />
+              <Skeleton width="30%" height={28} />
+              <Skeleton width="70%" />
+            </div>
+          ))}
+        </div>
+      )}
 
       {stats && split && (
         <div className="stats">
@@ -195,13 +207,20 @@ export function PartList({ dataVersion }: { dataVersion: number }) {
                 </tr>
               );
             })}
-            {page && page.items.length === 0 && (
-              <tr>
-                <td colSpan={7} className="muted">
-                  {filtered ? "No parts match these filters." : "No parts yet. Sync your own twins to fill the cache."}
-                </td>
-              </tr>
-            )}
+            {!page && !error && <SkeletonRows rows={6} cols={7} />}
+            {page && page.items.length === 0 &&
+              (filtered ? (
+                <EmptyState cols={7} title="No parts match these filters">
+                  <p>Clear the search or choose another type or aspect version.</p>
+                </EmptyState>
+              ) : (
+                <EmptyState cols={7} title="No parts yet">
+                  <p>
+                    Choose <strong>Sync own twins</strong> to read your parts from your Digital Twin Registry. If the
+                    registry is not connected yet, start in <a href="#/setup">Setup</a>.
+                  </p>
+                </EmptyState>
+              ))}
           </tbody>
         </table>
       </div>
