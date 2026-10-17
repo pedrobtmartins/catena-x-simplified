@@ -107,7 +107,7 @@ function Participant({
   const edcAuth = health.edc_auth.length ? health.edc_auth.map((a) => AUTH_LABEL[a]).join(" + ") : "no credentials";
   return (
     <section className="card" aria-labelledby="participant-title">
-      <div className="card-head" style={{ alignItems: "center" }}>
+      <div className="card-head center">
         <h2 id="participant-title">Your participant</h2>
         <div className="actions">
           {onEdit && (
@@ -445,7 +445,7 @@ function SetupRow({
           <ErrorAlert error={error} />
         </td>
         <td>
-          <div className="actions" style={{ flexWrap: "nowrap" }}>
+          <div className="actions nowrap">
             <button
               type="button"
               className="btn btn-secondary"
@@ -598,7 +598,7 @@ export function Setup({
         <div className="card-head">
           <h2 id="setup-partners-title">Partner connectors</h2>
           {partners && partners.length > 0 && (
-            <div className="actions" style={{ alignItems: "center" }}>
+            <div className="actions">
               <span className="sub">
                 {missing === 0
                   ? "Every partner has a connector address."

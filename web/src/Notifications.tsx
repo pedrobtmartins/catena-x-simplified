@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, formatDateTime, type NotificationPage, type NotificationSummary } from "./api";
-import { ChipGroup, ErrorAlert, SeverityBadge, StatusBadge, TypeBadge } from "./ui";
+import { ChipGroup, EmptyState, ErrorAlert, SeverityBadge, Skeleton, SkeletonRows, StatusBadge, TypeBadge } from "./ui";
 
 const PAGE_SIZE = 50;
 
@@ -11,7 +11,8 @@ export function Notifications({ dataVersion }: { dataVersion: number }) {
   const [openOnly, setOpenOnly] = useState(true);
   const [offset, setOffset] = useState(0);
   const [page, setPage] = useState<NotificationPage | null>(null);
-  const [summary, setSummary] = useState<NotificationSummary | null>(null);
+  // undefined while loading, null if it could not be read.
+  const [summary, setSummary] = useState<NotificationSummary | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -41,17 +42,17 @@ export function Notifications({ dataVersion }: { dataVersion: number }) {
       <div className="stats">
         <div className="stat">
           <span className="overline">Inbox · new</span>
-          <span className="stat-value">{summary?.inbound_new ?? "—"}</span>
+          <span className="stat-value">{summary === undefined ? <Skeleton width={36} height={28} /> : (summary?.inbound_new ?? "—")}</span>
           <span className="stat-note">Received, not yet acknowledged</span>
         </div>
         <div className="stat">
           <span className="overline">Inbox · open</span>
-          <span className="stat-value">{summary?.inbound_open ?? "—"}</span>
+          <span className="stat-value">{summary === undefined ? <Skeleton width={36} height={28} /> : (summary?.inbound_open ?? "—")}</span>
           <span className="stat-note">Received from partners, not closed</span>
         </div>
         <div className="stat">
           <span className="overline">Outbox · open</span>
-          <span className="stat-value">{summary?.outbound_open ?? "—"}</span>
+          <span className="stat-value">{summary === undefined ? <Skeleton width={36} height={28} /> : (summary?.outbound_open ?? "—")}</span>
           <span className="stat-note">Drafts and sent, not closed</span>
         </div>
       </div>
@@ -105,8 +106,8 @@ export function Notifications({ dataVersion }: { dataVersion: number }) {
                     <strong className="clamp">{n.description || "No description"}</strong>
                     <span className="sub">
                       <TypeBadge type={n.type} />
-                      {n.forwarded_from_id && <span style={{ marginLeft: 8 }}>forwarded</span>}
-                      {n.last_error && <span className="error-text" style={{ marginLeft: 8 }}>delivery failed</span>}
+                      {n.forwarded_from_id && <span className="tag-note">forwarded</span>}
+                      {n.last_error && <span className="error-text tag-note">delivery failed</span>}
                     </span>
                   </a>
                 </td>
@@ -120,18 +121,27 @@ export function Notifications({ dataVersion }: { dataVersion: number }) {
                 <td>
                   {n.affected_items.length} {n.affected_items.length === 1 ? "part" : "parts"}
                 </td>
-                <td style={{ whiteSpace: "nowrap" }}>{formatDateTime(n.updated_at)}</td>
+                <td className="nowrap">{formatDateTime(n.updated_at)}</td>
               </tr>
             ))}
-            {page && page.items.length === 0 && (
-              <tr>
-                <td colSpan={6} className="muted">
-                  {box === "inbound"
-                    ? `No ${openOnly ? "open " : ""}notifications received.`
-                    : `No ${openOnly ? "open " : ""}notifications sent. Start one from a part.`}
-                </td>
-              </tr>
-            )}
+            {!page && !error && <SkeletonRows rows={4} cols={6} />}
+            {page && page.items.length === 0 &&
+              (box === "inbound" ? (
+                <EmptyState cols={6} title={`No ${openOnly ? "open " : ""}notifications received`}>
+                  <p>
+                    Quality alerts from your suppliers and investigations from your customers arrive here, through your
+                    connector. Each one can be answered and forwarded to the next hop.
+                  </p>
+                </EmptyState>
+              ) : (
+                <EmptyState cols={6} title={`No ${openOnly ? "open " : ""}notifications sent`}>
+                  <p>
+                    A notification starts from a part: open one in <a href="#/">Parts</a> and choose{" "}
+                    <strong>Send quality alert</strong> for its customers or <strong>Start investigation</strong> for its
+                    suppliers.
+                  </p>
+                </EmptyState>
+              ))}
           </tbody>
         </table>
       </div>

@@ -222,7 +222,7 @@ export function ConfigEditor({
 
   return (
     <section className="card config-editor" ref={root} aria-labelledby="config-title">
-      <div className="card-head" style={{ alignItems: "center" }}>
+      <div className="card-head center">
         <h2 id="config-title">Connection settings</h2>
         <button type="button" className="btn btn-secondary" onClick={onClose}>
           Done
