@@ -52,7 +52,7 @@ started from. [`.env.example`](.env.example) lists them all with comments; see a
 | `CXS_DATABASE_URL`              | SQLAlchemy URL, e.g. `postgresql+psycopg://…` (install the `postgres` extra) |
 | `CXS_DTR_BASE_URL`              | Own DTR base URL; `CXS_DTR_API_PATH` defaults to `/api/v3`           |
 | `CXS_OAUTH_*`                   | OAuth 2.0 client credentials for the own DTR: `CLIENT_ID`, `CLIENT_SECRET`, optional `SCOPE`, and either a Keycloak `URL` + `REALM` or any `TOKEN_URL` (wins) |
-| `CXS_SUBMODEL_HREF_REWRITES`    | JSON list of `[public_prefix, internal_prefix]`: reads own submodels from the backend instead of the public data plane |
+| `CXS_SUBMODEL_HREF_REWRITES`    | JSON list of `[public_prefix, internal_prefix]`: reads own submodels from the backend instead of the public data plane. Without it (and with an EDC), a data plane that refuses a direct read (401/403: it wants an EDR) is read through the own EDC instead: the app negotiates with its own connector (the `dspEndpoint` in the descriptor's `subprotocolBody`) for the submodel's asset, so the accepted policies must include the own offers' policies |
 | `CXS_SUBMODEL_HEADERS`          | JSON object of extra headers for the submodel backend (e.g. an API key) |
 | `CXS_EDC_MANAGEMENT_URL`        | Own EDC management API (Saturn); with `CXS_EDC_MANAGEMENT_PATH`. Enables partner sync |
 | `CXS_EDC_API_KEY`               | Sent as `X-Api-Key` to the management API |
