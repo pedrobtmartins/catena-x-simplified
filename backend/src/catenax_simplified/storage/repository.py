@@ -4,7 +4,7 @@ from collections.abc import Collection, Sequence
 from dataclasses import asdict
 from datetime import datetime
 
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import and_, delete, func, or_, select, true
 from sqlalchemy.orm import Session
 
 from ..aspects import Part, Relations
@@ -167,30 +167,52 @@ class PartRepository:
                 counts[parent_id][1] += 1
         return {gid: (p, c) for gid, (p, c) in counts.items()}
 
-    def stats(self) -> dict:
+    def stats(self, own_bpnl: str | None = None) -> dict:
+        """Own parts and their links to suppliers and customers. A link between two own parts
+        (a vehicle and its own battery, say) is internal: it counts for neither, nor does the
+        company itself as a partner."""
         own_ids = select(PartRow.global_asset_id).where(PartRow.is_own.is_(True))
+        # A link counts when its other end is not an own part and its partner is not the company.
+        external = (
+            true()
+            if own_bpnl is None
+            else or_(
+                RelationRow.business_partner.is_(None), RelationRow.business_partner != own_bpnl
+            )
+        )
+        partner = RelationRow.business_partner.is_not(None)
+        if own_bpnl is not None:
+            partner = and_(partner, RelationRow.business_partner != own_bpnl)
 
         def distinct_count(query) -> int:
             return self._session.scalar(select(func.count()).select_from(query.subquery())) or 0
 
         supplier_pairs = (
             select(RelationRow.parent_id, RelationRow.child_id)
-            .where(RelationRow.parent_id.in_(own_ids))
+            .where(
+                RelationRow.parent_id.in_(own_ids), RelationRow.child_id.not_in(own_ids), external
+            )
             .distinct()
         )
         customer_pairs = (
             select(RelationRow.parent_id, RelationRow.child_id)
-            .where(RelationRow.child_id.in_(own_ids))
+            .where(
+                RelationRow.child_id.in_(own_ids), RelationRow.parent_id.not_in(own_ids), external
+            )
             .distinct()
         )
         suppliers = (
             select(RelationRow.business_partner)
-            .where(RelationRow.parent_id.in_(own_ids), RelationRow.business_partner.is_not(None))
+            .where(
+                RelationRow.parent_id.in_(own_ids), RelationRow.child_id.not_in(own_ids), partner
+            )
             .distinct()
         )
         customers = (
             select(RelationRow.business_partner)
-            .where(RelationRow.child_id.in_(own_ids), RelationRow.business_partner.is_not(None))
+            .where(
+                RelationRow.child_id.in_(own_ids), RelationRow.parent_id.not_in(own_ids), partner
+            )
             .distinct()
         )
         by_kind = dict(
