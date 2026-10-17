@@ -232,7 +232,7 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 </div>
 </div>
 <p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6A7480">Catena-X Traceability · 7</p>
-<aside>Each choice answers one of the reasons Trace-X stalled. Prerequisite infrastructure answers the heavy bundled stack. One level answers the recursive walk. Negotiate-once answers the per-request round trips: in production, 303 twins sharing a handful of assets synced in 7.5 minutes through the EDC. Tolerant reading answers version churn: the network does not upgrade in lockstep.</aside>
+<aside>Each choice answers one of the reasons Trace-X stalled. Prerequisite infrastructure answers the heavy bundled stack. One level answers the recursive walk. Negotiate-once answers the per-request round trips: in a local test against a production EDC, 303 twins sharing a handful of assets synced in 7.5 minutes through the EDC. Tolerant reading answers version churn: the network does not upgrade in lockstep.</aside>
 </section>
 </div></div>
 <div class="frame"><div class="slide">
@@ -307,7 +307,7 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 <tr><td style="color:#B9C6D2">Answers from</td><td>Asynchronous jobs per request</td><td>Local cache, refreshed by sync</td></tr>
 <tr style="background:#152A3B"><td style="color:#B9C6D2">Connector policies</td><td>IRS not ready for Saturn</td><td>Saturn, and Jupiter for partners not yet moved</td></tr>
 <tr><td style="color:#B9C6D2">Aspect versions</td><td>Tied to its release</td><td>v3 and v4 side by side</td></tr>
-<tr style="background:#152A3B"><td style="color:#B9C6D2">Status</td><td>Not in Tractus-X since 25.09</td><td>Running on production connectors, October 2026</td></tr>
+<tr style="background:#152A3B"><td style="color:#B9C6D2">Status</td><td>Not in Tractus-X since 25.09</td><td>Tested against a production connector, October 2026</td></tr>
 </table>
 <p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#8FA1B3">Catena-X Traceability · 10</p>
 <aside>Keep this factual, not a takedown. The notification model is the same — it is the KIT standard and Trace-X helped define it. What differs is where the work happens: in a recursive walk through the network, or locally at each company. [Check the "Aspect versions" row against your own experience with Trace-X before presenting.]</aside>
@@ -317,13 +317,13 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 <section id="today" data-section="Where we are, what comes next and what we need" style="background:#F7F7F5;color:#14181D;font-family:'Libre Franklin', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
 <div style="display:flex;flex-direction:column;gap:20px">
 <p style="font-size:24px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:#0F71CB">Where we are</p>
-<h2 style="font-size:64px;font-weight:600;line-height:1.15">Running on real connectors, in production</h2>
+<h2 style="font-size:64px;font-weight:600;line-height:1.15">Tested on real connectors</h2>
 </div>
 <div style="display:flex;flex-direction:row;gap:56px;align-items:start">
 <div style="width:640px;display:flex;flex-direction:column;gap:28px">
 <div style="display:flex;flex-direction:column;gap:4px;border-left:6px solid #B3CB2D;padding:0 0 0 24px">
 <p style="font-size:56px;font-weight:700;line-height:1.1">303 twins · 0 issues</p>
-<p style="font-size:28px;line-height:1.35;color:#4A5563">synced from a production registry through the company's own EDC, in 7.5 minutes</p>
+<p style="font-size:28px;line-height:1.35;color:#4A5563">synced in a local test against a production registry and EDC, in 7.5 minutes</p>
 </div>
 <div style="display:flex;flex-direction:column;gap:4px;border-left:6px solid #B3CB2D;padding:0 0 0 24px">
 <p style="font-size:56px;font-weight:700;line-height:1.1">2,192 · 204</p>
@@ -339,12 +339,12 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 </div>
 </div>
 <div style="flex:1;display:flex;flex-direction:column;gap:12px">
-<img src="parts-production.jpg" alt="The app's parts page after a sync: 302 own parts, 2192 supplier links, 204 customer links, 0 issues" style="width:960px;height:600px;object-fit:contain;background:#E9ECEF;border:1px solid #DCDCDC;border-radius:16px">
-<p style="font-size:24px;color:#6A7480">After a sync against a production connector — names, serials and BPNL blurred</p>
+<img src="parts-production.jpg" alt="The app's parts page after a local test sync: 302 own parts, 2192 supplier links, 204 customer links, 0 issues" style="width:960px;height:600px;object-fit:contain;background:#E9ECEF;border:1px solid #DCDCDC;border-radius:16px">
+<p style="font-size:24px;color:#6A7480">A local test against a production connector — names, serials and BPNL blurred</p>
 </div>
 </div>
 <p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6A7480">Catena-X Traceability · 11</p>
-<aside>Be precise about what is proven. In production: the app synced a selection of 200 vehicles (303 twins with their children) from a real Digital Twin Registry; the data plane wanted an EDR, so every submodel was read through the company's own EDC — one negotiation per shared asset, then plain reads — and nothing failed. In the Tractus-X umbrella lab: three companies, each with its own EDC, registry and app, read their direct partners and pass a quality alert Tier-2 → Tier-1 → OEM with the acceptance coming back. Not yet proven: notifications with a real partner in production — that is the pilot.</aside>
+<aside>Be precise about what is proven. In a one-off local test against a production EDC and registry (a local instance, not a production deployment), the app synced a selection of 200 vehicles (303 twins with their children) from a real Digital Twin Registry; the data plane wanted an EDR, so every submodel was read through the company's own EDC — one negotiation per shared asset, then plain reads — and nothing failed. In the Tractus-X umbrella lab: three companies, each with its own EDC, registry and app, read their direct partners and pass a quality alert Tier-2 → Tier-1 → OEM with the acceptance coming back. Not yet proven: notifications with a real partner in production — that is the pilot.</aside>
 </section>
 </div></div>
 <div class="frame"><div class="slide">
@@ -367,7 +367,7 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 <div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#F0F5D5;border:1px solid #B3CB2D;border-radius:16px;padding:36px">
 <p style="font-size:24px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#4F5A12">Phase 3 · done</p>
 <h3 style="font-size:36px;font-weight:600;line-height:1.2">Real connectors</h3>
-<p style="font-size:28px;line-height:1.4;color:#3F4A10">Three-company umbrella lab; own twins synced in production</p>
+<p style="font-size:28px;line-height:1.4;color:#3F4A10">Three-company umbrella lab; local test against a production EDC</p>
 </div>
 <div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#FFFFFF;border:2px solid #0F71CB;border-radius:16px;padding:36px">
 <p style="font-size:24px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#0D55AF">Phase 4 · next</p>
@@ -377,7 +377,7 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 </div>
 <p style="font-size:28px;line-height:1.4;color:#4A5563">Timeline: [weeks per phase] · Team: [people]</p>
 <p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6A7480">Catena-X Traceability · 12</p>
-<aside>Phase 3 was the proof point and it is done: three participants in the Tractus-X umbrella environment, one of them deliberately still on SerialPart 3, pass an alert Tier-2 to Tier-1 to OEM while each company only looks at its own level; and the app has synced its own twins from a production registry through a real EDC. What is left is the pilot: the same alerts with real partners. Fill in the timeline and team before presenting.</aside>
+<aside>Phase 3 was the proof point and it is done: three participants in the Tractus-X umbrella environment, one of them deliberately still on SerialPart 3, pass an alert Tier-2 to Tier-1 to OEM while each company only looks at its own level; and, in a local test, the app has synced twins from a production registry through a real EDC. What is left is the pilot: the same alerts with real partners. Fill in the timeline and team before presenting.</aside>
 </section>
 </div></div>
 <div class="frame"><div class="slide">
@@ -410,7 +410,7 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 </div>
 </div>
 <p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6A7480">Catena-X Traceability · 13</p>
-<aside>Replace the bracketed items with the concrete ask for this audience. Pilot partners matter most: the whole point is that the app works with partners as they are today, including those still on SerialPart 3 or on Jupiter. The connectors and the registry are no longer the open question: the app already runs on production ones.</aside>
+<aside>Replace the bracketed items with the concrete ask for this audience. Pilot partners matter most: the whole point is that the app works with partners as they are today, including those still on SerialPart 3 or on Jupiter. The connectors and the registry are no longer the open question: the app has already been tested locally against production ones.</aside>
 </section>
 </div></div>
 <div class="frame"><div class="slide">
