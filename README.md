@@ -5,9 +5,11 @@ Traceability KIT (8.0.0) and the Eclipse Tractus-X 26.03 release.
 
 - Quality Alerts and Quality Investigations (Notification API 1.2.1 and 2.0.0)
 - SerialPart/Batch/BoM/Usage aspect models, v3 and v4
-- Saturn-only (DSP 2025-1); EDC, DTR and identity are participant prerequisites
+- Saturn (DSP 2025-1), and Jupiter (DSP 0.8) for partners not yet moved; EDC, DTR and identity
+  are participant prerequisites
 
-See [docs/architecture.md](docs/architecture.md) for the design and
+See [docs/what-the-app-does.md](docs/what-the-app-does.md) for exactly what the app does,
+[docs/architecture.md](docs/architecture.md) for the design and
 [docs/glossary.md](docs/glossary.md) for the Catena-X terms.
 
 ## Status
@@ -19,8 +21,11 @@ direct partners' twins read through the EDC, quality alerts and investigations (
 1.2.1 and 2.0.0, KIT state model, assisted hop-by-hop forwarding) and their UI (inbox/outbox,
 notification detail, composer, partners). Partner health checks each partner's connector at
 three levels (discovery, catalog offers, full DTR access through an EDR) and show the result per
-partner in the UI. It is tested against mocks; the run against real EDCs on the umbrella
-environment is phase 3. See [the phases](docs/architecture.md#10-phases).
+partner in the UI. Phase 3 (real connectors) is done: on the Tractus-X umbrella lab, three
+companies with their own EDCs read each other's twins and pass a quality alert Tier-2 → Tier-1 →
+OEM; and a one-off local test synced 303 twins from a production registry through a real EDC.
+See [what has been verified](docs/what-the-app-does.md#what-has-been-verified) and
+[the phases](docs/architecture.md#10-phases).
 
 ## Quick start
 
@@ -96,6 +101,7 @@ with Compose, `caCertificates` in the Helm chart): see
 - [`backend/`](backend/README.md) — FastAPI application (Python, Tractus-X SDK)
 - [`web/`](web/README.md) — React UI
 - [`deploy/`](deploy/compose.yaml) — Docker Compose (app + Postgres) and the Helm chart for one participant
+- [`docs/what-the-app-does.md`](docs/what-the-app-does.md) — what the app does, step by step
 - [`docs/architecture.md`](docs/architecture.md) — architecture and decisions
 - [`docs/glossary.md`](docs/glossary.md) — Catena-X and Tractus-X terms
 - [`docs/pitch/`](docs/pitch/README.md) — pitch deck (open `docs/pitch/index.html`)

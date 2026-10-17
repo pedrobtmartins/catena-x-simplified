@@ -1,8 +1,9 @@
 # Architecture — catena-x-simplified
 
-> Status: phase 1 implemented (v0.1) · Baseline: **Eclipse Tractus-X 26.03** · KIT: **Traceability KIT 8.0.0**
+> Status: phases 1–3 done (v0.1) · Baseline: **Eclipse Tractus-X 26.03** · KIT: **Traceability KIT 8.0.0**
 >
-> Terms: see the [glossary](glossary.md).
+> Terms: see the [glossary](glossary.md). What the app does, function by function:
+> [what-the-app-does.md](what-the-app-does.md).
 
 ## 1. Goal
 
@@ -28,8 +29,8 @@ maintained since release 25.06.
 - Publishing the participant's own part data (Industry Core KIT) — the participant is assumed to
   publish it already. There is only a *seeding* script for the demo environment.
 - Recursive traversal of the full supply chain (the role of IRS in Trace-X) — see section 5.
-- Support for **Jupiter** connectors/policies (DSP 0.8). Jupiter support ends at the end of 2026;
-  the app is **Saturn-only** (DSP 2025-1, CX-0152).
+- Running on a **Jupiter** connector. The own EDC is Saturn (DSP 2025-1, CX-0152); partners still
+  on Jupiter (DSP 0.8, support ends with 2026) are reached through it (section 12).
 
 ## 2. Prerequisites (participant infrastructure)
 
@@ -309,7 +310,12 @@ Having one node on v3 ensures the mixed-version scenario is tested from day one.
       (`partner_checks`) with their steps, and error details are scrubbed of credentials. In dev
       direct mode the partner's app and DTR are probed instead, and the result is reported as
       *skipped* rather than healthy, since nothing went through an EDC.
-3. **Demo** — seeding of the three umbrella participants, automated E2E scenario, complete UI.
+3. **Real connectors** ✅ — the three umbrella participants seeded and running the app
+   ([deploy/umbrella](../deploy/umbrella/README.md#status)): partner reads through the EDCs, full
+   partner checks and an alert Tier-2 → Tier-1 → OEM and back; a one-off local test against a
+   production EDC and DTR (own submodels read through the own EDC when the data plane wants an EDR;
+   endpoint and token reused per shared asset); Jupiter partners over DSP 0.8; settings entered in
+   the UI; private CA certificates.
 4. **Extensions** — Block Notifications 2.0.0, qualityTask/ZeroKmFailure, migration to 26.09.
 
 ## 11. Decisions (summary ADRs)
@@ -320,7 +326,7 @@ Having one node on v3 ensures the mixed-version scenario is tested from day one.
 - **ADR-03 — 26.03 baseline, ready for 26.09.** Complete reference environment; migration limited to
   configuration and the `dataspace` module.
 - **ADR-04 — No IRS; hop-by-hop propagation.** See section 5.
-- **ADR-05 — Saturn-only.** Jupiter ends at the end of 2026.
+- **ADR-05 — Saturn first.** Jupiter ends at the end of 2026; partners still on it are reached over DSP 0.8 through the own Saturn EDC.
 - **ADR-06 — Tolerant aspect models (v3 + v4).** Most partners are still on SerialPart 3.
 - **ADR-07 — Notification API 1.2.1 + 2.0.0.** 1.2.1 is mandatory in the KIT; 2.0.0 is a superset.
 
@@ -336,8 +342,9 @@ Having one node on v3 ensures the mixed-version scenario is tested from day one.
   `Membership`); those still need their own accepted policy.
 - **Tractus-X SDK and EDC 0.12.0**: partner consumption uses the SDK's Saturn consumer
   (`/v3/catalog`, `/v3/contractnegotiations`, `/v3/edrs`, `/v4alpha/connectordiscovery`). It is
-  tested against a mocked SDK and mocked data planes, not yet against a real EDC; that happens on
-  the umbrella environment. EDC 0.13 (26.09) moves connector discovery to `/v3`.
+  tested against a mocked SDK and mocked data planes, and has run against real EDCs on the
+  umbrella lab and, once, against a production EDC. EDC 0.13 (26.09) moves connector discovery to
+  `/v3`.
 - **Notification sender identity**: the receiving endpoints trust `senderBpn` in the payload. They
   must only be reachable through our EDC's data plane (which enforces the contract) and are
   protected by `CXS_NOTIFICATION_API_KEY`; matching the BPNL of the contract agreement is a later
@@ -360,8 +367,9 @@ Having one node on v3 ensures the mixed-version scenario is tested from day one.
   stored ones fill the gaps, secrets encrypted with a key derived from `CXS_SECRET_KEY`. A change
   rebuilds the adapters in place (the runners keep their locks), so no restart is needed. Only
   administration needs the login; single sign-on with the company's IdP is a later option.
-- **EDR cache**: negotiated contracts and tokens are reused per process (SDK in-memory connection
-  manager); a restart re-negotiates. A persistent connection manager is a later option.
+- **EDR cache**: negotiated contracts are reused per process (SDK in-memory connection manager),
+  and the endpoint and token of an asset for `token_ttl_seconds` (60 s) in the partner client, so
+  many submodels of one shared asset cost one negotiation; a restart re-negotiates. A persistent connection manager is a later option.
 - **Schema migrations**: Alembic migrations are applied at startup. Databases created before
   migrations existed are adopted (missing tables created, then stamped as current).
 - **Partner IDs**: Catena-X IDs are compared verbatim (only a missing `urn:uuid:` prefix is
