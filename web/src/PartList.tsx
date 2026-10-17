@@ -181,10 +181,12 @@ export function PartList({ dataVersion }: { dataVersion: number }) {
                     </span>
                   </td>
                   <td>{part.production_date?.slice(0, 10) ?? "—"}</td>
-                  <td style={{ whiteSpace: "nowrap", color: "var(--text-2)" }}>
-                    <span title={`${part.parents_count} parents`}>↑ {part.parents_count}</span>
-                    <span title={`${part.children_count} children`} style={{ marginLeft: 10 }}>
-                      ↓ {part.children_count}
+                  <td className="cell-links">
+                    <span>
+                      {part.parents_count} {part.parents_count === 1 ? "customer" : "customers"}
+                    </span>
+                    <span className="sub">
+                      {part.children_count} {part.children_count === 1 ? "component" : "components"}
                     </span>
                   </td>
                   <td className="cell-id" title={part.global_asset_id}>

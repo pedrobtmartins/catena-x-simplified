@@ -159,7 +159,9 @@ export function Compose({ query, health }: { query: string; health: Health | nul
           <h2 id="recipients-title">Recipients</h2>
           {recipients.length === 0 ? (
             <p className="muted" style={{ marginTop: 12 }}>
-              {items.length === 0 ? "Select at least one part." : `No direct ${alert ? "customers" : "suppliers"} found.`}
+              {items.length === 0
+                ? "Select at least one part."
+                : `Nothing to send yet: none of the selected parts has a direct ${alert ? "customer" : "supplier"} in your data.`}
             </p>
           ) : (
             <ul className="recipient-list">
