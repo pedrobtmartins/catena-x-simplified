@@ -15,12 +15,14 @@ from .dataspace.connections import ConnectionTester
 from .dataspace.direct import DirectNotificationSender, DirectPartnerClient
 from .dataspace.discovery import ConnectorDiscovery, EdcDiscovery, SdkConnectorDiscovery
 from .dataspace.dtr import SdkTwinRegistry
+from .dataspace.edc import Partner
 from .dataspace.health import DirectHealthChecker, EdcHealthChecker
 from .dataspace.notification_assets import NotificationAssetPublisher
 from .dataspace.notifications import EdcNotificationSender
 from .dataspace.oauth import ClientCredentials, authenticate_sdk_service, keycloak_token_url
-from .dataspace.partners import EdcPartnerClient
-from .dataspace.submodels import HttpSubmodelReader
+from .dataspace.partners import EdcPartnerClient, parse_subprotocol_body
+from .dataspace.ports import DataspaceError
+from .dataspace.submodels import EdcFallbackSubmodelReader, HttpSubmodelReader
 
 
 def dtr_auth(settings: Settings) -> ClientCredentials | None:
@@ -77,10 +79,25 @@ def build_twin_registry(settings: Settings) -> SdkTwinRegistry | None:
     return SdkTwinRegistry(service, page_size=settings.dtr_page_size, bpn=settings.own_bpnl)
 
 
-def build_submodel_reader(settings: Settings) -> HttpSubmodelReader:
-    return HttpSubmodelReader(
+def build_submodel_reader(settings: Settings, partner_client=None):
+    """Own submodels: read directly, and through the own EDC where the public data plane
+    refuses that (``partner_client``: the EDC client also used for partners; the own BPNL is
+    the counterparty of that negotiation)."""
+    direct = HttpSubmodelReader(
         rewrites=settings.submodel_href_rewrites, headers=settings.submodel_headers
     )
+    if not isinstance(partner_client, EdcPartnerClient):
+        return direct
+    own_bpnl = settings.own_bpnl
+
+    def read_via_edc(ref):
+        if "dspEndpoint" not in parse_subprotocol_body(ref.subprotocol_body):
+            raise DataspaceError(
+                f"submodel at {ref.href} names no dspEndpoint of the own connector"
+            )
+        return partner_client.read_submodel(Partner(own_bpnl, ""), ref)
+
+    return EdcFallbackSubmodelReader(direct, read_via_edc)
 
 
 def _edc_headers(settings: Settings) -> dict[str, str] | None:

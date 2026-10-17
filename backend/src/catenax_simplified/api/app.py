@@ -503,7 +503,14 @@ class Runtime:
         o = self.overrides
         session_factory = self.session_factory
         registry = o.get("registry") or build_twin_registry(settings)
-        reader = o.get("reader") or build_submodel_reader(settings)
+        injected = ("partner_client", "notification_sender", "health_checker")
+        needs_consumer = not all(o.get(k) for k in injected) or (
+            settings.bp_explorer_address and not o.get("directory")
+        )
+        consumer = build_edc_consumer(settings) if needs_consumer else None
+        partner_client = o.get("partner_client") or build_partner_client(settings, consumer)
+        # Own submodels behind a data plane that wants an EDR are read through the own EDC.
+        reader = o.get("reader") or build_submodel_reader(settings, partner_client)
         sync = (
             OwnTwinSync(
                 registry,
@@ -515,12 +522,6 @@ class Runtime:
             if registry is not None
             else None
         )
-        injected = ("partner_client", "notification_sender", "health_checker")
-        needs_consumer = not all(o.get(k) for k in injected) or (
-            settings.bp_explorer_address and not o.get("directory")
-        )
-        consumer = build_edc_consumer(settings) if needs_consumer else None
-        partner_client = o.get("partner_client") or build_partner_client(settings, consumer)
         sender = o.get("notification_sender") or build_notification_sender(settings, consumer)
         partner_sync = (
             PartnerSync(
