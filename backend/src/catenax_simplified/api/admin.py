@@ -177,6 +177,8 @@ def _fields(request: Request) -> list[ConfigFieldOut]:
     _, unreadable = runtime.store.values()
     out = []
     for field in FIELDS:
+        if field.policies:
+            continue  # its own Setup section: api/policies.py
         is_locked = locked(base, field)
         row = rows.get(field.key)
         value = getattr(settings, field.key)
@@ -215,7 +217,7 @@ def _validated(update: ConfigUpdate, request: Request) -> dict[str, str | None]:
     errors: list[str] = []
     for key, raw in update.values.items():
         field = BY_KEY.get(key)
-        if field is None:
+        if field is None or field.policies:
             errors.append(f"{key}: not a setting that can be entered here")
             continue
         if locked(base, field):

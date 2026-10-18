@@ -2432,3 +2432,81 @@ th {
   color: inherit;
   font-weight: 600;
 }
+
+/* ---------- setup: accepted usage policies ---------- */
+
+.policy-list {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+}
+
+.policy-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 12px 0;
+  border-top: 1px solid var(--divider);
+}
+
+.policy-row > div:first-child {
+  min-width: 0;
+}
+
+.policy-text {
+  font-family: var(--mono);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.policy-json summary,
+.paste-policy summary {
+  cursor: pointer;
+  color: var(--primary);
+  font-size: 13px;
+  width: fit-content;
+}
+
+.policy-json pre {
+  margin: 8px 0 0;
+  padding: 12px;
+  max-height: 260px;
+  overflow: auto;
+  background: var(--surface-subtle);
+  border: 1px solid var(--divider);
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.paste-policy textarea {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.offer-finder {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--divider);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.offer-finder h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.offer-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 760px) {
+  .policy-row {
+    flex-direction: column;
+  }
+}

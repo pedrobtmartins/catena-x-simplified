@@ -6,6 +6,7 @@ environment variable or the .env file) always wins and is shown as locked.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import UTC, datetime
@@ -14,6 +15,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from ..config import Settings
+from ..dataspace.policies import same_policy
 from ..storage import ConfigValueRow
 from .security import SecretBox
 
@@ -33,6 +35,9 @@ class ConfigField:
     hint: str = ""
     # Other settings that lock this one when the deployment sets them.
     locked_by: tuple[str, ...] = ()
+    # A JSON list of usage policies, added to the deployment's instead of replacing them, so it
+    # is never locked. Edited on its own Setup section, not with the other settings.
+    policies: bool = False
 
     @property
     def variable(self) -> str:
@@ -127,18 +132,51 @@ FIELDS: tuple[ConfigField, ...] = (
         hint="Only if its catalog offers you more than one asset",
     ),
 )
+POLICIES = ConfigField("accepted_policies", "policies", "Accepted usage policies", policies=True)
+FIELDS = (*FIELDS, POLICIES)
 BY_KEY: dict[str, ConfigField] = {f.key: f for f in FIELDS}
+
+# Enough for every offer a company meets; keeps a pasted catalog from becoming a setting.
+MAX_ADDED_POLICIES = 50
+
+
+def parse_policies(stored: str | None) -> list[dict]:
+    """The policies stored as a JSON list; anything else counts as none."""
+    try:
+        value = json.loads(stored or "[]")
+    except ValueError:
+        return []
+    return [p for p in value if isinstance(p, dict)] if isinstance(value, list) else []
+
+
+def merge_policies(deployment: list[dict], added: list[dict]) -> list[dict]:
+    """The deployment's policies, then the added ones that mean something else."""
+    merged = list(deployment)
+    for policy in added:
+        if not any(same_policy(policy, p) for p in merged):
+            merged.append(policy)
+    return merged
 
 
 def locked(base: Settings, field: ConfigField) -> bool:
     """Whether the deployment sets this field (or one that decides it)."""
+    if field.policies:
+        return False
     return any(k in base.model_fields_set for k in (field.key, *field.locked_by))
 
 
 def effective_settings(base: Settings, stored: Mapping[str, str]) -> Settings:
     """The deployment's settings with the stored values filled in where the deployment set
     nothing."""
-    update = {k: v for k, v in stored.items() if k in BY_KEY and not locked(base, BY_KEY[k])}
+    update: dict = {
+        k: v
+        for k, v in stored.items()
+        if k in BY_KEY and not BY_KEY[k].policies and not locked(base, BY_KEY[k])
+    }
+    if stored.get(POLICIES.key):
+        update[POLICIES.key] = merge_policies(
+            base.accepted_policies, parse_policies(stored[POLICIES.key])
+        )
     return base.model_copy(update=update)
 
 

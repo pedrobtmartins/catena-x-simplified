@@ -57,7 +57,7 @@ started from. [`.env.example`](.env.example) lists them all with comments; see a
 | `CXS_EDC_MANAGEMENT_URL`        | Own EDC management API (Saturn); with `CXS_EDC_MANAGEMENT_PATH`. Enables partner sync |
 | `CXS_EDC_API_KEY`               | Sent as `X-Api-Key` to the management API |
 | `CXS_EDC_OAUTH_*`               | Or OAuth 2.0 client credentials for the management API (`TOKEN_URL`, `CLIENT_ID`, `CLIENT_SECRET`, optional `SCOPE`); a fresh token is sent with every call. Both can be set |
-| `CXS_ACCEPTED_POLICIES`         | JSON list of usage policies accepted in partners' catalogs; empty = no negotiation. Compared by meaning: Jupiter (`cx-policy:FrameworkAgreement`, `odrl:eq`) and Saturn spellings (`FrameworkAgreement` or its `https://w3id.org/catenax/policy/` IRI, `eq`) match, the order of constraints does not matter; the constraints themselves must be the same |
+| `CXS_ACCEPTED_POLICIES`         | JSON list of usage policies accepted in partners' catalogs; empty = no negotiation. Compared by meaning: Jupiter (`cx-policy:FrameworkAgreement`, `odrl:eq`) and Saturn spellings (`FrameworkAgreement` or its `https://w3id.org/catenax/policy/` IRI, `eq`) match, the order of constraints does not matter; the constraints themselves must be the same. An admin can add more on the Setup page; the app accepts both lists |
 | `CXS_ACCEPT_ANY_POLICY`         | Accept any offered policy — development only                         |
 | `CXS_PARTNER_CONNECTORS`        | JSON object BPNL → partner DSP endpoint (addresses set through the API win) |
 | `CXS_CENTRAL_IDP_*`             | Technical user of the dataspace's central IdP (`URL`, `REALM` (default `CX-Central`), `CLIENT_ID`, `CLIENT_SECRET`) for the core services below; independent of the DTR's `CXS_OAUTH_*` |
@@ -146,6 +146,9 @@ ignored, and the Setup page asks for them again.
 | POST   | `/api/auth/login`, `/api/auth/logout` | Admin sign-in (sets the session cookie) and sign-out |
 | GET    | `/api/setup/config`          | **Admin.** The settings that can be entered in the UI: source (deployment or UI), locked, value (never for secrets) |
 | PUT    | `/api/setup/config`          | **Admin.** Store settings (`null` removes one), apply them at once and return the connection tests |
+| GET    | `/api/setup/policies`        | The accepted usage policies: the deployment's (locked) and those added on Setup, each with a short form |
+| PUT    | `/api/setup/policies`        | **Admin.** Replace the policies added on Setup (`{"added": [...]}`, ODRL bodies) and apply them at once; one that means the same as an accepted policy is kept once |
+| POST   | `/api/setup/policies/offers` | **Admin** once the login is set up. Read a connector's catalog through the own EDC (`bpnl`, optional `connector_address`, optional `asset_id`; without it, the DTR offer) and list the offered policies, each with whether it is accepted. Nothing is negotiated |
 | POST   | `/api/setup/connection-tests` | Read-only calls to the own DTR and EDC and the core services with the configured credentials; one result each (the Business Partner Explorer: its catalog only, no negotiation) |
 | GET    | `/api/partners/{bpnl}/legal-entity` | A BPNL's legal name from the BPDM Pool or the Business Partner Explorer (nothing is stored) |
 | POST   | `/api/partners/names`        | Name every unnamed partner after its legal name in the BPDM Pool or the Business Partner Explorer |

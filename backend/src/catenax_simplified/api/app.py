@@ -68,7 +68,7 @@ from ..wiring import (
     central_auth,
     dtr_auth,
 )
-from . import admin, notifications
+from . import admin, notifications, policies
 from .schemas import (
     ConnectionCheckOut,
     ConnectorDiscoveryOut,
@@ -670,6 +670,8 @@ class Runtime:
 
         state = self.app.state
         state.settings = settings
+        # The own EDC's consumer side, for one-off catalog reads (api/policies.py); None without.
+        state.consumer = consumer if consumer is not None else build_edc_consumer(settings)
         self.sync_runner.job = sync.run if sync is not None else None
         self.partner_runner.job = partner_sync.run if partner_sync is not None else None
         self.health_runner.job = partner_health.run if partner_health is not None else None
@@ -771,6 +773,7 @@ def create_app(
     app.state.health_runner = runtime.health_runner
     app.include_router(router)
     app.include_router(admin.router)
+    app.include_router(policies.router)
     app.include_router(notifications.router)
     app.include_router(notifications.kit_router)
 

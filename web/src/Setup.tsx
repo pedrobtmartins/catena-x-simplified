@@ -1,5 +1,5 @@
 // Setup: the own participant, the guided checklist, the connection settings an admin can
-// enter, and the partners' connectors (added by hand or found through the discovery services,
+// enter, the accepted usage policies, and the partners' connectors (added by hand or found through the discovery services,
 // with names from the BPDM).
 import { useEffect, useState } from "react";
 import {
@@ -14,6 +14,7 @@ import {
   type SyncReport,
 } from "./api";
 import { Checklist } from "./Checklist";
+import { Policies } from "./Policies";
 import { ConfigEditor } from "./ConfigEditor";
 import { CheckIcon } from "./icons";
 import { ErrorAlert } from "./ui";
@@ -587,6 +588,16 @@ export function Setup({
         />
       )}
       {health && <Participant health={health} me={me} tests={tests} onEdit={edit && (() => edit("all"))} />}
+      {health && partners && (
+        <Policies
+          ownBpnl={health.own_bpnl}
+          partners={partners}
+          canConfigure={canConfigure}
+          // Reading a catalog goes through your EDC: an admin's call once the login is set up.
+          canReadOffers={health.edc_configured && canEdit}
+          dataVersion={dataVersion + version}
+        />
+      )}
       {partners && (
         <AddPartner
           partners={partners}
