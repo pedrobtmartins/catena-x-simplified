@@ -67,15 +67,19 @@ It does **not**:
   another (unless it is a batch). Findings sharing the same assemblies are listed together, since they
   usually have one cause: a twin to correct where it is published.
 
-### 2. Shows the parts and their tree
+### 2. Shows the parts, their structure and where they are used
 
-*UI: **Parts**, part detail · API: `GET /api/parts`, `/api/parts/{id}`, `/api/parts/{id}/tree`, `/api/stats`*
+*UI: **Parts**, part detail · API: `GET /api/parts`, `/api/parts/{id}`, `/api/parts/{id}/tree`, `/api/parts/{id}/structure`, `/api/parts/{id}/where-used`, `/api/stats`*
 
 - A searchable list of own parts (by Catena-X ID, part number or name; serialized or batch;
   aspect model v3 or v4), with counts of own parts, links to suppliers and links to customers.
-- Per part: its attributes, the submodels they came from, and the **as-built tree one level deep**:
-  the components it contains (and from which supplier) and the customers it was delivered to.
-  Answers come from the local database, not from the network, so they are immediate.
+- Per part: its attributes, the submodels they came from, and its **structure**: everything under
+  it, as a diagram or a table. Own parts open level by level all the way down, since the company
+  knows its own BoMs; another company's part stays a leaf (one level across companies, as the KIT
+  intends), grouped per supplier. A part declared in two places is marked.
+- **Where used**: every path from a part up to the products that contain it, which is the question
+  behind a quality alert, with a shortcut to the alert or the investigation.
+- Answers come from the local database, not from the network, so they are immediate.
 
 ### 3. Knows the direct partners
 

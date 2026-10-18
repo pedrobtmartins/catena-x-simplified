@@ -31,7 +31,9 @@ class PartTree:
     children: list[TreeNode]
 
 
-def _merge(relations: Iterable[RelationRow], counterpart: str) -> list[TreeNode]:
+def merge_relations(relations: Iterable[RelationRow], counterpart: str) -> list[TreeNode]:
+    """One node per counterpart (``parent_id`` or ``child_id``) of these relations, merging the
+    BoM and usage declarations of the same link."""
     nodes: dict[str, TreeNode] = {}
     for relation in relations:
         other = getattr(relation, counterpart)
@@ -56,8 +58,8 @@ def part_tree(repository: PartRepository, global_asset_id: str) -> PartTree | No
     part = repository.get_part(global_asset_id)
     if part is None:
         return None
-    parents = _merge(repository.parents(global_asset_id), "parent_id")
-    children = _merge(repository.children(global_asset_id), "child_id")
+    parents = merge_relations(repository.parents(global_asset_id), "parent_id")
+    children = merge_relations(repository.children(global_asset_id), "child_id")
     known = repository.get_parts([n.global_asset_id for n in parents + children])
     for node in parents + children:
         node.part = known.get(node.global_asset_id)

@@ -198,3 +198,18 @@ def test_web_ui_cache_headers(tmp_path):
 def test_the_endpoint_reports_nothing_for_consistent_boms(client):
     client.post("/api/sync")
     assert client.get("/api/data-checks").json() == {"total": 0, "findings": []}
+
+
+def test_structure_and_where_used_endpoints(client):
+    client.post("/api/sync")
+    assert client.get("/api/parts/urn:uuid:unknown/structure").status_code == 404
+    structure = client.get(f"/api/parts/{scenario.MODULE_A}/structure").json()
+    assert structure["root"] == scenario.MODULE_A
+    root = next(p for p in structure["parts"] if p["global_asset_id"] == scenario.MODULE_A)
+    assert root["own"] and root["cached"]
+    children = {link["child"] for link in structure["links"] if link["parent"] == scenario.MODULE_A}
+    assert children and all(
+        not p["own"] for p in structure["parts"] if p["global_asset_id"] in children
+    )
+    used = client.get(f"/api/parts/{scenario.MODULE_A}/where-used").json()
+    assert used["paths"] and all(path[0] == scenario.MODULE_A for path in used["paths"])
