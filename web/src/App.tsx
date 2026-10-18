@@ -1,3 +1,8 @@
+// The app shell: top bar (own BPNL, admin sign-in, last sync, "Sync own twins"), side navigation
+// and hash routing (#/parts/…, #/notifications/…, #/partners, #/sync, #/setup). It reads the
+// health of the backend on every route change, so pages can show only what is configured, and
+// opens Setup on first use while no Digital Twin Registry is connected. A sync bumps
+// `dataVersion`, which makes every page reload its data.
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, formatTime, syncState, type Health, type Me, type NotificationSummary, type SyncReport } from "./api";
 import { Compose } from "./Compose";

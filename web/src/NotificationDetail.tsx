@@ -1,3 +1,6 @@
+// One notification: its status path and the actions allowed next (acknowledge, accept,
+// decline, close, send), the affected parts as known locally, the previous and next hop, and the
+// log of every message exchanged with the partner. A received one can be forwarded from here.
 import { useEffect, useState } from "react";
 import {
   api,

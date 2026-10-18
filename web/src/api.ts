@@ -1,4 +1,6 @@
-// Types mirror backend/src/catenax_simplified/api/schemas.py.
+// The backend API: types that mirror backend/src/catenax_simplified/api/schemas.py, the `api`
+// client (one function per endpoint; errors become `ApiError` with the backend's detail) and small
+// formatting helpers shared by the pages.
 
 export interface Classification {
   standard: string;
@@ -306,6 +308,7 @@ export interface NotificationQuery {
   offset: number;
 }
 
+/** A failed API call: the HTTP status and the backend's `detail` (or the status text). */
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -337,6 +340,7 @@ export interface PartQuery {
   offset: number;
 }
 
+/** One function per backend endpoint the UI uses. */
 export const api = {
   health: () => request<Health>("/api/health"),
   stats: () => request<Stats>("/api/stats"),
@@ -431,6 +435,7 @@ export const STATUS_LABEL: Record<Status, string> = {
   CLOSED: "Closed",
 };
 
+/** "LIFE-THREATENING" → "Life-threatening" */
 export function severityLabel(severity: Severity): string {
   return severity === "LIFE-THREATENING" ? "Life-threatening" : severity[0] + severity.slice(1).toLowerCase();
 }
@@ -443,12 +448,15 @@ export function parseSemanticId(semanticId: string): { name: string; version: st
   return { name, version: `${match[1]}.${match[2]}.${match[3]}`, major: Number(match[1]) };
 }
 
+/** A Business Partner Number of a legal entity. */
 export const BPNL_PATTERN = /^BPNL[0-9A-Za-z]{12}$/;
 
+/** Local time of day, e.g. "14:18". */
 export function formatTime(iso: string): string {
   return new Date(iso).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
+/** Local date and time, in the browser's locale. */
 export function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString([], { dateStyle: "medium", timeStyle: "medium" });
 }
@@ -459,10 +467,12 @@ export function shortId(id: string): string {
   return match ? `${match[1]}-…-${match[2]}` : id;
 }
 
+/** Every local identifier of a part, for the Serial / batch column. */
 export function localIdentifiers(part: Part): string {
   return Object.values(part.local_identifiers).join(", ");
 }
 
+/** A run is an error when its listing did not finish, a warning when some twins had issues. */
 export function syncState(report: SyncReport): "ok" | "warn" | "error" {
   if (!report.complete) return "error";
   return report.issues.length > 0 ? "warn" : "ok";

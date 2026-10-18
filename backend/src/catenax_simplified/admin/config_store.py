@@ -20,6 +20,8 @@ from .security import SecretBox
 
 @dataclass(frozen=True)
 class ConfigField:
+    """A connection setting an admin can enter on the Setup page, and how it is shown."""
+
     key: str  # the Settings attribute; the variable is CXS_<KEY>
     group: str  # registry | connector | notifications | services | names
     label: str
@@ -34,6 +36,7 @@ class ConfigField:
 
     @property
     def variable(self) -> str:
+        """The deployment's environment variable for this setting."""
         return f"CXS_{self.key.upper()}"
 
 
@@ -140,6 +143,10 @@ def effective_settings(base: Settings, stored: Mapping[str, str]) -> Settings:
 
 
 class ConfigStore:
+    """Settings entered on the Setup page, stored in the database (secrets encrypted with a
+    key derived from ``CXS_SECRET_KEY``). They only fill what the deployment leaves unset.
+    """
+
     def __init__(self, session_factory: sessionmaker[Session], box: SecretBox | None):
         """Without a ``box`` (no CXS_SECRET_KEY) nothing can be stored or read."""
         self._session_factory = session_factory
@@ -147,9 +154,11 @@ class ConfigStore:
 
     @property
     def available(self) -> bool:
+        """Whether settings can be stored at all (``CXS_SECRET_KEY`` is set)."""
         return self._box is not None
 
     def rows(self) -> dict[str, ConfigValueRow]:
+        """The stored settings by key; keys no longer known are ignored."""
         with self._session_factory() as session:
             rows = session.scalars(select(ConfigValueRow)).all()
             session.expunge_all()

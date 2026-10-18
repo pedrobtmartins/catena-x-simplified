@@ -102,6 +102,7 @@ with Compose, `caCertificates` in the Helm chart): see
 - [`web/`](web/README.md) — React UI
 - [`deploy/`](deploy/compose.yaml) — Docker Compose (app + Postgres) and the Helm chart for one participant
 - [`docs/what-the-app-does.md`](docs/what-the-app-does.md) — what the app does, step by step
+- [`docs/developing.md`](docs/developing.md) — code map, how a request travels, common changes
 - [`docs/architecture.md`](docs/architecture.md) — architecture and decisions
 - [`docs/glossary.md`](docs/glossary.md) — Catena-X and Tractus-X terms
 - [`docs/pitch/`](docs/pitch/README.md) — pitch deck (open `docs/pitch/index.html`)

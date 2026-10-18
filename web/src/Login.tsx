@@ -1,3 +1,4 @@
+// Admin sign-in. Only administration (settings, partners) needs it; reading never does.
 import { useState } from "react";
 import { api, ApiError, type Me } from "./api";
 import { ErrorAlert } from "./ui";

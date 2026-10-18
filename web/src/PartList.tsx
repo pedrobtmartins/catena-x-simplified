@@ -1,3 +1,5 @@
+// The Parts page: counts of own parts and their supplier and customer links, then the searchable
+// list of cached parts (own and partners'), filtered by kind and aspect model version.
 import { useEffect, useMemo, useState } from "react";
 import { api, localIdentifiers, parseSemanticId, shortId, type PartPage, type Stats } from "./api";
 import { SearchIcon } from "./icons";

@@ -1,3 +1,6 @@
+// One part: its identity, the actions it allows (investigation, alert, each saying why when it
+// cannot), data check findings, the as-built tree one level up and down, its attributes and the
+// submodels they were read from. Partner names come from the partners list.
 import { useEffect, useState } from "react";
 import { api, formatDateTime, instanceId, parseSemanticId, type Part, type PartTree, type TreeNode } from "./api";
 import { composeHref } from "./Compose";

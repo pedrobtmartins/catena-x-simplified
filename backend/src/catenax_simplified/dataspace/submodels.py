@@ -48,12 +48,20 @@ def rewrite(url: str, rewrites: Sequence[tuple[str, str]]) -> str:
 
 
 class SubmodelHttpError(DataspaceError):
+    """A submodel read answered with an HTTP error; ``status`` lets the caller tell a refusal
+    (401/403) from the rest.
+    """
+
     def __init__(self, message: str, status: int):
         super().__init__(message)
         self.status = status
 
 
 class HttpSubmodelReader:
+    """Reads own submodels over HTTP from their ``href`` (or the internal backend behind it,
+    through ``rewrites``).
+    """
+
     def __init__(
         self,
         session: requests.Session | None = None,
@@ -67,6 +75,7 @@ class HttpSubmodelReader:
         self._timeout = timeout
 
     def read(self, ref: SubmodelRef) -> dict[str, Any]:
+        """The submodel's value-only form (``{href}/$value``)."""
         url = rewrite(value_url(ref), self._rewrites)
         try:
             response = self._session.get(url, headers=self._headers, timeout=self._timeout)
@@ -101,6 +110,9 @@ class EdcFallbackSubmodelReader:
         return urlsplit(ref.href).netloc
 
     def read(self, ref: SubmodelRef) -> dict[str, Any]:
+        """The submodel, directly or (once its data plane refused a direct read) through the
+        own EDC.
+        """
         data_plane = self._data_plane(ref)
         if data_plane in self._via_edc:
             return self._read_via_edc(ref)

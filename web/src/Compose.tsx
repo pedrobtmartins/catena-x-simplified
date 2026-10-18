@@ -1,3 +1,7 @@
+// The composer for a new quality alert (to direct customers) or investigation (to direct
+// suppliers). Opened with #/compose?type=…&items=…[&from=…]: the backend plans the recipients
+// from the local tree, and one notification is created per recipient with only its parts.
+// `from` links a next hop to the received notification it forwards.
 import { useEffect, useMemo, useState } from "react";
 import { api, ApiError, SEVERITIES, severityLabel, TYPE_LABEL, type Health, type NotificationType, type Plan, type Severity } from "./api";
 import { ChipGroup, ErrorAlert } from "./ui";

@@ -44,6 +44,10 @@ class _Http:
 
 
 class DirectPartnerClient(_Http):
+    """Development mode only: reads partners' twins straight from their registries
+    (``CXS_DEV_PARTNER_DTRS``), without EDC, contracts or policies.
+    """
+
     def __init__(
         self,
         registries: Mapping[str, str],
@@ -55,6 +59,7 @@ class DirectPartnerClient(_Http):
         self._registries = dict(registries)
 
     def find_twin(self, partner: Partner, global_asset_id: str) -> TwinRef | None:
+        """The partner's twin with this Catena-X ID, looked up in its registry."""
         base = self._registries.get(partner.bpnl)
         if not base:
             raise DataspaceError(f"no registry URL for {partner.bpnl} (CXS_DEV_PARTNER_DTRS)")
@@ -70,6 +75,7 @@ class DirectPartnerClient(_Http):
         return twin_from_descriptor(descriptor) if descriptor else None
 
     def read_submodel(self, partner: Partner, ref: SubmodelRef) -> dict[str, Any]:
+        """The submodel's value-only form, read without a token."""
         payload = self.get_json(value_url(ref))
         if not isinstance(payload, dict):
             raise DataspaceError(f"submodel at {ref.href} is missing or not a JSON object")
@@ -77,6 +83,10 @@ class DirectPartnerClient(_Http):
 
 
 class DirectNotificationSender(_Http):
+    """Development mode only: posts notifications straight to the partner app's Notification
+    API, without an EDC.
+    """
+
     def __init__(
         self,
         api_key: str | None = None,
@@ -89,6 +99,9 @@ class DirectNotificationSender(_Http):
     def send(
         self, partner: Partner, asset_type: str, build: Callable[[str], dict[str, Any]]
     ) -> str:
+        """Posts to the partner app's receive or update endpoint; always Notification API
+        2.0.0.
+        """
         operation = "receive" if "#Receive" in asset_type else "update"
         url = f"{partner.connector_address.rstrip('/')}/api/qualitynotifications/{operation}"
         try:

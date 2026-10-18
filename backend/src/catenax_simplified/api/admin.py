@@ -35,6 +35,7 @@ def _auth(request: Request) -> AdminAuth | None:
 
 
 def current_admin(request: Request) -> str | None:
+    """The signed-in admin's username, or ``None`` (also when the admin login is not set up)."""
     auth = _auth(request)
     return auth.user(request.cookies.get(COOKIE)) if auth else None
 
@@ -61,11 +62,17 @@ Admin = Annotated[str, Depends(require_admin)]
 
 
 class LoginIn(BaseModel):
+    """Admin credentials for the sign-in form."""
+
     username: str = Field(max_length=64)
     password: str = Field(max_length=256)
 
 
 class MeOut(BaseModel):
+    """Who is signed in, whether an admin login exists at all, and whether settings can be edited
+    (needs the login and ``CXS_SECRET_KEY``).
+    """
+
     login_enabled: bool
     admin: str | None
     # An admin can enter settings in the UI (needs CXS_SECRET_KEY).
@@ -82,11 +89,15 @@ def _me(request: Request) -> MeOut:
 
 @router.get("/auth/me", response_model=MeOut)
 def me(request: Request) -> MeOut:
+    """Whether the admin login is set up, who is signed in and whether settings can be edited."""
     return _me(request)
 
 
 @router.post("/auth/login", response_model=MeOut)
 async def login(body: LoginIn, request: Request, response: Response) -> MeOut:
+    """Signs the admin in and sets an HTTP-only session cookie. Repeated failures from one address
+    lock it out for a while (429).
+    """
     auth = _auth(request)
     if auth is None:
         raise HTTPException(status_code=503, detail="admin login is not set up")
@@ -114,11 +125,16 @@ async def login(body: LoginIn, request: Request, response: Response) -> MeOut:
 
 @router.post("/auth/logout", response_model=MeOut)
 def logout(request: Request, response: Response) -> MeOut:
+    """Ends the admin session."""
     response.delete_cookie(COOKIE, path="/")
     return MeOut(login_enabled=_auth(request) is not None, admin=None, config_editable=False)
 
 
 class ConfigFieldOut(BaseModel):
+    """One connection setting for the Setup page: where it comes from (deployment, stored, unset),
+    whether it is locked by the deployment, and its value (secrets only as set or not).
+    """
+
     key: str
     variable: str  # the environment variable of the deployment
     group: str  # registry | connector | notifications | services
@@ -140,11 +156,15 @@ class ConfigFieldOut(BaseModel):
 
 
 class ConfigUpdate(BaseModel):
+    """Settings to store from the Setup page."""
+
     # A new value, or null / "" to remove what was entered here. Secrets left out stay as they are.
     values: dict[str, str | None]
 
 
 class ConfigSaved(BaseModel):
+    """The settings after a save, and the connection tests run with them."""
+
     fields: list[ConfigFieldOut]
     checks: list[ConnectionCheckOut]
 
@@ -185,6 +205,7 @@ def _fields(request: Request) -> list[ConfigFieldOut]:
 
 @router.get("/setup/config", response_model=list[ConfigFieldOut])
 def get_config(request: Request, _: Admin) -> list[ConfigFieldOut]:
+    """The connection settings an admin can see and change on the Setup page."""
     return _fields(request)
 
 

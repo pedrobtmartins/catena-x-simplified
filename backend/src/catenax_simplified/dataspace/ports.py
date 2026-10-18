@@ -17,6 +17,8 @@ class DataspaceError(Exception):
 
 @dataclass(frozen=True)
 class SubmodelRef:
+    """Where a twin's submodel is and how it is read."""
+
     semantic_id: str
     href: str
     interface: str | None = None
@@ -26,6 +28,8 @@ class SubmodelRef:
 
 @dataclass(frozen=True)
 class TwinRef:
+    """A shell descriptor as the app needs it: its IDs, who made the part and its submodels."""
+
     aas_id: str
     global_asset_id: str
     manufacturer_id: str | None
@@ -33,6 +37,8 @@ class TwinRef:
 
 
 class TwinRegistry(Protocol):
+    """The own Digital Twin Registry."""
+
     def iter_twins(self) -> Iterator[TwinRef]:
         """Yield every shell descriptor visible to the application."""
         ...
@@ -47,6 +53,8 @@ class TwinRegistry(Protocol):
 
 
 class SubmodelReader(Protocol):
+    """Reads the own submodels."""
+
     def read(self, ref: SubmodelRef) -> dict[str, Any]:
         """Return the submodel in value-only serialization."""
         ...

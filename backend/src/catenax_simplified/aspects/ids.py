@@ -1,3 +1,5 @@
+"""Catena-X IDs (``globalAssetId``) as the app compares them."""
+
 import re
 
 _URN_UUID_PREFIX = "urn:uuid:"

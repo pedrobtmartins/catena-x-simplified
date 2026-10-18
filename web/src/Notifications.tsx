@@ -1,3 +1,4 @@
+// Inbox and outbox of quality notifications, with open/all filters and the counts that need attention.
 import { useEffect, useState } from "react";
 import { api, formatDateTime, type NotificationPage, type NotificationSummary } from "./api";
 import { ChipGroup, EmptyState, ErrorAlert, SeverityBadge, Skeleton, SkeletonRows, StatusBadge, TypeBadge } from "./ui";

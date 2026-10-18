@@ -65,6 +65,9 @@ def canonical(value: Any) -> Any:
 
 
 def same_policy(a: Any, b: Any) -> bool:
+    """Whether two ODRL policies mean the same, however they are spelled (Jupiter or Saturn
+    vocabulary, list or single constraint).
+    """
     return canonical(a) == canonical(b)
 
 

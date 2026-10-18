@@ -20,12 +20,18 @@ from .ports import DataspaceError
 
 
 class ConnectorDiscovery(Protocol):
+    """Finds a partner's DSP endpoints by BPNL."""
+
     def find(self, bpnl: str) -> list[str]:
         """The DSP endpoints registered for a BPNL; empty if it has none."""
         ...
 
 
 class SdkConnectorDiscovery:
+    """Asks the Discovery Finder for the EDC Discovery services, then those for the BPNL's
+    connectors (Tractus-X SDK).
+    """
+
     def __init__(self, finder_url: str, oauth: Any):
         """``oauth``: the central IdP's client (``add_auth_header``), asked for a token per call."""
         self._finder_url = finder_url
@@ -43,6 +49,9 @@ class SdkConnectorDiscovery:
             return self._service
 
     def find(self, bpnl: str) -> list[str]:
+        """The DSP endpoints registered for the BPNL, in the service's order, without
+        duplicates.
+        """
         try:
             endpoints = self._connect().find_connector_by_bpn(bpnl)
         except Exception as exc:
@@ -62,6 +71,7 @@ class EdcDiscovery:
         self._timeout = timeout
 
     def find(self, bpnl: str) -> list[str]:
+        """The DSP endpoints the EDC Discovery returns for the BPNL."""
         try:
             headers = self._oauth.add_auth_header({"Content-Type": "application/json"})
             response = requests.post(self._url, json=[bpnl], headers=headers, timeout=self._timeout)

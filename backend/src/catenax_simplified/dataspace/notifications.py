@@ -33,12 +33,16 @@ class NotificationRejected(DataspaceError):
 
 @dataclass(frozen=True)
 class Offer:
+    """A partner's notification asset and the API version we would use with it."""
+
     asset_id: str
     offered_version: str | None
     api_version: str | None  # what we would serialize; None if incompatible
 
 
 class NotificationSender(Protocol):
+    """Delivers notifications to partners."""
+
     def send(
         self, partner: Partner, asset_type: str, build: Callable[[str], dict[str, Any]]
     ) -> str:
@@ -71,6 +75,7 @@ def _scalar(value: Any) -> str | None:
 
 
 def offers_in(catalog: Any) -> list[Offer]:
+    """The notification offers in a partner's catalog, with the version each one declares."""
     offers = []
     for dataset in _datasets(catalog):
         asset_id = _scalar(dataset.get("@id") or dataset.get("id"))
@@ -82,6 +87,7 @@ def offers_in(catalog: Any) -> list[Offer]:
 
 
 def choose_offer(offers: list[Offer]) -> Offer | None:
+    """The offer with the highest Notification API version both sides support, or ``None``."""
     compatible = [o for o in offers if o.api_version]
     if not compatible:
         return None
@@ -89,6 +95,11 @@ def choose_offer(offers: list[Offer]) -> Offer | None:
 
 
 class EdcNotificationSender:
+    """Sends notifications through the own EDC: finds the partner's asset of the right
+    ``dct:type``, picks the highest compatible version, negotiates and posts through the
+    EDR.
+    """
+
     def __init__(
         self,
         consumer: ConnectorConsumer,
@@ -113,6 +124,9 @@ class EdcNotificationSender:
     def send(
         self, partner: Partner, asset_type: str, build: Callable[[str], dict[str, Any]]
     ) -> str:
+        """Delivers one message; raises ``DataspaceError`` if the partner offers no compatible
+        asset or does not accept it.
+        """
         offers = self._offers(partner, asset_type)
         offer = choose_offer(offers)
         if offer is None:

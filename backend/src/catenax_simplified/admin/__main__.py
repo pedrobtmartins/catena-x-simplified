@@ -13,6 +13,7 @@ from .security import hash_password
 
 
 def main(argv: list[str]) -> int:
+    """Runs the command in ``argv[1]``; returns the exit code."""
     command = argv[1] if len(argv) > 1 else ""
     if command == "hash-password":
         password = getpass.getpass("Admin password: ")

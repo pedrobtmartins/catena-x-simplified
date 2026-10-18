@@ -1,3 +1,5 @@
+// Direct partners found in the own BoM and usage data: connector addresses (editable by an
+// admin), partner sync per partner or for all, and each connector's health with its checks.
 import { useEffect, useState } from "react";
 import { api, ApiError, formatDateTime, type CheckLevel, type CheckStatus, type Health, type Partner } from "./api";
 import { ConnectorOverview, healthOf, type HealthFilter } from "./ConnectorOverview";

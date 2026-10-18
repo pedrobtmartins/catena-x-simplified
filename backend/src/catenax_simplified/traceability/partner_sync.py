@@ -27,6 +27,8 @@ PART_ASPECTS = {aspects.AspectType.SERIAL_PART, aspects.AspectType.BATCH}
 
 @dataclass
 class PartnerSyncResult:
+    """What a partner sync read for one partner."""
+
     bpnl: str
     roles: list[str]
     linked_twins: int
@@ -39,12 +41,19 @@ class PartnerSyncResult:
 
 @dataclass
 class PartnerSyncReport:
+    """One partner sync run, per partner."""
+
     started_at: datetime
     finished_at: datetime | None = None
     partners: list[PartnerSyncResult] = field(default_factory=list)
 
 
 class PartnerSync:
+    """Caches the direct partners' counterpart twins (one level, through
+    ``PartnerDataClient``) and records per partner how it went. Partner parts no longer
+    linked to an own part are removed.
+    """
+
     def __init__(
         self,
         client: PartnerDataClient,
@@ -62,6 +71,7 @@ class PartnerSync:
         self._clock = clock
 
     def run(self, only_bpnl: str | None = None) -> PartnerSyncReport:
+        """Syncs every direct partner, or only ``only_bpnl``; the own BPNL is never a partner."""
         report = PartnerSyncReport(started_at=self._clock())
         with self._session_factory() as session:
             counterparts = PartRepository(session).partner_counterparts()

@@ -16,6 +16,11 @@
   startup; `tests/test_migrations.py` fails when tables and migrations disagree.
 - **Documentation** moves with the code: a new setting goes into `backend/.env.example` and the
   backend README, a new endpoint into the API table, a new screen into the web README.
+- **Documentation in the code**: every module starts with a docstring; public classes and
+  functions get one unless the name says it all (what it does, and why when that is not obvious).
+  Endpoint and schema docstrings are what `/docs` shows. Comments explain why, not what. Each web
+  file starts with a comment saying what the page or part does. See
+  [docs/developing.md](docs/developing.md) for the code map and recipes for common changes.
 
 ## Setup
 

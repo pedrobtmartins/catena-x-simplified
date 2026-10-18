@@ -66,6 +66,7 @@ def central_auth(settings: Settings) -> ClientCredentials | None:
 
 
 def build_twin_registry(settings: Settings) -> SdkTwinRegistry | None:
+    """The own DTR client (Tractus-X SDK), or ``None`` without ``CXS_DTR_BASE_URL``."""
     if not settings.dtr_base_url:
         return None
     service = AasService(
@@ -133,6 +134,9 @@ def _with_edc_auth(service, settings: Settings):
 
 
 def build_partner_client(settings: Settings, consumer=None):
+    """How partners' twins are read: through the own EDC, or directly in development mode;
+    ``None`` without either.
+    """
     if settings.dev_direct:
         return DirectPartnerClient(settings.dev_partner_dtrs) if settings.dev_partner_dtrs else None
     consumer = consumer or build_edc_consumer(settings)
@@ -142,6 +146,9 @@ def build_partner_client(settings: Settings, consumer=None):
 
 
 def build_notification_sender(settings: Settings, consumer=None):
+    """How notifications are delivered: through the own EDC, or directly in development mode;
+    ``None`` without either.
+    """
     if settings.dev_direct:
         return DirectNotificationSender(settings.notification_api_key)
     consumer = consumer or build_edc_consumer(settings)
@@ -151,6 +158,9 @@ def build_notification_sender(settings: Settings, consumer=None):
 
 
 def build_health_checker(settings: Settings, consumer=None):
+    """How partners' connectors are checked: through the own EDC, or the partner apps directly
+    in development mode.
+    """
     if settings.dev_direct:
         return DirectHealthChecker(settings.dev_partner_dtrs)
     consumer = consumer or build_edc_consumer(settings)
@@ -202,6 +212,9 @@ def build_partner_directory(
 
 
 def build_asset_publisher(settings: Settings) -> NotificationAssetPublisher | None:
+    """Publishes the notification assets in the own EDC; ``None`` in development mode or
+    without the EDC and ``CXS_NOTIFICATION_BASE_URL``.
+    """
     if settings.dev_direct or not (settings.edc_management_url and settings.notification_base_url):
         return None
     provider = ServiceFactory.get_connector_provider_service(
@@ -225,6 +238,9 @@ def build_asset_publisher(settings: Settings) -> NotificationAssetPublisher | No
 
 
 def build_connection_tester(settings: Settings, consumer=None) -> ConnectionTester:
+    """The Setup page's connection tests, with their own credentials so every test asks for
+    fresh tokens.
+    """
     # Own OAuth clients, so a test always asks the IdPs for a fresh token; an own explorer client,
     # so a test always reads the catalog again.
     return ConnectionTester(

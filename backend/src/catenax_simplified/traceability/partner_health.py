@@ -20,6 +20,9 @@ log = logging.getLogger(__name__)
 
 
 def overall_status(steps: list[CheckStep]) -> str:
+    """One status for a check from its steps: failed, degraded (a warning), skipped
+    (development mode) or healthy.
+    """
     if any(step.status == "failed" for step in steps):
         return "failed"
     if any(step.status == "warn" for step in steps):
@@ -32,6 +35,10 @@ def overall_status(steps: list[CheckStep]) -> str:
 
 
 class PartnerHealth:
+    """Runs connector checks of the direct partners with a ``PartnerHealthChecker`` and stores
+    each result in the check history.
+    """
+
     def __init__(
         self,
         checker: PartnerHealthChecker,
@@ -63,6 +70,7 @@ class PartnerHealth:
         return partners
 
     def known(self, bpnl: str) -> bool:
+        """Whether the BPNL is a direct partner (from the BoM/usage data or set by hand)."""
         return bpnl in self._partners()
 
     def run(

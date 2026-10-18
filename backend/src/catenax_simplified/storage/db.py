@@ -1,3 +1,5 @@
+"""Database connection, sessions and schema migration."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -12,6 +14,10 @@ from .tables import Base
 
 
 def make_engine(url: str) -> Engine:
+    """An engine for the URL: SQLite (a file, or in memory for tests) or PostgreSQL in
+    production. In-memory SQLite shares one connection so every session sees the same
+    database.
+    """
     if url.startswith("sqlite") and ":memory:" in url:
         # One shared connection, so every session sees the same in-memory database.
         return create_engine(url, connect_args={"check_same_thread": False}, poolclass=StaticPool)
@@ -40,4 +46,7 @@ def init_schema(engine: Engine) -> None:
 
 
 def make_session_factory(engine: Engine) -> sessionmaker:
+    """Sessions that keep their objects usable after commit (``expire_on_commit=False``), so
+    API handlers can return them.
+    """
     return sessionmaker(bind=engine, expire_on_commit=False)

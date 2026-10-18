@@ -1,3 +1,6 @@
+// Setup: the own participant, the guided checklist, the connection settings an admin can
+// enter, and the partners' connectors (added by hand or found through the discovery services,
+// with names from the BPDM).
 import { useEffect, useState } from "react";
 import {
   api,

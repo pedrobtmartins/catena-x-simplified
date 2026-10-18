@@ -1,3 +1,11 @@
+"""Data access for the local cache: one repository per table group, each working in the
+caller's session (the caller commits).
+
+``PartRepository`` holds parts and their one-level relations and answers the questions the
+UI asks of them (tree, counts, partners, data checks); the other repositories keep
+partners, connector checks, sync runs and notifications.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Collection, Sequence
@@ -20,12 +28,19 @@ from .tables import (
 
 
 class PartRepository:
+    """Parts (own and cached partner parts) and the relations declared by their BoM and usage
+    aspects.
+    """
+
     def __init__(self, session: Session):
         self._session = session
 
     def upsert_part(
         self, part: Part, *, manufacturer_id: str | None, is_own: bool, synced_at: datetime
     ) -> None:
+        """Insert or update a part from its SerialPart or Batch aspect. ``is_own`` marks the
+        participant's own parts; partner parts are cached copies.
+        """
         row = self._session.get(PartRow, part.global_asset_id) or PartRow(
             global_asset_id=part.global_asset_id
         )
@@ -91,6 +106,7 @@ class PartRepository:
         return self._session.get(PartRow, global_asset_id)
 
     def get_parts(self, global_asset_ids: Collection[str]) -> dict[str, PartRow]:
+        """The cached parts among these Catena-X IDs, by ID; unknown IDs are left out."""
         if not global_asset_ids:
             return {}
         rows = self._session.scalars(
@@ -108,6 +124,10 @@ class PartRepository:
         limit: int = 50,
         offset: int = 0,
     ) -> tuple[Sequence[PartRow], int]:
+        """A page of parts by name, and the total. ``search`` matches the Catena-X ID, part
+        numbers and names (case-insensitive); ``aspect_major`` the major version in the
+        semantic ID.
+        """
         query = select(PartRow)
         if aspect_major is not None:
             # semantic IDs look like urn:samm:<namespace>:<major>.<minor>.<patch>#<Aspect>
@@ -136,6 +156,9 @@ class PartRepository:
         return rows, total
 
     def children(self, global_asset_id: str) -> Sequence[RelationRow]:
+        """Relations in which this part is the parent: its components (BoM) and, for a
+        customer's part, the own parts that went into it (usage).
+        """
         return self._session.scalars(
             select(RelationRow)
             .where(RelationRow.parent_id == global_asset_id)
@@ -143,6 +166,7 @@ class PartRepository:
         ).all()
 
     def parents(self, global_asset_id: str) -> Sequence[RelationRow]:
+        """Relations in which this part is the child: where it is used."""
         return self._session.scalars(
             select(RelationRow)
             .where(RelationRow.child_id == global_asset_id)
@@ -328,6 +352,10 @@ class PartRepository:
 
 
 class PartnerRepository:
+    """What is known about each partner beyond the BoM/usage data: name, connector address and
+    the last partner sync.
+    """
+
     def __init__(self, session: Session):
         self._session = session
 
@@ -335,6 +363,7 @@ class PartnerRepository:
         return self._session.get(PartnerRow, bpnl)
 
     def get_or_create(self, bpnl: str) -> PartnerRow:
+        """The partner's row, created (not yet flushed) if there is none."""
         row = self.get(bpnl)
         if row is None:
             row = PartnerRow(bpnl=bpnl, twins_found=0, twins_missing=0)
@@ -349,6 +378,8 @@ class PartnerRepository:
 
 
 class PartnerCheckRepository:
+    """Connector checks of partners, kept as a history."""
+
     def __init__(self, session: Session):
         self._session = session
 
@@ -358,6 +389,7 @@ class PartnerCheckRepository:
         return row
 
     def recent(self, bpnl: str | None = None, limit: int = 50) -> Sequence[PartnerCheckRow]:
+        """Recent checks, newest first, optionally of one partner."""
         query = select(PartnerCheckRow)
         if bpnl:
             query = query.where(PartnerCheckRow.bpnl == bpnl)
@@ -368,6 +400,7 @@ class PartnerCheckRepository:
         ).all()
 
     def latest_by_partner(self) -> dict[str, PartnerCheckRow]:
+        """Each partner's most recent check."""
         latest = (
             select(func.max(PartnerCheckRow.id)).group_by(PartnerCheckRow.bpnl).scalar_subquery()
         )
@@ -376,6 +409,8 @@ class PartnerCheckRepository:
 
 
 class SyncRunRepository:
+    """The history of own-twin sync runs."""
+
     def __init__(self, session: Session):
         self._session = session
 
@@ -385,6 +420,7 @@ class SyncRunRepository:
         return run
 
     def recent(self, limit: int = 20) -> Sequence[SyncRunRow]:
+        """Recent runs, newest first."""
         return self._session.scalars(
             select(SyncRunRow)
             .order_by(SyncRunRow.started_at.desc(), SyncRunRow.id.desc())
@@ -393,6 +429,8 @@ class SyncRunRepository:
 
 
 class NotificationRepository:
+    """Quality notifications (both directions) and the log of messages exchanged for each."""
+
     def __init__(self, session: Session):
         self._session = session
 
@@ -405,6 +443,9 @@ class NotificationRepository:
         return self._session.get(NotificationRow, pk)
 
     def find(self, partner_bpnl: str, notification_id: str) -> NotificationRow | None:
+        """A notification with this partner by its ``notificationId``, the ID both sides
+        share.
+        """
         return self._session.scalar(
             select(NotificationRow).where(
                 NotificationRow.partner_bpnl == partner_bpnl,
@@ -447,6 +488,7 @@ class NotificationRepository:
         limit: int = 50,
         offset: int = 0,
     ) -> tuple[Sequence[NotificationRow], int]:
+        """A page of notifications, most recently updated first, and the total."""
         query = select(NotificationRow)
         if direction:
             query = query.where(NotificationRow.direction == direction)
@@ -467,6 +509,7 @@ class NotificationRepository:
         return rows, total
 
     def forwarded_to(self, pk: int) -> Sequence[NotificationRow]:
+        """The next-hop notifications created from this received one."""
         return self._session.scalars(
             select(NotificationRow)
             .where(NotificationRow.forwarded_from_id == pk)
@@ -477,6 +520,7 @@ class NotificationRepository:
         self._session.add(message)
 
     def messages(self, pk: int) -> Sequence[NotificationMessageRow]:
+        """The messages sent and received for a notification, oldest first."""
         return self._session.scalars(
             select(NotificationMessageRow)
             .where(NotificationMessageRow.notification_pk == pk)

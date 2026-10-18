@@ -16,6 +16,8 @@ from .model import Part, PartKind, Relations
 
 
 class AspectType(StrEnum):
+    """The aspect models the app reads, whatever their version."""
+
     SERIAL_PART = "SerialPart"
     BATCH = "Batch"
     BOM_AS_BUILT = "SingleLevelBomAsBuilt"
@@ -24,6 +26,8 @@ class AspectType(StrEnum):
 
 @dataclass(frozen=True)
 class SupportedAspect:
+    """One supported aspect model version and the payload shape its adapter expects."""
+
     type: AspectType
     shape: str  # "v3" or "v4", see adapters
 
@@ -83,6 +87,7 @@ def lookup(semantic_id: str) -> SupportedAspect | None:
 
 
 def is_supported(semantic_id: str) -> bool:
+    """Whether the app can read submodels with this semantic ID."""
     return lookup(semantic_id) is not None
 
 
