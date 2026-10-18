@@ -2289,3 +2289,28 @@ td {
 .tag-note {
   margin-left: 8px;
 }
+
+/* ---------- partners: the health panel stays in view ---------- */
+
+/* The table scrolls sideways inside its box when the page is narrow; the box is the size
+   container its open health panel is measured against. */
+.table-box {
+  container-type: inline-size;
+}
+
+th {
+  white-space: nowrap;
+}
+
+.health-toggle {
+  white-space: nowrap;
+}
+
+/* The panel spans the row but is as wide as the visible box and stays put while the table
+   scrolls, so its actions are never cut off. */
+.health-panel {
+  position: sticky;
+  left: 20px;
+  width: calc(100cqw - 40px);
+  min-width: 0;
+}
