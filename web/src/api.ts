@@ -71,6 +71,32 @@ export interface SyncReport {
   issues: SyncIssue[];
 }
 
+// The identifier that names one unit or lot; manufacturerId only says who made it.
+export function instanceId(localIdentifiers: Record<string, string>): string | undefined {
+  for (const key of ["partInstanceId", "van", "batchId"]) if (localIdentifiers[key]) return localIdentifiers[key];
+  return Object.entries(localIdentifiers).find(([k]) => k !== "manufacturerId")?.[1];
+}
+
+export interface PartRef {
+  global_asset_id: string;
+  name: string | null;
+  serial: string | null;
+}
+
+export interface DataFinding {
+  kind: "two_levels" | "two_assemblies";
+  part: PartRef;
+  business_partner: string | null;
+  partner_name: string | null;
+  // two_levels: the assembly, then its sub-assembly
+  parents: PartRef[];
+}
+
+export interface DataChecks {
+  total: number;
+  findings: DataFinding[];
+}
+
 export interface Stats {
   own_parts: number;
   own_parts_by_kind: Record<string, number>;
@@ -314,6 +340,8 @@ export interface PartQuery {
 export const api = {
   health: () => request<Health>("/api/health"),
   stats: () => request<Stats>("/api/stats"),
+  dataChecks: (part?: string) =>
+    request<DataChecks>(`/api/data-checks${part ? `?part=${encodeURIComponent(part)}` : ""}`),
   parts: (q: PartQuery) => {
     // The parts page lists own parts; partner parts appear in the tree of the part they belong to.
     const query = new URLSearchParams({ limit: String(q.limit), offset: String(q.offset), own_only: "true" });

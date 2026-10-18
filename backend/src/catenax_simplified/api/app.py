@@ -35,7 +35,14 @@ from ..storage import (
     make_engine,
     make_session_factory,
 )
-from ..traceability import OwnTwinSync, PartnerHealth, PartnerSync, parse_twin_ids, part_tree
+from ..traceability import (
+    OwnTwinSync,
+    PartnerHealth,
+    PartnerSync,
+    bom_findings,
+    parse_twin_ids,
+    part_tree,
+)
 from ..wiring import (
     build_admin_auth,
     build_asset_publisher,
@@ -55,6 +62,8 @@ from . import admin, notifications
 from .schemas import (
     ConnectionCheckOut,
     ConnectorDiscoveryOut,
+    DataChecksOut,
+    DataFindingOut,
     HealthOut,
     LegalEntityOut,
     NotificationAssetsOut,
@@ -69,6 +78,7 @@ from .schemas import (
     PartnerUpdate,
     PartOut,
     PartPage,
+    PartRefOut,
     PartTreeOut,
     StatsOut,
     SyncReportOut,
@@ -159,6 +169,54 @@ async def test_connections(request: Request) -> list[ConnectionCheckOut]:
 @router.get("/stats", response_model=StatsOut)
 def stats(session: SessionDep, request: Request) -> StatsOut:
     return StatsOut(**PartRepository(session).stats(request.app.state.settings.own_bpnl))
+
+
+# The identifier that names one unit or lot; manufacturerId only says who made it.
+INSTANCE_KEYS = ("partInstanceId", "van", "batchId")
+
+
+def instance_id(local_identifiers: dict[str, str]) -> str | None:
+    for key in INSTANCE_KEYS:
+        if local_identifiers.get(key):
+            return local_identifiers[key]
+    return next((v for k, v in local_identifiers.items() if k != "manufacturerId"), None)
+
+
+@router.get("/data-checks", response_model=DataChecksOut)
+def data_checks(
+    session: SessionDep,
+    part: Annotated[str | None, Query(description="Only findings about this part")] = None,
+) -> DataChecksOut:
+    """Contradictions in the own bills of material, found in the local cache: a part declared
+    in an assembly and again in one of its sub-assemblies, or in two unrelated own parts."""
+    repository = PartRepository(session)
+    findings = bom_findings(repository)
+    if part:
+        findings = [f for f in findings if part == f.global_asset_id or part in f.parents]
+    ids = {gid for f in findings for gid in (f.global_asset_id, *f.parents)}
+    parts = repository.get_parts(ids)
+    names = {p.bpnl: p.name for p in PartnerRepository(session).all()}
+
+    def ref(gid: str) -> PartRefOut:
+        row = parts.get(gid)
+        serial = instance_id(row.local_identifiers) if row else None
+        return PartRefOut(
+            global_asset_id=gid, name=row.name_at_manufacturer if row else None, serial=serial
+        )
+
+    return DataChecksOut(
+        total=len(findings),
+        findings=[
+            DataFindingOut(
+                kind=f.kind,
+                part=ref(f.global_asset_id),
+                business_partner=f.business_partner,
+                partner_name=names.get(f.business_partner) if f.business_partner else None,
+                parents=[ref(p) for p in f.parents],
+            )
+            for f in findings
+        ],
+    )
 
 
 @router.get("/parts", response_model=PartPage)

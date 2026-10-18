@@ -193,3 +193,8 @@ def test_web_ui_cache_headers(tmp_path):
         asset = client.get("/assets/index-abc123.js")
         assert asset.headers["cache-control"] == "public, max-age=31536000, immutable"
         assert client.get("/api/health").status_code == 200
+
+
+def test_the_endpoint_reports_nothing_for_consistent_boms(client):
+    client.post("/api/sync")
+    assert client.get("/api/data-checks").json() == {"total": 0, "findings": []}
