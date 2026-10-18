@@ -87,7 +87,10 @@ function PartnerRow({
           </div>
         </td>
         <td>
-          {partner.linked_twins} linked · {partner.cached_parts} cached
+          <div className="part-link">
+            <span className="nowrap">{partner.linked_twins} linked</span>
+            <span className="sub nowrap">{partner.cached_parts} cached</span>
+          </div>
         </td>
         <td>
           {editing ? (
