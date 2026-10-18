@@ -99,6 +99,15 @@ def _with_other_dct_namespace(filter_expression: list[dict]) -> list[dict] | Non
     return swapped if swapped != filter_expression else None
 
 
+@dataclass(frozen=True)
+class OfferedPolicy:
+    """A usage policy a connector offers for one of its assets."""
+
+    asset_id: str
+    policy: dict  # the ODRL body, without the offer's @id/@type
+    accepted: bool
+
+
 class EdcNegotiator:
     """Catalog requests and contract negotiations with partners' connectors through the own
     EDC (Tractus-X SDK).
@@ -129,6 +138,31 @@ class EdcNegotiator:
                     f"connector discovery for {bpnl} at {address} failed: {exc}"
                 ) from exc
         return self._discovery[key]
+
+    def accepts(self, policy: dict) -> bool:
+        """Whether the company accepts this offered policy (compared by meaning)."""
+        if self._policies is None:
+            return True
+        return any(same_policy(policy, p) for p in self._policies)
+
+    def offered_policies(
+        self, bpnl: str, address: str, filter_expression: list[dict]
+    ) -> list[OfferedPolicy]:
+        """The usage policies the connector offers for the matching assets, each once per
+        asset, and whether the company accepts it. Only reads the catalog."""
+        found = list(datasets(self.catalog(bpnl, address, filter_expression)))
+        other = _with_other_dct_namespace(filter_expression)
+        if not found and other:
+            found = list(datasets(self.catalog(bpnl, address, other)))
+        result: list[OfferedPolicy] = []
+        for dataset in found:
+            asset_id = dataset.get("@id") or dataset.get("id") or ""
+            for offer in offers_of(dataset):
+                body = {k: v for k, v in offer.items() if k not in ("@id", "@type")}
+                if any(o.asset_id == asset_id and same_policy(o.policy, body) for o in result):
+                    continue
+                result.append(OfferedPolicy(str(asset_id), body, self.accepts(body)))
+        return result
 
     def catalog(self, bpnl: str, address: str, filter_expression: list[dict]) -> dict:
         """The partner connector's catalog, filtered (e.g. by asset id or ``dct:type``)."""

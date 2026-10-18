@@ -136,7 +136,7 @@ send to the partner.
 
 ### 6. Is set up in the browser
 
-*UI: **Setup** · API: `/api/setup/config`, `/api/setup/connection-tests`, `/api/auth/…`*
+*UI: **Setup** · API: `/api/setup/config`, `/api/setup/policies`, `/api/setup/connection-tests`, `/api/auth/…`*
 
 - A guided checklist: the company (BPNL), its DTR, loading the parts, its EDC, receiving
   notifications, the partners' connectors and the dataspace services. The DTR, the EDC, the
@@ -144,13 +144,17 @@ send to the partner.
 - An administrator (one local account) signs in to enter or change the connection settings.
   Settings fixed by the deployment win and are shown locked; secrets entered in the UI are stored
   encrypted. A change takes effect without a restart.
+- **Accepted usage policies**: the deployment's are shown locked; an admin adds more, which the app
+  accepts next to them. To find the policy a connector really offers, the app reads that
+  connector's catalog for an asset (only the catalog, nothing is negotiated) and shows each offered
+  policy with whether it is accepted, so it can be accepted as offered.
 
 ## How it behaves in the dataspace
 
 - **Connectors**: Tractus-X EDC 0.12 (release 26.03), DSP 2025-1 with Saturn policies; partners
   still on Jupiter are reached over DSP 0.8 through the same EDC.
 - **Policies**: the app only accepts the usage policies the company lists
-  (`CXS_ACCEPTED_POLICIES`); if no offer matches, it does not negotiate and says which policies
+  (`CXS_ACCEPTED_POLICIES`, plus those added on the Setup page); if no offer matches, it does not negotiate and says which policies
   were offered. Policies spelled the Jupiter or the Saturn way are compared by meaning.
 - **Reuse**: a negotiation happens once per partner, asset and policy set; the access token of an
   asset is reused for a minute, so reading many submodels of one shared asset is a series of

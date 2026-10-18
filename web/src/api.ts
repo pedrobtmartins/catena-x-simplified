@@ -79,6 +79,23 @@ export function instanceId(localIdentifiers: Record<string, string>): string | u
   return Object.entries(localIdentifiers).find(([k]) => k !== "manufacturerId")?.[1];
 }
 
+export interface PolicyEntry {
+  description: string;
+  policy: Record<string, unknown>;
+}
+
+export interface Policies {
+  deployment: PolicyEntry[];
+  added: PolicyEntry[];
+  editable: boolean;
+  accept_any: boolean;
+}
+
+export interface OfferedPolicy extends PolicyEntry {
+  asset_id: string;
+  accepted: boolean;
+}
+
 export interface PartRef {
   global_asset_id: string;
   name: string | null;
@@ -372,6 +389,10 @@ export const api = {
   config: () => request<ConfigField[]>("/api/setup/config"),
   saveConfig: (values: Record<string, string | null>) =>
     request<{ fields: ConfigField[]; checks: ConnectionCheck[] }>("/api/setup/config", json("PUT", { values })),
+  policies: () => request<Policies>("/api/setup/policies"),
+  savePolicies: (added: Record<string, unknown>[]) => request<Policies>("/api/setup/policies", json("PUT", { added })),
+  offeredPolicies: (body: { bpnl: string; connector_address?: string; asset_id?: string }) =>
+    request<OfferedPolicy[]>("/api/setup/policies/offers", json("POST", body)),
   testConnections: () => request<ConnectionCheck[]>("/api/setup/connection-tests", { method: "POST" }),
   legalEntity: (bpnl: string) =>
     request<{ bpnl: string; legal_name: string | null }>(`/api/partners/${encodeURIComponent(bpnl)}/legal-entity`),
