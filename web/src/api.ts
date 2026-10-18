@@ -96,6 +96,41 @@ export interface OfferedPolicy extends PolicyEntry {
   accepted: boolean;
 }
 
+export interface StructurePart {
+  global_asset_id: string;
+  cached: boolean;
+  own: boolean;
+  kind: string | null;
+  name: string | null;
+  serial: string | null;
+  part_number: string | null;
+  manufacturer_id: string | null;
+  manufacturer_name: string | null;
+}
+
+export interface StructureLink {
+  parent: string;
+  child: string;
+  business_partner: string | null;
+  quantity: number | null;
+  unit: string | null;
+  declared_in: string[];
+}
+
+export interface PartStructure {
+  root: string;
+  parts: StructurePart[];
+  links: StructureLink[];
+  truncated: boolean;
+}
+
+export interface WhereUsed {
+  part: string;
+  parts: StructurePart[];
+  paths: string[][];
+  truncated: boolean;
+}
+
 export interface PartRef {
   global_asset_id: string;
   name: string | null;
@@ -372,6 +407,8 @@ export const api = {
     return request<PartPage>(`/api/parts?${query}`);
   },
   tree: (id: string) => request<PartTree>(`/api/parts/${encodeURIComponent(id)}/tree`),
+  structure: (id: string) => request<PartStructure>(`/api/parts/${encodeURIComponent(id)}/structure`),
+  whereUsed: (id: string) => request<WhereUsed>(`/api/parts/${encodeURIComponent(id)}/where-used`),
   sync: () => request<SyncReport>("/api/sync", { method: "POST" }),
   lastSync: () => request<SyncReport>("/api/sync/last"),
   syncRuns: (limit = 20) => request<{ items: SyncReport[] }>(`/api/sync/runs?limit=${limit}`),

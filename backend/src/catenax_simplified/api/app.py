@@ -51,7 +51,9 @@ from ..traceability import (
     PartnerSync,
     bom_findings,
     parse_twin_ids,
+    part_structure,
     part_tree,
+    where_used,
 )
 from ..wiring import (
     build_admin_auth,
@@ -89,10 +91,14 @@ from .schemas import (
     PartOut,
     PartPage,
     PartRefOut,
+    PartStructureOut,
     PartTreeOut,
     StatsOut,
+    StructureLinkOut,
+    StructurePartOut,
     SyncReportOut,
     SyncRunPage,
+    WhereUsedOut,
 )
 
 log = logging.getLogger(__name__)
@@ -293,6 +299,63 @@ def get_part_tree(global_asset_id: str, session: SessionDep) -> PartTreeOut:
     if tree is None:
         raise HTTPException(status_code=404, detail="part not found")
     return PartTreeOut.model_validate(tree)
+
+
+def _structure_parts(
+    session: Session, rows: dict, partners: dict[str, str | None], own_bpnl: str
+) -> list[StructurePartOut]:
+    names = {p.bpnl: p.name for p in PartnerRepository(session).all()}
+    out = []
+    for gid, row in rows.items():
+        maker = (row.manufacturer_id if row else None) or partners.get(gid)
+        out.append(
+            StructurePartOut(
+                global_asset_id=gid,
+                cached=row is not None,
+                own=(row.is_own if row else False) or maker == own_bpnl,
+                kind=row.kind if row else None,
+                name=row.name_at_manufacturer if row else None,
+                serial=instance_id(row.local_identifiers) if row else None,
+                part_number=row.manufacturer_part_id if row else None,
+                manufacturer_id=maker,
+                manufacturer_name=names.get(maker) if maker else None,
+            )
+        )
+    return out
+
+
+@router.get("/parts/{global_asset_id}/structure", response_model=PartStructureOut)
+def get_part_structure(
+    global_asset_id: str, session: SessionDep, request: Request
+) -> PartStructureOut:
+    """Everything under a part: own parts at every level (all known locally), other companies'
+    parts as leaves, with quantities. A part declared in two places is linked twice."""
+    own_bpnl = request.app.state.settings.own_bpnl
+    structure = part_structure(PartRepository(session), global_asset_id, own_bpnl)
+    if structure is None:
+        raise HTTPException(status_code=404, detail="part not found")
+    makers = {link.child: link.business_partner for link in structure.links}
+    return PartStructureOut(
+        root=structure.root,
+        parts=_structure_parts(session, structure.parts, makers, own_bpnl),
+        links=[
+            StructureLinkOut.model_validate(link, from_attributes=True) for link in structure.links
+        ],
+        truncated=structure.truncated,
+    )
+
+
+@router.get("/parts/{global_asset_id}/where-used", response_model=WhereUsedOut)
+def get_where_used(global_asset_id: str, session: SessionDep, request: Request) -> WhereUsedOut:
+    """Every path from a part up to the products that contain it, through own BoMs (and a
+    customer's part where the usage names one): the parts a quality alert concerns."""
+    used = where_used(PartRepository(session), global_asset_id)
+    return WhereUsedOut(
+        part=used.part,
+        parts=_structure_parts(session, used.parts, {}, request.app.state.settings.own_bpnl),
+        paths=used.paths,
+        truncated=used.truncated,
+    )
 
 
 @router.post("/sync", response_model=SyncReportOut)

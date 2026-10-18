@@ -100,6 +100,51 @@ class PartTreeOut(BaseModel):
     children: list[TreeNodeOut]
 
 
+class StructurePartOut(BaseModel):
+    """A part in a structure or a where-used path, named for a person. ``cached``: its part
+    aspect is in the cache (own parts, and partner parts after a partner sync)."""
+
+    global_asset_id: str
+    cached: bool
+    own: bool
+    kind: str | None
+    name: str | None
+    serial: str | None
+    part_number: str | None
+    manufacturer_id: str | None
+    manufacturer_name: str | None
+
+
+class StructureLinkOut(BaseModel):
+    """A parent contains a child; ``business_partner`` is the child's maker as the BoM says."""
+
+    parent: str
+    child: str
+    business_partner: str | None
+    quantity: float | None
+    unit: str | None
+    declared_in: list[str]
+
+
+class PartStructureOut(BaseModel):
+    """A part and everything under it: own parts at every level, other companies' parts as
+    leaves. ``truncated``: the structure was cut at the size limit."""
+
+    root: str
+    parts: list[StructurePartOut]
+    links: list[StructureLinkOut]
+    truncated: bool
+
+
+class WhereUsedOut(BaseModel):
+    """Every path from a part up to a product nothing contains, the part first."""
+
+    part: str
+    parts: list[StructurePartOut]
+    paths: list[list[str]]
+    truncated: bool
+
+
 class SyncIssueOut(BaseModel):
     """A problem with one twin or submodel during a sync; the sync carries on with the others."""
 

@@ -135,6 +135,8 @@ ignored, and the Setup page asks for them again.
 | GET    | `/api/parts`                 | Cached parts with parent/child counts (`search`, `kind`, `aspect_major`, `own_only`, `limit`, `offset`) |
 | GET    | `/api/parts/{id}`            | One part                                      |
 | GET    | `/api/parts/{id}/tree`       | Part with its direct parents and children     |
+| GET    | `/api/parts/{id}/structure`  | Everything under a part: own parts at every level, other companies' parts as leaves, with quantities (cut at 2000 parts, `truncated`) |
+| GET    | `/api/parts/{id}/where-used` | Every path from a part up to the products that contain it (part first; at most 200 paths) |
 | POST   | `/api/sync`                  | Sync own twins from the DTR now               |
 | GET    | `/api/sync/last`             | Report of the last sync                       |
 | GET    | `/api/sync/runs`             | Recorded sync runs, newest first (`limit`)    |
