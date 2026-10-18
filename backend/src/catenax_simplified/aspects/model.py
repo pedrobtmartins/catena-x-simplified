@@ -11,6 +11,8 @@ from enum import StrEnum
 
 
 class PartKind(StrEnum):
+    """A serialized part (one unit) or a batch (a lot)."""
+
     SERIAL = "serial"
     BATCH = "batch"
 
@@ -24,6 +26,8 @@ class RelationSource(StrEnum):
 
 @dataclass(frozen=True)
 class Classification:
+    """A classification of the part type (e.g. a customs or product code) and its standard."""
+
     standard: str
     id: str
     description: str | None = None

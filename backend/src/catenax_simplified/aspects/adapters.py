@@ -34,6 +34,9 @@ def _id_key(shape: str) -> str:
 
 
 def parse_part(payload: Mapping[str, Any], kind: PartKind, shape: str, semantic_id: str) -> Part:
+    """A SerialPart or Batch payload, v3 or v4 shape, into the internal ``Part``. v3 field
+    names (``catenaXId``, ``date``, ``classificationID`` …) are mapped to the v4 ones.
+    """
     info = payload.get("manufacturingInformation") or {}
     type_info = payload.get("partTypeInformation") or {}
 
@@ -89,6 +92,9 @@ def _quantity(item: Mapping[str, Any]) -> tuple[float | None, str | None]:
 
 
 def parse_bom(payload: Mapping[str, Any], shape: str) -> Relations:
+    """A SingleLevelBomAsBuilt payload into the parent's ``Relations``: one per child, with
+    its supplier and quantity.
+    """
     id_key = _id_key(shape)
     parent_id = normalize_global_asset_id(_require_str(payload, id_key))
     items = []
@@ -108,6 +114,9 @@ def parse_bom(payload: Mapping[str, Any], shape: str) -> Relations:
 
 
 def parse_usage(payload: Mapping[str, Any], shape: str) -> Relations:
+    """A SingleLevelUsageAsBuilt payload into the child's ``Relations``: one per parent, with
+    its customer and quantity.
+    """
     id_key = _id_key(shape)
     child_id = normalize_global_asset_id(_require_str(payload, id_key))
     items = []

@@ -13,6 +13,8 @@ from .messages import Status
 
 
 class Direction(StrEnum):
+    """Our side of a notification."""
+
     OUTBOUND = "outbound"  # we are the initiator
     INBOUND = "inbound"  # we are the receiver
 
@@ -60,6 +62,9 @@ def local_targets(direction: Direction, current: Status) -> set[Status]:
 
 
 def check_local(direction: Direction, current: Status, new: Status) -> None:
+    """Raises ``TransitionError`` unless a user on this side may move the notification from
+    ``current`` to ``new``.
+    """
     if new not in _LOCAL[direction].get(current, set()):
         who = "initiator" if direction is Direction.OUTBOUND else "receiver"
         raise TransitionError(f"the {who} cannot change {current} to {new}")

@@ -1,3 +1,4 @@
+// Sync history: the latest own-twin sync, the recent runs with their issues, the data checks and where the twins come from.
 import { useEffect, useMemo, useState } from "react";
 import { api, formatDateTime, formatTime, syncState, type Health, type SyncReport } from "./api";
 import { CheckIcon } from "./icons";

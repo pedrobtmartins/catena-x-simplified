@@ -54,6 +54,8 @@ def scrub(text: str, limit: int = 500) -> str:
 
 @dataclass(frozen=True)
 class CheckStep:
+    """One step of a connector check and how it went."""
+
     key: str  # discovery | dtr_offer | notification:<dct:type name> | registry_access
     name: str
     status: str  # ok | warn | failed | skipped
@@ -61,6 +63,8 @@ class CheckStep:
 
 
 class PartnerHealthChecker(Protocol):
+    """Checks a partner's connector, step by step."""
+
     def check(
         self, partner: Partner, level: str, notification_types: Sequence[str]
     ) -> list[CheckStep]:
@@ -102,6 +106,11 @@ def _skipped(key: str, name: str, reason: str) -> CheckStep:
 
 
 class EdcHealthChecker:
+    """Checks a partner's connector through the own EDC with the same calls the app uses:
+    discovery, the catalog's DTR and notification offers, and (``full``) a DTR negotiation
+    and one shell lookup through the EDR.
+    """
+
     def __init__(
         self,
         consumer: ConnectorConsumer,
@@ -117,6 +126,9 @@ class EdcHealthChecker:
     def check(
         self, partner: Partner, level: str, notification_types: Sequence[str]
     ) -> list[CheckStep]:
+        """The steps of ``level`` (``discovery``, ``catalog`` or ``full``, each including the
+        previous one); a failed step skips the rest.
+        """
         if level not in LEVELS:
             raise ValueError(f"unknown level {level!r}")
         # A new negotiator per check: discovery is not served from an earlier check's cache.
@@ -243,6 +255,9 @@ class DirectHealthChecker:
     def check(
         self, partner: Partner, level: str, notification_types: Sequence[str]
     ) -> list[CheckStep]:
+        """Development mode: probes the partner app and its registry directly and reports the
+        dataspace steps as skipped.
+        """
         if level not in LEVELS:
             raise ValueError(f"unknown level {level!r}")
         ok, detail = self._get(f"{partner.connector_address.rstrip('/')}/api/health")

@@ -67,6 +67,8 @@ class ConnectorProvider(Protocol):
 
 @dataclass(frozen=True)
 class NotificationAsset:
+    """One of the notification assets this app offers in the own EDC."""
+
     asset_id: str
     dct_type: str
     version: str
@@ -92,6 +94,12 @@ def notification_assets(base_url: str, prefix: str) -> list[NotificationAsset]:
 
 
 class NotificationAssetPublisher:
+    """Publishes the eight notification assets (receive and update, alert and investigation,
+    Notification API 1.2.1 and 2.0.0) in the own EDC with the KIT's access and usage
+    policies, pointing at this app's receiving endpoints. Existing assets and policies are
+    updated by ID, so publishing again is safe.
+    """
+
     def __init__(
         self,
         provider: ConnectorProvider,

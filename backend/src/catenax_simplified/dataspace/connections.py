@@ -23,6 +23,8 @@ EDC_NAMESPACE = "https://w3id.org/edc/v0.0.1/ns/"
 
 @dataclass(frozen=True)
 class ConnectionCheck:
+    """The result of testing one configured connection."""
+
     key: str  # dtr | edc | central_idp | discovery | bpdm | bp_explorer
     name: str
     status: str  # ok | failed | skipped | not_configured
@@ -45,6 +47,12 @@ def _http_failure(response: requests.Response) -> str:
 
 
 class ConnectionTester:
+    """Read-only tests of every configured connection, for the Setup page: the own DTR and EDC
+    management API, the central IdP and the services that use it (discovery, BPDM Pool,
+    Business Partner Explorer). Nothing is created or changed; credentials are scrubbed
+    from errors.
+    """
+
     def __init__(
         self,
         settings: Settings,
@@ -64,6 +72,9 @@ class ConnectionTester:
         self._timeout = timeout
 
     def run(self) -> list[ConnectionCheck]:
+        """Every test, in the order of the Setup checklist. Services that need the central IdP
+        are skipped if it fails.
+        """
         central = self._central_idp()
         central_ok = central.status == "ok"
         return [

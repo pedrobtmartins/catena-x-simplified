@@ -1,3 +1,7 @@
+"""Database tables (SQLAlchemy). The schema is created and migrated by Alembic
+(``storage/migrations``); a change here needs a migration.
+"""
+
 from __future__ import annotations
 
 from datetime import datetime
@@ -8,10 +12,16 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class Base(DeclarativeBase):
+    """Declarative base of every table."""
+
     pass
 
 
 class PartRow(Base):
+    """A part read from a SerialPart or Batch aspect: an own part, or a direct partner's part
+    cached by the partner sync. Keyed by its Catena-X ID (``globalAssetId``).
+    """
+
     __tablename__ = "parts"
 
     global_asset_id: Mapped[str] = mapped_column(String(255), primary_key=True)
@@ -32,6 +42,15 @@ class PartRow(Base):
 
 
 class RelationRow(Base):
+    """One link of a one-level as-built tree, as declared by an aspect.
+
+    ``source`` is ``bom`` (SingleLevelBomAsBuilt: the parent contains the child) or
+    ``usage`` (SingleLevelUsageAsBuilt: the child went into the parent). ``declared_by`` is
+    the twin whose aspect declared it, so a re-sync replaces exactly its own links.
+    ``business_partner`` is the BPNL of the counterpart: the child's maker for a BoM link,
+    the parent's owner for a usage link. The counterpart may not be cached.
+    """
+
     __tablename__ = "relations"
     __table_args__ = (
         UniqueConstraint("parent_id", "child_id", "source", name="uq_relation"),

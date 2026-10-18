@@ -25,6 +25,8 @@ FindingKind = Literal["two_levels", "two_assemblies"]
 
 @dataclass(frozen=True)
 class DataFinding:
+    """A part declared in more than one own bill of material, and how."""
+
     kind: FindingKind
     # The part declared more than once, and who makes it (from the BoM).
     global_asset_id: str
@@ -51,6 +53,10 @@ def _ancestors(
 
 
 def bom_findings(repository: PartRepository) -> list[DataFinding]:
+    """Every finding in the cache: for each part declared in the BoMs of several own parts,
+    the pairs where one contains the other (``two_levels``) and, unless the part is a
+    batch, the own parts that do not (``two_assemblies``).
+    """
     findings: list[DataFinding] = []
     ancestors: dict[str, set[str]] = {}
     for child_id, relations in repository.bom_children_of_several().items():

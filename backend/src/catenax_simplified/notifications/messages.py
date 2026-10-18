@@ -25,11 +25,14 @@ _BPNL = re.compile(r"^BPNL[0-9A-Za-z]{12}$")
 
 
 class NotificationType(StrEnum):
+    """Quality alert (to customers) or quality investigation (to suppliers)."""
+
     ALERT = "alert"  # supplier → direct customer (bottom-up)
     INVESTIGATION = "investigation"  # customer → direct supplier (top-down)
 
     @property
     def context(self) -> str:
+        """The message header's ``context`` for this type (Notification API 2.0.0)."""
         name = "Alert" if self is NotificationType.ALERT else "Investigation"
         return f"Traceability-QualityNotification-{name}:2.0.0"
 
@@ -41,6 +44,8 @@ class NotificationType(StrEnum):
 
 
 class Status(StrEnum):
+    """Statuses of the KIT state model, shared by both sides."""
+
     CREATED = "CREATED"
     SENT = "SENT"
     RECEIVED = "RECEIVED"
@@ -51,6 +56,8 @@ class Status(StrEnum):
 
 
 class Severity(StrEnum):
+    """Severities defined by the Notification API."""
+
     MINOR = "MINOR"
     MAJOR = "MAJOR"
     CRITICAL = "CRITICAL"
@@ -81,10 +88,12 @@ class Message:
 
 
 def new_uuid() -> str:
+    """A new ``notificationId`` or ``messageId``."""
     return str(uuid.uuid4())
 
 
 def timestamp(value: datetime) -> str:
+    """A UTC timestamp in the format the Notification API uses."""
     return value.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 

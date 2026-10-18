@@ -1,3 +1,4 @@
+// Entry point: fonts, global styles and the app.
 import "@fontsource/libre-franklin/400.css";
 import "@fontsource/libre-franklin/500.css";
 import "@fontsource/libre-franklin/600.css";

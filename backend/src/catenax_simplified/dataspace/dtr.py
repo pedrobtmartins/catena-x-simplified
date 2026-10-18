@@ -74,6 +74,7 @@ class SdkTwinRegistry:
         self._bpn = bpn
 
     def iter_twins(self) -> Iterator[TwinRef]:
+        """Every shell descriptor visible to the own BPNL, page by page (cursor paging)."""
         cursor: str | None = None
         while True:
             try:

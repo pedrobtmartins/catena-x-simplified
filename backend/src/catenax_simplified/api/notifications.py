@@ -140,6 +140,8 @@ def list_notifications(
     limit: Annotated[int, Query(ge=1, le=500)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> NotificationPage:
+    """The inbox (``direction=inbound``) or outbox (``outbound``), most recently updated first,
+    filtered by type, status, partner BPNL or, with ``open_only``, by those not closed."""
     rows, total = NotificationRepository(session).list(
         direction=direction,
         type=type.value if type else None,
@@ -155,16 +157,26 @@ def list_notifications(
 
 @router.get("/summary", response_model=NotificationSummaryOut)
 def summary(session: SessionDep) -> NotificationSummaryOut:
+    """Counts for the Notifications page: new and open received notifications, open sent ones."""
     return NotificationSummaryOut(**NotificationRepository(session).counts())
 
 
 @router.post("/plan", response_model=PlanOut)
 def plan(request: PlanRequest, service: ServiceDep) -> PlanOut:
+    """Who would receive a notification about these parts, before creating it: an alert goes to the
+    direct customers of own parts (usage), an investigation to the direct suppliers of the parts
+    (BoM). Parts with no known partner are listed as unmatched.
+    """
     return PlanOut.model_validate(service.plan(request.type, request.affected_items))
 
 
 @router.post("", response_model=list[NotificationOut], status_code=201)
 async def create(request: NotificationCreate, service: ServiceDep) -> list[NotificationOut]:
+    """Creates one notification per recipient from the plan, each with only the parts that concern
+    that partner, and sends them when ``send`` is set. A notification whose delivery fails stays
+    a draft with the error; ``forwarded_from`` links a next hop to the received notification it
+    came from.
+    """
     if request.send and not service.can_send:
         raise HTTPException(status_code=503, detail="no EDC configured")
     try:
@@ -192,6 +204,9 @@ async def create(request: NotificationCreate, service: ServiceDep) -> list[Notif
 
 @router.get("/{pk}", response_model=NotificationDetailOut)
 def get_notification(pk: int, session: SessionDep) -> NotificationDetailOut:
+    """One notification with its affected parts (as known locally), message log, the hop it was
+    forwarded from or to, and the status changes allowed next.
+    """
     row = NotificationRepository(session).get(pk)
     if row is None:
         raise HTTPException(status_code=404, detail="notification not found")
@@ -200,6 +215,10 @@ def get_notification(pk: int, session: SessionDep) -> NotificationDetailOut:
 
 @router.get("/{pk}/forward-plan", response_model=ForwardPlanOut)
 def forward_plan(pk: int, service: ServiceDep) -> ForwardPlanOut:
+    """The next hop for a received notification: for an alert, the own parts that contain the
+    affected parts and their customers; for an investigation, the components of the affected own
+    parts and their suppliers.
+    """
     try:
         return ForwardPlanOut.model_validate(service.forward_plan(pk))
     except NotificationError as exc:
@@ -208,6 +227,9 @@ def forward_plan(pk: int, service: ServiceDep) -> ForwardPlanOut:
 
 @router.post("/{pk}/send", response_model=NotificationOut)
 async def send(pk: int, service: ServiceDep) -> NotificationOut:
+    """Sends a draft through the EDC, in the highest Notification API version the partner offers.
+    On failure it stays a draft with the error.
+    """
     try:
         return NotificationOut.model_validate(await run_in_threadpool(service.send, pk))
     except NotificationError as exc:
@@ -216,6 +238,9 @@ async def send(pk: int, service: ServiceDep) -> NotificationOut:
 
 @router.post("/{pk}/status", response_model=NotificationOut)
 async def change_status(pk: int, change: StatusChange, service: ServiceDep) -> NotificationOut:
+    """Acknowledges, accepts, declines or closes a notification, following the KIT state model. The
+    partner is told first; the status changes locally only once the partner accepted the update.
+    """
     try:
         row = await run_in_threadpool(service.change_status, pk, change.status, change.information)
     except NotificationError as exc:

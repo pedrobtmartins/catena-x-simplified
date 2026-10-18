@@ -1,3 +1,8 @@
+"""The application settings: one ``CXS_*`` variable each. ``backend/.env.example`` and
+``backend/README.md`` describe them; an admin can fill the connection settings on the Setup
+page.
+"""
+
 from __future__ import annotations
 
 from pydantic import Field

@@ -1,3 +1,7 @@
+"""Request and response models of the REST API (Pydantic). They are what ``/docs`` shows;
+field comments say what a value means where the name alone does not.
+"""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -19,12 +23,19 @@ UtcDatetime = Annotated[datetime, AfterValidator(_as_utc)]
 
 
 class ClassificationOut(BaseModel):
+    """A part classification, e.g. a customs or product code, with the standard it comes from."""
+
     standard: str
     id: str
     description: str | None = None
 
 
 class PartOut(BaseModel):
+    """A cached part (own or a partner's) as read from its SerialPart or Batch aspect, in any
+    supported version. ``kind``: serial or batch; ``semantic_id``: the aspect model it was
+    read from.
+    """
+
     model_config = ConfigDict(from_attributes=True)
 
     global_asset_id: str
@@ -45,11 +56,17 @@ class PartOut(BaseModel):
 
 
 class PartListItem(PartOut):
+    """A part in the parts list, with how many parents (where it is used) and children (what
+    it contains) it has.
+    """
+
     parents_count: int
     children_count: int
 
 
 class PartPage(BaseModel):
+    """One page of the parts list."""
+
     items: list[PartListItem]
     total: int
     limit: int
@@ -57,6 +74,11 @@ class PartPage(BaseModel):
 
 
 class TreeNodeOut(BaseModel):
+    """A direct parent or child of a part. ``part`` is ``None`` for a partner twin not cached
+    yet; ``declared_in`` says whether the link comes from the BoM, the usage aspect, or
+    both.
+    """
+
     model_config = ConfigDict(from_attributes=True)
 
     global_asset_id: str
@@ -69,6 +91,8 @@ class TreeNodeOut(BaseModel):
 
 
 class PartTreeOut(BaseModel):
+    """A part with its direct parents and children: the as-built tree, one level each way."""
+
     model_config = ConfigDict(from_attributes=True)
 
     part: PartOut
@@ -77,6 +101,8 @@ class PartTreeOut(BaseModel):
 
 
 class SyncIssueOut(BaseModel):
+    """A problem with one twin or submodel during a sync; the sync carries on with the others."""
+
     model_config = ConfigDict(from_attributes=True)
 
     global_asset_id: str
@@ -85,6 +111,9 @@ class SyncIssueOut(BaseModel):
 
 
 class SyncReportOut(BaseModel):
+    """One own-twin sync run. ``complete``: the listing (the whole registry, or the selected
+    twins) was read without error, so own parts not in it were removed from the cache."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int | None
@@ -100,10 +129,16 @@ class SyncReportOut(BaseModel):
 
 
 class SyncRunPage(BaseModel):
+    """Recent sync runs, newest first."""
+
     items: list[SyncReportOut]
 
 
 class StatsOut(BaseModel):
+    """Counts for the Parts page. Links between two own parts are internal and count as
+    neither supplier nor customer links.
+    """
+
     own_parts: int
     own_parts_by_kind: dict[str, int]
     own_parts_by_semantic_id: dict[str, int]
@@ -114,12 +149,20 @@ class StatsOut(BaseModel):
 
 
 class PartRefOut(BaseModel):
+    """A part named for a person: Catena-X ID, name and the identifier of the unit or lot
+    (``None`` when it is not cached).
+    """
+
     global_asset_id: str
     name: str | None
     serial: str | None
 
 
 class DataFindingOut(BaseModel):
+    """A contradiction in the own bills of material: a part declared in two places (see
+    ``traceability.data_checks``).
+    """
+
     kind: Literal["two_levels", "two_assemblies"]
     part: PartRefOut
     business_partner: str | None
@@ -130,11 +173,15 @@ class DataFindingOut(BaseModel):
 
 
 class DataChecksOut(BaseModel):
+    """All data findings in the cache (or those about one part)."""
+
     total: int
     findings: list[DataFindingOut]
 
 
 class NotificationAssetsOut(BaseModel):
+    """Whether the notification assets are published in the own EDC, and their IDs."""
+
     # not_configured | publishing | published | failed
     state: str
     message: str | None = None
@@ -143,6 +190,8 @@ class NotificationAssetsOut(BaseModel):
 
 
 class HealthOut(BaseModel):
+    """What the app is connected to and can do; the UI shows or hides actions from it."""
+
     status: str
     own_bpnl: str
     dtr_configured: bool
@@ -164,6 +213,10 @@ class HealthOut(BaseModel):
 
 
 class PartnerCheckStepOut(BaseModel):
+    """One step of a connector check (discovery, catalog offers, negotiation, registry
+    answer).
+    """
+
     key: str
     name: str
     status: str  # ok | warn | failed | skipped
@@ -171,6 +224,8 @@ class PartnerCheckStepOut(BaseModel):
 
 
 class PartnerCheckOut(BaseModel):
+    """A connector check of a partner and its steps."""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -184,21 +239,31 @@ class PartnerCheckOut(BaseModel):
 
 
 class PartnerCheckPage(BaseModel):
+    """Recent connector checks, newest first."""
+
     items: list[PartnerCheckOut]
 
 
 class PartnerCheckRequest(BaseModel):
+    """How far to check a partner's connector: ``discovery``, ``catalog`` or ``full``."""
+
     level: str = Field(pattern="^(discovery|catalog|full)$")
     # A full check negotiates a contract and opens a transfer in both connectors.
     confirm_state_change: bool = False
 
 
 class PartnerBatchCheckRequest(PartnerCheckRequest):
+    """A connector check of every partner."""
+
     # Only partners that were never checked or whose last check was not healthy.
     only_unhealthy: bool = True
 
 
 class PartnerOut(BaseModel):
+    """A direct partner: found in the own BoM (supplier) or usage (customer) data, or set by
+    hand.
+    """
+
     bpnl: str
     name: str | None
     roles: list[str]  # supplier and/or customer
@@ -215,11 +280,15 @@ class PartnerOut(BaseModel):
 
 
 class PartnerUpdate(BaseModel):
+    """A partner's name or DSP address to set; fields left out stay as they are."""
+
     name: str | None = Field(default=None, max_length=255)
     connector_address: str | None = Field(default=None, max_length=512, pattern=r"^https?://\S+$")
 
 
 class ConnectionCheckOut(BaseModel):
+    """A read-only test of one configured connection (DTR, EDC, central IdP, discovery, BPDM)."""
+
     model_config = ConfigDict(from_attributes=True)
 
     key: str  # dtr | edc | central_idp | discovery | bpdm | bp_explorer
@@ -229,11 +298,15 @@ class ConnectionCheckOut(BaseModel):
 
 
 class LegalEntityOut(BaseModel):
+    """A BPNL's legal name in the BPDM golden record."""
+
     bpnl: str
     legal_name: str | None  # None: the BPNL is not in the golden record
 
 
 class PartnerNameOut(BaseModel):
+    """The outcome of looking up one partner's name."""
+
     bpnl: str
     status: str  # named | not_found | failed
     name: str | None = None
@@ -241,11 +314,17 @@ class PartnerNameOut(BaseModel):
 
 
 class ConnectorDiscoveryOut(BaseModel):
+    """DSP endpoints the dataspace's discovery services know for a BPNL."""
+
     bpnl: str
     endpoints: list[str]  # DSP endpoints registered for the BPNL, in the service's order
 
 
 class PartnerSyncResultOut(BaseModel):
+    """What a partner sync read for one partner: counterpart twins found and missing, cached
+    parts removed, problems.
+    """
+
     model_config = ConfigDict(from_attributes=True)
 
     bpnl: str
@@ -259,6 +338,8 @@ class PartnerSyncResultOut(BaseModel):
 
 
 class PartnerSyncReportOut(BaseModel):
+    """One partner sync run, per partner."""
+
     model_config = ConfigDict(from_attributes=True)
 
     started_at: UtcDatetime
@@ -270,6 +351,10 @@ class PartnerSyncReportOut(BaseModel):
 
 
 class NotificationOut(BaseModel):
+    """A quality alert or investigation, sent or received. ``notification_id`` is shared by
+    both sides; ``api_version`` is the Notification API version used with the partner.
+    """
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -291,6 +376,8 @@ class NotificationOut(BaseModel):
 
 
 class NotificationPage(BaseModel):
+    """One page of the inbox or outbox."""
+
     items: list[NotificationOut]
     total: int
     limit: int
@@ -298,12 +385,16 @@ class NotificationPage(BaseModel):
 
 
 class NotificationSummaryOut(BaseModel):
+    """Counts for the Notifications page."""
+
     inbound_open: int
     inbound_new: int  # received, not yet acknowledged
     outbound_open: int
 
 
 class NotificationMessageOut(BaseModel):
+    """One message of a notification's log (a send or an update, either way)."""
+
     model_config = ConfigDict(from_attributes=True)
 
     direction: str
@@ -315,11 +406,17 @@ class NotificationMessageOut(BaseModel):
 
 
 class AffectedItemOut(BaseModel):
+    """An affected part of a notification, with the local part if it is cached."""
+
     global_asset_id: str
     part: PartOut | None  # None if the part is not in the local cache
 
 
 class NotificationDetailOut(NotificationOut):
+    """A notification with its parts, message log, the hops before and after it, and the
+    actions allowed next.
+    """
+
     items: list[AffectedItemOut]
     messages: list[NotificationMessageOut]
     forwarded_from: NotificationOut | None
@@ -329,11 +426,17 @@ class NotificationDetailOut(NotificationOut):
 
 
 class PlanRequest(BaseModel):
+    """Parts to notify about: own parts for an alert, supplier parts for an investigation."""
+
     type: NotificationType
     affected_items: list[str] = Field(min_length=1, max_length=1000)
 
 
 class PlanOut(BaseModel):
+    """Recipients of a planned notification: partner BPNL → the affected parts that concern
+    it; ``unmatched``: parts with no known partner.
+    """
+
     model_config = ConfigDict(from_attributes=True)
 
     type: NotificationType
@@ -342,11 +445,17 @@ class PlanOut(BaseModel):
 
 
 class ForwardPlanOut(PlanOut):
+    """The next hop of a received notification: the plan, the notification it starts from and
+    the own parts involved.
+    """
+
     source_id: int
     own_parts: list[str]
 
 
 class NotificationCreate(BaseModel):
+    """A new alert or investigation. One notification is created per recipient of the plan."""
+
     type: NotificationType
     affected_items: list[str] = Field(min_length=1, max_length=1000)
     severity: Severity
@@ -357,5 +466,7 @@ class NotificationCreate(BaseModel):
 
 
 class StatusChange(BaseModel):
+    """A status change with an optional message for the partner (e.g. why it is declined)."""
+
     status: Status
     information: str | None = Field(default=None, max_length=1000)

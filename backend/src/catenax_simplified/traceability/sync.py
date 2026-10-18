@@ -39,6 +39,8 @@ def parse_twin_ids(text: str | None) -> list[str]:
 
 @dataclass(frozen=True)
 class SyncIssue:
+    """A problem with one twin or submodel; the sync records it and carries on."""
+
     global_asset_id: str
     semantic_id: str | None
     message: str
@@ -46,6 +48,10 @@ class SyncIssue:
 
 @dataclass
 class SyncReport:
+    """What one own-twin sync did. ``complete`` is set when the listing was read without
+    error, which is also when stale own parts were removed.
+    """
+
     started_at: datetime
     finished_at: datetime | None = None
     twins: int = 0
@@ -59,6 +65,14 @@ class SyncReport:
 
 
 class OwnTwinSync:
+    """Reads the own twins from the DTR into the local cache: their part aspect (SerialPart or
+    Batch) and their BoM and usage relations, in any supported version.
+
+    With ``twin_ids`` only those twins and, through their BoMs, their own children are
+    read; otherwise the whole registry. A twin or submodel that cannot be read is reported
+    and skipped; a failed listing aborts without deleting anything.
+    """
+
     def __init__(
         self,
         registry: TwinRegistry,
@@ -79,9 +93,11 @@ class OwnTwinSync:
 
     @property
     def subset(self) -> list[str]:
+        """The twins a subset sync starts from; empty: the whole registry."""
         return list(self._twin_ids)
 
     def run(self) -> SyncReport:
+        """One sync run, recorded in the history."""
         report = SyncReport(started_at=self._clock())
         seen: set[str] = set()
         try:

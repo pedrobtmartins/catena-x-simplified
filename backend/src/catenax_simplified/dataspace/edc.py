@@ -35,6 +35,10 @@ JUPITER_NEGOTIATION_CONTEXT = [
 
 @dataclass(frozen=True)
 class Partner:
+    """A partner as the dataspace layer sees it: its BPNL and the DSP endpoint of its
+    connector.
+    """
+
     bpnl: str
     connector_address: str  # the partner's DSP endpoint, e.g. https://edc.partner/api/v1/dsp
 
@@ -66,6 +70,7 @@ class ConnectorConsumer(Protocol):
 
 
 def equals(key: str, value: str) -> dict:
+    """An EDC catalog filter: ``key`` equals ``value``."""
     return {"operandLeft": key, "operator": "=", "operandRight": value}
 
 
@@ -95,6 +100,14 @@ def _with_other_dct_namespace(filter_expression: list[dict]) -> list[dict] | Non
 
 
 class EdcNegotiator:
+    """Catalog requests and contract negotiations with partners' connectors through the own
+    EDC (Tractus-X SDK).
+
+    Resolves each connector's protocol (DSP 2025-1, or 0.8 for Jupiter partners) once, only
+    negotiates for offers whose usage policy the company accepts (compared by meaning,
+    whichever way the policy is spelled), and lets the SDK reuse negotiations and EDRs.
+    """
+
     def __init__(self, consumer: ConnectorConsumer, accepted_policies: list[dict] | None):
         """``accepted_policies``: the usage policies the company accepts (bodies without
         ``@id``/``@type``, as offered in the partner's catalog); ``None`` accepts any policy and
@@ -118,6 +131,7 @@ class EdcNegotiator:
         return self._discovery[key]
 
     def catalog(self, bpnl: str, address: str, filter_expression: list[dict]) -> dict:
+        """The partner connector's catalog, filtered (e.g. by asset id or ``dct:type``)."""
         dsp_address, counter_party_id, protocol = self.counter_party(bpnl, address)
         try:
             return self.consumer.get_catalog_with_filter(

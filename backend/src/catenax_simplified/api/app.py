@@ -1,3 +1,13 @@
+"""The FastAPI application: the REST API for the web UI and the runtime that holds the adapters.
+
+``create_app`` builds the app from the settings. ``Runtime`` owns everything built from the
+effective settings (the deployment's, completed by what an admin entered on the Setup page) and
+rebuilds it in place when they change. The long-running jobs (own sync, partner sync, partner
+checks) run one at a time each through an ``ExclusiveRunner``. The Notification API endpoints that
+partners call live in ``api/notifications.py``, the admin login and the settings editor in
+``api/admin.py``.
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -97,6 +107,7 @@ class ExclusiveRunner:
 
     @property
     def configured(self) -> bool:
+        """Whether there is a job to run (its adapters are configured)."""
         return self.job is not None
 
     def run(self, *args: Any, **kwargs: Any) -> Any | None:
@@ -127,6 +138,10 @@ router = APIRouter(prefix="/api")
 
 @router.get("/health", response_model=HealthOut)
 def health(request: Request) -> HealthOut:
+    """What the app is connected to and can do: the own BPNL, which adapters are configured (DTR,
+    EDC, discovery, names), how they authenticate, the state of the notification assets and the
+    supported aspect models. The UI reads it on every page to show or hide actions.
+    """
     settings: Settings = request.app.state.settings
     return HealthOut(
         status="ok",
@@ -168,6 +183,9 @@ async def test_connections(request: Request) -> list[ConnectionCheckOut]:
 
 @router.get("/stats", response_model=StatsOut)
 def stats(session: SessionDep, request: Request) -> StatsOut:
+    """Counts for the Parts page: own parts by kind and aspect model, and the links to suppliers
+    and customers. Links between two own parts are internal and count for neither.
+    """
     return StatsOut(**PartRepository(session).stats(request.app.state.settings.own_bpnl))
 
 
@@ -176,6 +194,9 @@ INSTANCE_KEYS = ("partInstanceId", "van", "batchId")
 
 
 def instance_id(local_identifiers: dict[str, str]) -> str | None:
+    """The identifier that names one unit or lot in a part's local identifiers (``partInstanceId``,
+    ``van``, ``batchId``), else any other than ``manufacturerId``.
+    """
     for key in INSTANCE_KEYS:
         if local_identifiers.get(key):
             return local_identifiers[key]
@@ -229,6 +250,9 @@ def list_parts(
     limit: Annotated[int, Query(ge=1, le=500)] = 50,
     offset: Annotated[int, Query(ge=0)] = 0,
 ) -> PartPage:
+    """Cached parts, own and partner (or own only), by name, with how many parents and children
+    each has. ``search`` matches the Catena-X ID, part numbers and names; ``kind`` filters
+    serialized parts or batches, ``aspect_major`` the aspect model's major version (3 or 4)."""
     repository = PartRepository(session)
     rows, total = repository.list_parts(
         search=search,
@@ -252,6 +276,7 @@ def list_parts(
 
 @router.get("/parts/{global_asset_id}", response_model=PartOut)
 def get_part(global_asset_id: str, session: SessionDep) -> PartOut:
+    """One cached part by its Catena-X ID."""
     row = PartRepository(session).get_part(global_asset_id)
     if row is None:
         raise HTTPException(status_code=404, detail="part not found")
@@ -260,6 +285,10 @@ def get_part(global_asset_id: str, session: SessionDep) -> PartOut:
 
 @router.get("/parts/{global_asset_id}/tree", response_model=PartTreeOut)
 def get_part_tree(global_asset_id: str, session: SessionDep) -> PartTreeOut:
+    """A part with its direct parents (where it is used, from usage aspects) and children (what it
+    is built from, from BoM aspects), one level each way. Partner twins not cached yet appear
+    without their part data.
+    """
     tree = part_tree(PartRepository(session), global_asset_id)
     if tree is None:
         raise HTTPException(status_code=404, detail="part not found")
@@ -268,6 +297,9 @@ def get_part_tree(global_asset_id: str, session: SessionDep) -> PartTreeOut:
 
 @router.post("/sync", response_model=SyncReportOut)
 async def trigger_sync(request: Request) -> SyncReportOut:
+    """Reads the own twins from the DTR into the cache now, and waits for the result. 409 while
+    another sync runs; 503 without a DTR.
+    """
     runner: ExclusiveRunner = request.app.state.sync_runner
     if not runner.configured:
         raise HTTPException(status_code=503, detail="no Digital Twin Registry configured")
@@ -279,6 +311,7 @@ async def trigger_sync(request: Request) -> SyncReportOut:
 
 @router.get("/sync/last", response_model=SyncReportOut)
 def last_sync(session: SessionDep) -> SyncReportOut:
+    """The most recent own-twin sync run."""
     runs = SyncRunRepository(session).recent(limit=1)
     if not runs:
         raise HTTPException(status_code=404, detail="no sync has run yet")
@@ -287,12 +320,18 @@ def last_sync(session: SessionDep) -> SyncReportOut:
 
 @router.get("/sync/runs", response_model=SyncRunPage)
 def sync_runs(session: SessionDep, limit: Annotated[int, Query(ge=1, le=200)] = 20) -> SyncRunPage:
+    """Recent own-twin sync runs, newest first, with their issues."""
     runs = SyncRunRepository(session).recent(limit=limit)
     return SyncRunPage(items=[SyncReportOut.model_validate(r) for r in runs])
 
 
 @router.get("/partners", response_model=list[PartnerOut])
 def list_partners(session: SessionDep, request: Request) -> list[PartnerOut]:
+    """Direct partners: every BPNL named in the own parts' BoM (suppliers) or usage (customers),
+    plus partners set by hand, never the own BPNL. Each with its roles, linked twins, cached
+    parts, connector address and where it comes from, last partner sync and last connector
+    check.
+    """
     settings: Settings = request.app.state.settings
     counterparts = PartRepository(session).partner_counterparts()
     rows = {row.bpnl: row for row in PartnerRepository(session).all()}
@@ -328,6 +367,9 @@ def list_partners(session: SessionDep, request: Request) -> list[PartnerOut]:
 def update_partner(
     bpnl: Bpnl, update: PartnerUpdate, session: SessionDep, request: Request, _: AdminIfEnabled
 ) -> PartnerOut:
+    """Sets a partner's name or DSP connector address (fields left out stay as they are). Needs an
+    admin session once the admin login is set up.
+    """
     if bpnl == request.app.state.settings.own_bpnl:
         raise HTTPException(status_code=422, detail="that is your own BPNL")
     row = PartnerRepository(session).get_or_create(bpnl)
@@ -420,6 +462,10 @@ async def discover_connectors(bpnl: Bpnl, request: Request) -> ConnectorDiscover
 
 @router.post("/partners/sync", response_model=PartnerSyncReportOut)
 async def sync_partners(request: Request, bpnl: str | None = None) -> PartnerSyncReportOut:
+    """Reads the direct partners' counterpart twins through the EDC into the cache (all partners,
+    or only ``bpnl``). Negotiates with the partners' connectors. 409 while another partner sync
+    runs; 503 without an EDC.
+    """
     runner: ExclusiveRunner = request.app.state.partner_runner
     if not runner.configured:
         raise HTTPException(status_code=503, detail="no EDC configured")
@@ -448,12 +494,17 @@ def partner_checks(
     bpnl: str | None = None,
     limit: Annotated[int, Query(ge=1, le=200)] = 50,
 ) -> PartnerCheckPage:
+    """Recent connector checks, newest first, optionally of one partner."""
     rows = PartnerCheckRepository(session).recent(bpnl=bpnl, limit=limit)
     return PartnerCheckPage(items=[PartnerCheckOut.model_validate(r) for r in rows])
 
 
 @router.post("/partners/checks", response_model=PartnerCheckPage)
 async def check_partners(request: Request, body: PartnerBatchCheckRequest) -> PartnerCheckPage:
+    """Checks every partner's connector at the requested level (or only those not healthy). A
+    ``full`` check negotiates a contract and opens a transfer in both connectors, so it needs
+    ``confirm_state_change``.
+    """
     runner = _health_runner(request, body)
     rows = await run_in_threadpool(runner.run, body.level, only_unhealthy=body.only_unhealthy)
     if rows is None:
@@ -463,6 +514,8 @@ async def check_partners(request: Request, body: PartnerBatchCheckRequest) -> Pa
 
 @router.post("/partners/{bpnl}/checks", response_model=PartnerCheckOut)
 async def check_partner(bpnl: str, request: Request, body: PartnerCheckRequest) -> PartnerCheckOut:
+    """Checks one partner's connector at the requested level: ``discovery``, ``catalog`` or
+    ``full`` (see ``check_partners``)."""
     runner = _health_runner(request, body)
     rows = await run_in_threadpool(runner.run, body.level, bpnl)
     if rows is None:
@@ -483,6 +536,7 @@ class AssetPublishing:
         self._lock = threading.Lock()
 
     def run(self) -> NotificationAssetsOut:
+        """Publishes the notification assets now and records the outcome; never raises."""
         if self.publisher is None:
             return self.status
         with self._lock:
@@ -502,6 +556,10 @@ class AssetPublishing:
 
 @router.post("/notifications/assets", response_model=NotificationAssetsOut)
 async def publish_assets(request: Request) -> NotificationAssetsOut:
+    """Publishes, again, the eight notification assets (receive and update, alert and
+    investigation, Notification API 1.2.1 and 2.0.0) in the own EDC. They are also published at
+    startup; this retries after a failure or a change.
+    """
     publishing: AssetPublishing = request.app.state.asset_publishing
     if publishing.publisher is None:
         raise HTTPException(
@@ -548,6 +606,9 @@ class Runtime:
         self._reload_lock = asyncio.Lock()
 
     def settings(self) -> Settings:
+        """The effective settings: the deployment's, completed by those stored from the Setup
+        page.
+        """
         values, unreadable = self.store.values()
         if unreadable:
             log.warning(
@@ -557,6 +618,9 @@ class Runtime:
         return effective_settings(self.base, values)
 
     def build(self) -> None:
+        """Builds every adapter and job from the effective settings and puts them on
+        ``app.state``. Adapters given as ``overrides`` (tests, demos) are used as they are.
+        """
         settings = self.settings()
         o = self.overrides
         session_factory = self.session_factory
@@ -638,6 +702,7 @@ class Runtime:
             )
 
     async def stop(self) -> None:
+        """Cancels the background tasks (periodic sync, asset publishing)."""
         tasks, self._tasks = self._tasks, []
         for task in tasks:
             task.cancel()
@@ -645,6 +710,9 @@ class Runtime:
                 await task
 
     async def reload(self) -> None:
+        """Rebuilds after a settings change, one change at a time; running jobs finish with
+        the old adapters.
+        """
         async with self._reload_lock:
             await self.stop()
             await run_in_threadpool(self.build)
@@ -716,6 +784,9 @@ class WebFiles(StaticFiles):
     good; everything else (index.html) is revalidated, so an upgrade shows the new UI at once."""
 
     def file_response(self, full_path, stat_result, scope, status_code=200) -> Response:
+        """Built assets have content hashes in their names and are cached for a year;
+        ``index.html`` is revalidated, so an upgrade shows at once.
+        """
         response = super().file_response(full_path, stat_result, scope, status_code)
         if FsPath(full_path).parent.name == "assets":
             response.headers["Cache-Control"] = "public, max-age=31536000, immutable"

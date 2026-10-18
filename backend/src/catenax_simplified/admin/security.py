@@ -32,6 +32,9 @@ def hash_password(password: str) -> str:
 
 
 def verify_password(password: str, encoded: str) -> bool:
+    """Whether the password matches a ``scrypt:…`` hash from ``hash_password``, in constant
+    time.
+    """
     try:
         scheme, n, r, p, salt, digest = encoded.split(":")
         if scheme != "scrypt":
@@ -52,6 +55,9 @@ def verify_password(password: str, encoded: str) -> bool:
 
 
 def derive_key(secret_key: str, purpose: str) -> bytes:
+    """A key for one ``purpose`` (session signing, secret encryption) derived from
+    ``CXS_SECRET_KEY``, so one secret serves both without reusing the same key.
+    """
     return hmac.new(secret_key.encode(), purpose.encode(), hashlib.sha256).digest()
 
 
@@ -62,6 +68,7 @@ class SecretBox:
         self._fernet = Fernet(base64.urlsafe_b64encode(derive_key(secret_key, "config-secrets")))
 
     def encrypt(self, value: str) -> str:
+        """``value`` encrypted (Fernet) for storage."""
         return self._fernet.encrypt(value.encode()).decode()
 
     def decrypt(self, token: str) -> str | None:
@@ -87,6 +94,7 @@ class AdminAuth:
         self._lock = threading.Lock()
 
     def locked_out(self, client: str) -> bool:
+        """Whether this client failed to sign in too often recently."""
         with self._lock:
             recent = self._recent(client)
             return len(recent) >= self.MAX_FAILURES

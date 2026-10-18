@@ -25,6 +25,10 @@ COFINITY_X_BP_EXPLORER_BPNL = "BPNLCOFINITYEZFA"
 
 
 class BusinessPartnerDirectory(Protocol):
+    """Where partner names come from: the BPDM Pool directly, or through an EDC (the Business
+    Partner Explorer).
+    """
+
     source: str  # shown to users, e.g. "BPDM Pool"
 
     def legal_name(self, bpnl: str) -> str | None:
@@ -33,6 +37,10 @@ class BusinessPartnerDirectory(Protocol):
 
 
 class BpdmPool:
+    """The BPDM Pool's golden record, reached directly with a technical user of the central
+    IdP.
+    """
+
     source = "BPDM Pool"
 
     def __init__(self, base_url: str, oauth: Any, timeout: float = 15):
@@ -43,6 +51,7 @@ class BpdmPool:
         self._timeout = timeout
 
     def legal_name(self, bpnl: str) -> str | None:
+        """The legal name of the BPNL's legal entity (``GET /v7/legal-entities/{bpnl}``)."""
         url = f"{self._base_url}/v7/legal-entities/{bpnl}"
         try:
             headers = self._oauth.add_auth_header({"Accept": "application/json"})
@@ -60,6 +69,11 @@ class BpdmPool:
 
 
 class BpExplorer:
+    """A BPDM Pool offered through a connector (the Cofinity-X Business Partner Explorer): our
+    EDC negotiates for its asset, like for a partner's registry, and reuses the token for a
+    minute.
+    """
+
     source = "Business Partner Explorer"
 
     def __init__(
@@ -121,6 +135,9 @@ class BpExplorer:
         return endpoint, token
 
     def legal_name(self, bpnl: str) -> str | None:
+        """The legal name of the BPNL, through the explorer's data plane (Pool ``/v6/members``
+        search).
+        """
         endpoint, token = self._endpoint()
         url = f"{endpoint.rstrip('/')}/legal-entities/search"
         try:

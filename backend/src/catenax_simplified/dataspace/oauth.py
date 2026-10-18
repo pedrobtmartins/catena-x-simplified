@@ -48,6 +48,7 @@ class ClientCredentials(AuthBase):
         self._lock = threading.Lock()
 
     def token(self) -> str:
+        """A bearer token, cached until shortly before it expires."""
         with self._lock:
             if self._token is None or time.monotonic() >= self._expires_at:
                 self._token, lifetime = self._request()
@@ -84,6 +85,7 @@ class ClientCredentials(AuthBase):
             raise DataspaceError(f"{self.token_url} returned no access token") from exc
 
     def add_auth_header(self, headers: dict | None = None) -> dict:
+        """``headers`` with ``Authorization: Bearer …`` added."""
         return {**(headers or {}), "Authorization": f"Bearer {self.token()}"}
 
     def __call__(self, request: requests.PreparedRequest) -> requests.PreparedRequest:

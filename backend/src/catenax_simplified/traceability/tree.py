@@ -10,6 +10,8 @@ from ..storage import PartRepository, PartRow, RelationRow
 
 @dataclass
 class TreeNode:
+    """A direct parent or child of a part, merged from every aspect that declared the link."""
+
     global_asset_id: str
     part: PartRow | None
     business_partner: str | None = None
@@ -22,6 +24,8 @@ class TreeNode:
 
 @dataclass
 class PartTree:
+    """A part with its direct parents (where it is used) and children (what it is built from)."""
+
     part: PartRow
     parents: list[TreeNode]
     children: list[TreeNode]
@@ -46,6 +50,9 @@ def _merge(relations: Iterable[RelationRow], counterpart: str) -> list[TreeNode]
 
 
 def part_tree(repository: PartRepository, global_asset_id: str) -> PartTree | None:
+    """The one-level as-built tree of a cached part, or ``None`` if the part is not cached.
+    Counterparts are filled in from the cache where known.
+    """
     part = repository.get_part(global_asset_id)
     if part is None:
         return None

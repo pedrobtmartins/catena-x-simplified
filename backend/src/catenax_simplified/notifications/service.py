@@ -48,26 +48,38 @@ class NotificationError(Exception):
 
 
 class Malformed(NotificationError):
+    """The partner's message could not be parsed (HTTP 400)."""
+
     status_code = 400
 
 
 class NotFound(NotificationError):
+    """No such notification (HTTP 404)."""
+
     status_code = 404
 
 
 class Conflict(NotificationError):
+    """The notification is in a state that does not allow this (HTTP 409)."""
+
     status_code = 409
 
 
 class Invalid(NotificationError):
+    """The request does not make sense for this notification (HTTP 422)."""
+
     status_code = 422
 
 
 class Unavailable(NotificationError):
+    """Sending is not possible: no EDC is configured (HTTP 503)."""
+
     status_code = 503
 
 
 class DeliveryFailed(NotificationError):
+    """The partner's connector did not accept the message (HTTP 502)."""
+
     status_code = 502
 
 
@@ -82,6 +94,10 @@ class Plan:
 
 @dataclass
 class ForwardPlan(Plan):
+    """The next hop of a received notification: the plan, the notification it starts from and
+    the own parts involved.
+    """
+
     source_id: int = 0
     # Own parts affected by the received notification.
     own_parts: list[str] = field(default_factory=list)
@@ -120,6 +136,14 @@ def plan_recipients(
 
 
 class NotificationService:
+    """Quality alerts and investigations, both ways, following the KIT state model.
+
+    Creates drafts per recipient from the local tree, sends them with a
+    ``NotificationSender`` in the highest Notification API version the partner offers,
+    receives partners' messages and updates, applies status changes only after the partner
+    accepted them, and keeps a log of every message.
+    """
+
     def __init__(
         self,
         session_factory: sessionmaker[Session],
@@ -138,11 +162,13 @@ class NotificationService:
 
     @property
     def can_send(self) -> bool:
+        """Whether a sender (an EDC, or development mode) is configured."""
         return self._sender is not None
 
     # -- creating ------------------------------------------------------------------------
 
     def plan(self, type_: NotificationType, items: Sequence[str]) -> Plan:
+        """Who would receive a notification about these parts (see ``plan_recipients``)."""
         with self._sessions() as session:
             return plan_recipients(PartRepository(session), self._own_bpnl, type_, items)
 
@@ -241,6 +267,7 @@ class NotificationService:
     # -- local actions -------------------------------------------------------------------
 
     def get(self, pk: int) -> NotificationRow:
+        """One notification by its local ID; raises ``NotFound``."""
         with self._sessions() as session:
             return self._get(session, pk)
 

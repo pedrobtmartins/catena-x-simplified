@@ -54,6 +54,8 @@ __all__ = [
 
 
 class PartnerDataClient(Protocol):
+    """Reads direct partners' twins and submodels."""
+
     def find_twin(self, partner: Partner, global_asset_id: str) -> TwinRef | None:
         """The partner's twin with this Catena-X ID, or ``None`` if its registry has none."""
         ...
@@ -74,6 +76,12 @@ def parse_subprotocol_body(body: str | None) -> dict[str, str]:
 
 
 class EdcPartnerClient:
+    """Reads direct partners' twins through the own EDC: negotiates for the partner's DTR,
+    looks twins up by Catena-X ID, then negotiates for each submodel's asset at the
+    ``dspEndpoint`` its descriptor names. Endpoint and token of an asset are reused for
+    ``token_ttl_seconds``.
+    """
+
     def __init__(
         self,
         consumer: ConnectorConsumer,
@@ -131,6 +139,7 @@ class EdcPartnerClient:
     # -- PartnerDataClient ---------------------------------------------------------------
 
     def find_twin(self, partner: Partner, global_asset_id: str) -> TwinRef | None:
+        """The partner's twin with this Catena-X ID (``/lookup/shells``), or ``None``."""
         endpoint, token = self._dtr(partner)
         base = endpoint.rstrip("/")
         asset_id = json.dumps({"name": "globalAssetId", "value": global_asset_id})
@@ -155,6 +164,7 @@ class EdcPartnerClient:
         return twin_from_descriptor(descriptor)
 
     def read_submodel(self, partner: Partner, ref: SubmodelRef) -> dict[str, Any]:
+        """The submodel's value-only form, read with the token of its asset."""
         body = parse_subprotocol_body(ref.subprotocol_body)
         if "id" not in body:
             raise DataspaceError(f"submodel descriptor at {ref.href} names no asset id")
