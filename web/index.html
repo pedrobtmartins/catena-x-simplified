@@ -6,6 +6,13 @@
     <meta name="description" content="Catena-X traceability for one company: own parts, direct partners and quality notifications." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>Traceability · Catena-X</title>
+    <script>
+      // The theme picked in this browser (Theme.tsx), applied before the first paint.
+      try {
+        const theme = localStorage.getItem("cxs-theme");
+        if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
+      } catch {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

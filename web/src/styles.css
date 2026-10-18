@@ -26,6 +26,16 @@
   --success-text: #2f5e1e;
   --danger: #d91e18;
   --danger-tint: #fee7e2;
+  --danger-text: #a3160f;
+  --danger-strong: #a3160f;
+
+  /* Text on a coloured ground, and the other values that change with the theme. */
+  --on-primary: #ffffff;
+  --on-danger: #ffffff;
+  --on-accent: #3a2400;
+  --text-disabled: #5e5e5e;
+  --shadow-sm: rgba(17, 17, 17, 0.08);
+  color-scheme: light;
 
   --mono: "IBM Plex Mono", ui-monospace, monospace;
   font-family: "Libre Franklin", system-ui, sans-serif;
@@ -129,7 +139,7 @@ code,
 .bpnl-chip {
   font-family: var(--mono);
   font-size: 12px;
-  color: #252525;
+  color: var(--text);
   background: var(--surface-subtle);
   border: 1px solid var(--border);
   border-radius: 6px;
@@ -275,7 +285,7 @@ code,
 
 .btn-primary {
   background: var(--primary);
-  color: #ffffff;
+  color: var(--on-primary);
 }
 
 .btn-primary:hover:not(:disabled) {
@@ -292,7 +302,7 @@ code,
   cursor: not-allowed;
   background: var(--divider);
   border-color: var(--divider);
-  color: #5e5e5e;
+  color: var(--text-disabled);
 }
 
 .btn-secondary:disabled {
@@ -588,7 +598,7 @@ code,
 
 .badge-error {
   background: var(--danger-tint);
-  color: #a3160f;
+  color: var(--danger-text);
   gap: 6px;
 }
 
@@ -608,7 +618,7 @@ code,
 
 .alert-error {
   background: var(--danger-tint);
-  color: #a3160f;
+  color: var(--danger-text);
 }
 
 /* ---------- table ---------- */
@@ -883,11 +893,11 @@ a.node:hover {
   border-radius: 14px;
   padding: 18px 20px;
   background: var(--primary);
-  color: #ffffff;
+  color: var(--on-primary);
   display: flex;
   flex-direction: column;
   gap: 6px;
-  box-shadow: 0 8px 24px rgba(15, 113, 203, 0.25);
+  box-shadow: 0 8px 24px var(--shadow-sm);
 }
 
 .node-focus strong {
@@ -1095,7 +1105,7 @@ a.btn {
 
 a.btn-primary,
 a.btn-primary:hover {
-  color: #ffffff;
+  color: var(--on-primary);
 }
 
 a.btn-secondary:hover {
@@ -1106,7 +1116,7 @@ a.btn-secondary:hover {
 .btn-danger {
   background: var(--surface);
   border-color: var(--danger);
-  color: #a3160f;
+  color: var(--danger-text);
 }
 
 .btn-danger:hover:not(:disabled) {
@@ -1197,7 +1207,7 @@ a.btn-secondary:hover {
 }
 
 .error-text {
-  color: #a3160f;
+  color: var(--danger-text);
   font-weight: 600;
 }
 
@@ -1246,12 +1256,12 @@ a.btn-secondary:hover {
 
 .badge-sev-critical {
   background: var(--danger-tint);
-  color: #a3160f;
+  color: var(--danger-text);
 }
 
 .badge-sev-life-threatening {
-  background: #a3160f;
-  color: #ffffff;
+  background: var(--danger-strong);
+  color: var(--on-danger);
 }
 
 .badge-status-created,
@@ -1268,7 +1278,7 @@ a.btn-secondary:hover {
 
 .badge-status-acknowledged {
   background: var(--primary);
-  color: #ffffff;
+  color: var(--on-primary);
 }
 
 .badge-status-accepted {
@@ -1287,7 +1297,7 @@ a.btn-secondary:hover {
   justify-content: center;
   padding: 2px 7px;
   background: var(--orange);
-  color: #111111;
+  color: var(--on-accent);
 }
 
 /* status path */
@@ -1335,7 +1345,7 @@ a.btn-secondary:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #ffffff;
+  color: var(--on-primary);
   position: relative;
 }
 
@@ -1669,7 +1679,7 @@ a.btn-secondary:hover {
 }
 
 .input[aria-invalid="true"] {
-  border-color: #a3160f;
+  border-color: var(--danger-text);
 }
 
 .field-hint {
@@ -1811,13 +1821,13 @@ a.btn-secondary:hover {
 .setup-step-done .setup-step-marker {
   background: var(--primary);
   border-color: var(--primary);
-  color: #fff;
+  color: var(--on-primary);
 }
 
 .setup-step-failed .setup-step-marker {
-  background: #a3160f;
-  border-color: #a3160f;
-  color: #fff;
+  background: var(--danger-strong);
+  border-color: var(--danger-strong);
+  color: var(--on-danger);
 }
 
 .setup-step-optional .setup-step-marker {
@@ -2060,7 +2070,7 @@ td {
 .chip[aria-pressed="true"] {
   background: var(--surface);
   color: var(--primary-dark);
-  box-shadow: 0 1px 2px rgba(17, 17, 17, 0.08), 0 0 0 1px var(--border);
+  box-shadow: 0 1px 2px var(--shadow-sm), 0 0 0 1px var(--border);
 }
 
 /* Row and inline actions share the button's shape and size. */
@@ -2697,7 +2707,7 @@ th {
   height: 18px;
   border-radius: 50%;
   background: var(--orange);
-  color: #3a2400;
+  color: var(--on-accent);
   font-size: 12px;
   font-weight: 700;
 }
@@ -2840,4 +2850,86 @@ a.ps-step:hover {
 .ps-arrow {
   color: var(--text-3);
   font-size: 18px;
+}
+
+/* ---------- dark theme ----------
+   Follows the system unless the user picks a theme (App.tsx sets data-theme on <html>). Both
+   blocks hold the same values: one for the system preference, one for the explicit choice. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #14181d;
+    --surface: #1c2229;
+    --surface-subtle: #222a33;
+    --text: #eef1f4;
+    --text-2: #b9c2cc;
+    --text-3: #8e99a5;
+    --border: #38424d;
+    --border-strong: #4b5664;
+    --divider: #2c343d;
+    --primary: #6aa9ec;
+    --primary-dark: #8dbdf1;
+    --primary-tint: #1d3550;
+    --orange-tint: #3a2c19;
+    --orange-text: #f2c48a;
+    --orange-soft: #2b2218;
+    --orange-soft-text: #f0cfa3;
+    --lime-tint: #2a3317;
+    --lime-text: #c9dc77;
+    --success: #3ecf7f;
+    --success-tint: #1c3324;
+    --success-text: #9fe0b5;
+    --danger: #ff6b61;
+    --danger-tint: #3d1f1c;
+    --danger-text: #ff9a8f;
+    --danger-strong: #e5534b;
+    --on-primary: #0b1a2b;
+    --text-disabled: #6c7784;
+    --shadow-sm: rgba(0, 0, 0, 0.45);
+    color-scheme: dark;
+  }
+}
+
+:root[data-theme="dark"] {
+  --bg: #14181d;
+  --surface: #1c2229;
+  --surface-subtle: #222a33;
+  --text: #eef1f4;
+  --text-2: #b9c2cc;
+  --text-3: #8e99a5;
+  --border: #38424d;
+  --border-strong: #4b5664;
+  --divider: #2c343d;
+  --primary: #6aa9ec;
+  --primary-dark: #8dbdf1;
+  --primary-tint: #1d3550;
+  --orange-tint: #3a2c19;
+  --orange-text: #f2c48a;
+  --orange-soft: #2b2218;
+  --orange-soft-text: #f0cfa3;
+  --lime-tint: #2a3317;
+  --lime-text: #c9dc77;
+  --success: #3ecf7f;
+  --success-tint: #1c3324;
+  --success-text: #9fe0b5;
+  --danger: #ff6b61;
+  --danger-tint: #3d1f1c;
+  --danger-text: #ff9a8f;
+  --danger-strong: #e5534b;
+  --on-primary: #0b1a2b;
+  --text-disabled: #6c7784;
+  --shadow-sm: rgba(0, 0, 0, 0.45);
+  color-scheme: dark;
+}
+
+/* The theme switch sits in the top bar: smaller than the page's filters. */
+.theme-switch .chip {
+  min-height: 26px;
+  padding: 0 9px;
+  font-size: 12px;
+}
+
+@media (max-width: 760px) {
+  .theme-switch {
+    order: 10;
+  }
 }

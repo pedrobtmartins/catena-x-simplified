@@ -34,6 +34,12 @@ One file per page (`PartList`, `PartDetail`, `Notifications`, `NotificationDetai
 `api.ts`. Styles are plain CSS in `styles.css`, with the colour tokens on `:root`. React only, no
 UI framework.
 
+**Themes**: every colour is a token on `:root` at the top of `styles.css` (light), redefined at its
+end for dark, under `prefers-color-scheme: dark` and again under `:root[data-theme="dark"]`. A new
+colour gets a token in all three places, never a literal in a rule. `Theme.tsx` holds the
+System / Light / Dark switch in the top bar; the choice is kept in `localStorage` and applied by a
+small script in `index.html` before the first paint.
+
 ## How a request travels
 
 **Sync own twins** (`POST /api/sync`):
