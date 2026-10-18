@@ -2314,3 +2314,43 @@ th {
   width: calc(100cqw - 40px);
   min-width: 0;
 }
+
+/* ---------- partners: a table that fits ---------- */
+
+/* Long legal names wrap instead of widening the table; a long DSP address shows its start
+   (the host) on one line, the whole address in its tooltip. */
+.partners-table .cell-partner .part-link strong {
+  white-space: normal;
+  min-width: 180px;
+  max-width: 240px;
+}
+
+.partners-table .cell-connector {
+  max-width: 240px;
+}
+
+.partners-table .cell-connector .cell-id {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* If the table still scrolls sideways, the partner stays in view. */
+.partners-table th:first-child,
+.partners-table td.cell-partner {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  background: var(--surface);
+  /* Collapsed borders do not follow a sticky cell: draw its edges instead. */
+  box-shadow: 1px 0 0 var(--divider), inset 0 -1px 0 var(--divider);
+}
+
+.partners-table th:first-child {
+  background: var(--surface-subtle);
+}
+
+.partners-table tbody tr:hover td.cell-partner {
+  background: var(--surface-subtle);
+}

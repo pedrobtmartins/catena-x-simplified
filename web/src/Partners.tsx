@@ -62,7 +62,7 @@ function PartnerRow({
   return (
     <>
       <tr className={expanded ? "row-expanded" : undefined}>
-        <td>
+        <td className="cell-partner">
           <div className="part-link">
             {partner.name ? (
               <>
@@ -106,8 +106,10 @@ function PartnerRow({
               <ErrorAlert error={error} />
             </div>
           ) : partner.connector_address ? (
-            <div className="part-link">
-              <span className="cell-id">{partner.connector_address}</span>
+            <div className="part-link cell-connector">
+              <span className="cell-id" title={partner.connector_address}>
+                {partner.connector_address}
+              </span>
               <span className="sub">{partner.connector_source === "api" ? "set here" : "from settings"}</span>
             </div>
           ) : (
@@ -311,7 +313,7 @@ export function Partners({
         <ConnectorOverview partners={partners} filter={healthFilter} onFilter={setHealthFilter} />
       )}
 
-      <div className="table-box">
+      <div className="table-box partners-table">
         <table>
           <thead>
             <tr>
