@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, formatTime, syncState, type Health, type Me, type NotificationSummary, type SyncReport } from "./api";
 import { Compose } from "./Compose";
+import { ThemeSwitch } from "./Theme";
 import { Login } from "./Login";
 import { BellIcon, ClockIcon, LogoMark, PartnersIcon, PartsIcon, SettingsIcon, SyncIcon } from "./icons";
 import { NotificationDetail } from "./NotificationDetail";
@@ -153,6 +154,7 @@ export function App() {
         </a>
         {health && <span className="bpnl-chip">{health.own_bpnl}</span>}
         <div className="spacer" />
+        <ThemeSwitch />
         {me?.login_enabled &&
           (me.admin ? (
             <span className="admin-chip">
