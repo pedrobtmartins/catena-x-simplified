@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, formatDateTime, formatTime, syncState, type Health, type SyncReport } from "./api";
 import { CheckIcon } from "./icons";
+import { DataChecksCard } from "./DataChecks";
 import { Skeleton } from "./ui";
 
 function duration(run: SyncReport): string | null {
@@ -166,6 +167,8 @@ export function SyncHistory({ health, dataVersion }: { health: Health | null; da
               </ol>
             </section>
           )}
+
+          <DataChecksCard dataVersion={dataVersion} />
         </div>
 
         <aside className="card" aria-labelledby="cfg-title">

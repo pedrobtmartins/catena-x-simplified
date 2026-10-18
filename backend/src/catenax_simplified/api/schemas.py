@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field
 
@@ -111,6 +111,27 @@ class StatsOut(BaseModel):
     suppliers: int
     customer_links: int
     customers: int
+
+
+class PartRefOut(BaseModel):
+    global_asset_id: str
+    name: str | None
+    serial: str | None
+
+
+class DataFindingOut(BaseModel):
+    kind: Literal["two_levels", "two_assemblies"]
+    part: PartRefOut
+    business_partner: str | None
+    partner_name: str | None
+    # Own parts whose BoM declares the part. For "two_levels": the assembly, then its
+    # sub-assembly.
+    parents: list[PartRefOut]
+
+
+class DataChecksOut(BaseModel):
+    total: int
+    findings: list[DataFindingOut]
 
 
 class NotificationAssetsOut(BaseModel):

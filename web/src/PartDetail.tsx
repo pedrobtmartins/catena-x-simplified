@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
-import { api, formatDateTime, parseSemanticId, type Part, type PartTree, type TreeNode } from "./api";
+import { api, formatDateTime, instanceId, parseSemanticId, type Part, type PartTree, type TreeNode } from "./api";
 import { composeHref } from "./Compose";
 import { CopyIcon, InfoIcon } from "./icons";
+import { PartDataNotice } from "./DataChecks";
 import { Skeleton } from "./ui";
 
 function quantity(node: TreeNode): string | null {
@@ -103,7 +104,7 @@ export function PartDetail({ id, dataVersion }: { id: string; dataVersion: numbe
 
   const part = tree?.part;
   const model = part ? parseSemanticId(part.semantic_id) : null;
-  const serial = part ? Object.values(part.local_identifiers)[0] : undefined;
+  const serial = part ? instanceId(part.local_identifiers) : undefined;
   // Own part: investigate its supplier parts; partner part: investigate the part itself.
   const investigate = !tree
     ? []
@@ -211,6 +212,8 @@ export function PartDetail({ id, dataVersion }: { id: string; dataVersion: numbe
             ))}
             </div>
           </div>
+
+          <PartDataNotice id={part.global_asset_id} dataVersion={dataVersion} />
 
           <section className="card tree-card" aria-labelledby="tree-title">
             <div className="card-head">

@@ -2354,3 +2354,81 @@ th {
 .partners-table tbody tr:hover td.cell-partner {
   background: var(--surface-subtle);
 }
+
+/* ---------- data checks ---------- */
+
+.alert-warn {
+  background: var(--orange-tint);
+  color: var(--orange-text);
+}
+
+.alert-warn a {
+  color: inherit;
+  font-weight: 600;
+}
+
+.findings {
+  list-style: none;
+  margin: 16px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.findings > li {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  align-items: baseline;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--divider);
+  line-height: 1.5;
+}
+
+.findings > li > .badge {
+  justify-self: start;
+}
+
+@media (max-width: 760px) {
+  .findings > li {
+    grid-template-columns: 1fr;
+    gap: 4px;
+  }
+}
+
+.finding-parts summary {
+  cursor: pointer;
+  color: var(--primary);
+  font-size: 13px;
+  width: fit-content;
+}
+
+.finding-parts ul {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+/* Serials and VANs can be long tokens: one line, the whole value in the tooltip. */
+.ref-serial {
+  display: inline-block;
+  max-width: 18ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: bottom;
+}
+
+.findings > li > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.alert-warn .finding-parts summary {
+  color: inherit;
+  font-weight: 600;
+}

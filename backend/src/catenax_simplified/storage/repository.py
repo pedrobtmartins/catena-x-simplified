@@ -239,6 +239,41 @@ class PartRepository:
             "customers": distinct_count(customers),
         }
 
+    def bom_children_of_several(self) -> dict[str, list[RelationRow]]:
+        """Parts declared in the bill of material of more than one own part: child → the BoM
+        relations that declare it."""
+        own_ids = select(PartRow.global_asset_id).where(PartRow.is_own.is_(True))
+        in_own_bom = and_(RelationRow.source == "bom", RelationRow.parent_id.in_(own_ids))
+        several = (
+            select(RelationRow.child_id)
+            .where(in_own_bom)
+            .group_by(RelationRow.child_id)
+            .having(func.count(func.distinct(RelationRow.parent_id)) > 1)
+        )
+        result: dict[str, list[RelationRow]] = {}
+        for row in self._session.scalars(
+            select(RelationRow)
+            .where(in_own_bom, RelationRow.child_id.in_(several))
+            .order_by(RelationRow.child_id, RelationRow.parent_id)
+        ):
+            result.setdefault(row.child_id, []).append(row)
+        return result
+
+    def bom_parents(self, global_asset_id: str) -> list[str]:
+        """Own parts whose bill of material declares this part."""
+        own_ids = select(PartRow.global_asset_id).where(PartRow.is_own.is_(True))
+        return list(
+            self._session.scalars(
+                select(RelationRow.parent_id)
+                .where(
+                    RelationRow.child_id == global_asset_id,
+                    RelationRow.source == "bom",
+                    RelationRow.parent_id.in_(own_ids),
+                )
+                .distinct()
+            )
+        )
+
     def partner_counterparts(self) -> dict[str, dict[str, set[str]]]:
         """Direct partners of own parts and the counterpart twins each one owns.
 
