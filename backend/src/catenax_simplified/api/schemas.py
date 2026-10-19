@@ -402,6 +402,14 @@ class PartnerSyncReportOut(BaseModel):
     started_at: UtcDatetime
     finished_at: UtcDatetime | None
     partners: list[PartnerSyncResultOut]
+    not_linked: list[str] = []
+
+
+class PartnerSyncRequest(BaseModel):
+    """A partner sync limited to some counterpart twins (Catena-X IDs), e.g. the supplier parts
+    under one assembly."""
+
+    twins: list[str] = Field(min_length=1, max_length=2000)
 
 
 # -- notifications -----------------------------------------------------------------------------

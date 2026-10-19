@@ -95,6 +95,10 @@ It does **not**:
 - **Partner sync** (`POST /api/partners/sync`): for every partner, negotiates access to its DTR,
   looks up the counterpart twins of the own relations by Catena-X ID and reads their SerialPart or
   Batch. It reads nothing else: no partner bill of materials, no partner usage.
+- **Only some partner parts**: in a part's structure, selecting an own part offers to read just
+  the supplier parts under it (every own level down), and selecting a supplier part offers to read
+  that one. The same partner sync runs for those twins only (`POST /api/partners/sync` with
+  `{"twins": [...]}`); the rest of the cache and the partners' last-sync summary stay as they are.
 
 ### 4. Checks the partners' connectors
 

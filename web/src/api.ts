@@ -279,6 +279,8 @@ export interface PartnerSyncReport {
   started_at: string;
   finished_at: string | null;
   partners: PartnerSyncResult[];
+  // The twins asked for that no own part is linked to (a selection only).
+  not_linked: string[];
 }
 
 export type NotificationType = "alert" | "investigation";
@@ -446,6 +448,13 @@ export const api = {
   syncPartners: (bpnl?: string) =>
     request<PartnerSyncReport>(`/api/partners/sync${bpnl ? `?bpnl=${encodeURIComponent(bpnl)}` : ""}`, {
       method: "POST",
+    }),
+  // Reads only these partner twins; the rest of the cache stays as it is.
+  syncPartnerTwins: (twins: string[]) =>
+    request<PartnerSyncReport>("/api/partners/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ twins }),
     }),
   partnerChecks: (bpnl?: string, limit = 10) =>
     request<{ items: PartnerCheck[] }>(

@@ -87,6 +87,7 @@ from .schemas import (
     PartnerNameOut,
     PartnerOut,
     PartnerSyncReportOut,
+    PartnerSyncRequest,
     PartnerUpdate,
     PartOut,
     PartPage,
@@ -524,15 +525,20 @@ async def discover_connectors(bpnl: Bpnl, request: Request) -> ConnectorDiscover
 
 
 @router.post("/partners/sync", response_model=PartnerSyncReportOut)
-async def sync_partners(request: Request, bpnl: str | None = None) -> PartnerSyncReportOut:
+async def sync_partners(
+    request: Request, bpnl: str | None = None, body: PartnerSyncRequest | None = None
+) -> PartnerSyncReportOut:
     """Reads the direct partners' counterpart twins through the EDC into the cache (all partners,
-    or only ``bpnl``). Negotiates with the partners' connectors. 409 while another partner sync
+    or only ``bpnl``). With a body, reads only the ``twins`` listed, leaving the rest of the
+    cache and the partners' last-sync summary as they are; IDs no own part is linked to come back
+    in ``not_linked``. Negotiates with the partners' connectors. 409 while another partner sync
     runs; 503 without an EDC.
     """
     runner: ExclusiveRunner = request.app.state.partner_runner
     if not runner.configured:
         raise HTTPException(status_code=503, detail="no EDC configured")
-    report = await run_in_threadpool(runner.run, bpnl)
+    twins = body.twins if body else None
+    report = await run_in_threadpool(runner.run, bpnl, twins)
     if report is None:
         raise HTTPException(status_code=409, detail="a partner sync is already running")
     return PartnerSyncReportOut.model_validate(report)

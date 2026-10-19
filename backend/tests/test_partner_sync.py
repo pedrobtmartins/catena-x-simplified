@@ -101,6 +101,26 @@ def test_stored_address_wins_over_settings(session_factory):
     assert client.lookups == [(scenario.OEM, scenario.VEHICLE)]
 
 
+def test_a_selection_reads_only_those_twins_and_keeps_the_rest(session_factory):
+    _partner_sync(session_factory).run()
+    with session_factory() as session:
+        before = PartnerRepository(session).get(scenario.TIER2).last_sync_at
+    client = FakePartnerClient(scenario.tier2_twins(), scenario.tier2_payloads())
+
+    report = _partner_sync(session_factory, client).run(
+        only_twins=[scenario.CELL_3, scenario.MODULE_A]
+    )
+
+    assert client.lookups == [(scenario.TIER2, scenario.CELL_3)]
+    assert [(r.bpnl, r.linked_twins, r.twins_found) for r in report.partners] == [
+        (scenario.TIER2, 1, 1)
+    ]
+    assert report.not_linked == [scenario.MODULE_A]  # an own part, not a counterpart
+    with session_factory() as session:
+        assert PartRepository(session).get_part(scenario.CELL_1) is not None  # kept
+        assert PartnerRepository(session).get(scenario.TIER2).last_sync_at == before
+
+
 def test_unreachable_partner_keeps_its_cached_parts(session_factory):
     _partner_sync(session_factory).run()
     client = FakePartnerClient({}, {}, unreachable={scenario.TIER2})
