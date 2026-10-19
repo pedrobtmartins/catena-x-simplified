@@ -1,6 +1,6 @@
 import threading
 import time
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 import scenario
@@ -8,6 +8,7 @@ from fakes import FakePartnerClient, FakeReader, FakeRegistry
 
 from catenax_simplified.storage import (
     PartnerRepository,
+    PartnerSyncRunRepository,
     PartRepository,
     init_schema,
     make_engine,
@@ -303,3 +304,88 @@ def test_an_unexpected_error_fails_that_twin_not_the_run(session_factory):
     tier2 = next(r for r in report.partners if r.bpnl == scenario.TIER2)
     assert (tier2.status, tier2.twins_found) == ("partial", 1)
     assert any("unexpected error" in issue for issue in tier2.issues)
+
+
+def test_a_sync_that_is_not_full_skips_twins_read_recently(session_factory):
+    _partner_sync(session_factory).run(only_bpnl=scenario.TIER2)
+    client = FakePartnerClient(scenario.tier2_twins(), scenario.tier2_payloads())
+    sync = _partner_sync(session_factory, client)
+
+    report = sync.run(only_bpnl=scenario.TIER2, full=False)
+
+    result = report.partners[0]
+    # The two cached parts are fresh; the twin TIER2 does not have is looked up again.
+    assert {gid for _, gid in client.lookups} == {scenario.CELL_2}
+    assert (result.twins_fresh, result.twins_found, result.twins_missing) == (2, 0, 1)
+    assert (result.status, result.removed_parts) == ("partial", 0)
+    progress = sync.progress.snapshot()
+    assert (progress["full"], progress["twins_fresh"], progress["twins_done"]) == (False, 2, 3)
+    with session_factory() as session:
+        assert PartRepository(session).get_part(scenario.CELL_1) is not None  # kept
+        assert PartnerRepository(session).get(scenario.TIER2).twins_found == 2
+
+
+def test_twins_read_longer_ago_than_the_maximum_age_are_read_again(session_factory):
+    _partner_sync(session_factory).run(only_bpnl=scenario.TIER2)
+    client = FakePartnerClient(scenario.tier2_twins(), scenario.tier2_payloads())
+    later = PartnerSync(
+        client,
+        session_factory,
+        scenario.TIER1,
+        configured_connectors={scenario.TIER2: scenario.TIER2_CONNECTOR},
+        clock=lambda: CLOCK + timedelta(hours=25),
+    )
+    report = later.run(only_bpnl=scenario.TIER2, full=False)
+    assert report.partners[0].twins_fresh == 0
+    assert len(client.lookups) == 3
+
+
+def test_the_periodic_sync_leaves_a_failing_partner_alone_for_a_while(session_factory):
+    now = {"t": CLOCK}
+    client = FakePartnerClient({}, {}, unreachable={scenario.TIER2})
+    sync = PartnerSync(
+        client,
+        session_factory,
+        scenario.TIER1,
+        configured_connectors={scenario.TIER2: scenario.TIER2_CONNECTOR},
+        clock=lambda: now["t"],
+        backoff_after=2,
+    )
+
+    def tier2(report):
+        return next(r for r in report.partners if r.bpnl == scenario.TIER2)
+
+    assert tier2(sync()).status == "failed"
+    assert tier2(sync()).status == "failed"
+    with session_factory() as session:
+        assert PartnerRepository(session).get(scenario.TIER2).consecutive_failures == 2
+    skipped = tier2(sync())
+    assert skipped.status == "backoff"
+    assert "left alone after 2 failed syncs in a row" in skipped.issues[0]
+    # A sync someone asks for still tries it.
+    assert tier2(sync.run()).status == "failed"
+    # Three failures now: it waits 15 min × 2 after the last one.
+    now["t"] = CLOCK + timedelta(minutes=29)
+    assert tier2(sync()).status == "backoff"
+    now["t"] = CLOCK + timedelta(minutes=31)
+    client.unreachable = set()
+    client.twins, client.reader = scenario.tier2_twins(), FakeReader(scenario.tier2_payloads())
+    assert tier2(sync()).status == "partial"
+    with session_factory() as session:
+        assert PartnerRepository(session).get(scenario.TIER2).consecutive_failures == 0
+
+
+def test_every_run_is_stored_in_the_history(session_factory):
+    sync = _partner_sync(session_factory)
+    sync.run()
+    sync()
+    with session_factory() as session:
+        runs = PartnerSyncRunRepository(session).recent()
+    assert [(r.trigger, r.full) for r in runs] == [("periodic", False), ("manual", True)]
+    manual = runs[1]
+    assert (manual.partners_total, manual.linked_twins, manual.twins_cached) == (2, 4, 2)
+    assert {p["bpnl"]: p["state"] for p in manual.partners} == {
+        scenario.TIER2: "partial",
+        scenario.OEM: "no_connector",
+    }
+    assert runs[0].twins_fresh == 2

@@ -292,7 +292,7 @@ def client(checker):
     ):
         for url, payload in scenario.payloads().items():
             mock.get(url.replace(scenario.BASE, "http://submodel-server/data"), json=payload)
-        test_client.post("/api/sync")
+        test_client.post("/api/sync", params={"wait": True})
         yield test_client
 
 

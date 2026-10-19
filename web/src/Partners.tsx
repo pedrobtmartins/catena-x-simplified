@@ -139,6 +139,7 @@ function PartnerRow({
               <span className="sub" title={partner.last_message ?? undefined}>
                 {partner.last_sync_at && formatDateTime(partner.last_sync_at)}
                 {partner.twins_missing > 0 && ` · ${partner.twins_missing} not found`}
+                {partner.consecutive_failures > 1 && ` · failed ${partner.consecutive_failures}× in a row`}
               </span>
             </div>
           ) : (
@@ -266,12 +267,13 @@ export function Partners({
   }, [running]);
 
   // Starts the sync in the background; the polling above follows it to its end.
-  const sync = async (bpnl?: string) => {
+  // One partner: every twin; all partners: twins read recently are skipped unless `full`.
+  const sync = async (bpnl?: string, full?: boolean) => {
     setSyncing(bpnl ?? "*");
     setSummaryOpen(false);
     setError(null);
     try {
-      const started = await api.syncPartners(bpnl);
+      const started = await api.syncPartners(bpnl, full);
       setProgress(started);
       if (!started.running) {
         // Over before it could be followed.
@@ -338,7 +340,13 @@ export function Partners({
             type="button"
             className="btn btn-primary"
             disabled={!canSync || polling}
-            title={canSync ? (running && syncing === null ? "A partner sync is running" : undefined) : "No EDC configured"}
+            title={
+              !canSync
+                ? "No EDC configured"
+                : running && syncing === null
+                  ? "A partner sync is running"
+                  : "Skips twins read recently; a partner's own sync button reads every twin of it"
+            }
             onClick={() => sync()}
           >
             <SyncIcon className={polling ? "spin" : undefined} />
@@ -360,7 +368,14 @@ export function Partners({
         <SyncLive progress={progress} names={names} />
       ) : (
         summaryOpen &&
-        progress && <SyncSummary progress={progress} names={names} onDismiss={() => setSummaryOpen(false)} />
+        progress && (
+          <SyncSummary
+            progress={progress}
+            names={names}
+            onDismiss={() => setSummaryOpen(false)}
+            onFullSync={canSync ? () => sync(undefined, true) : undefined}
+          />
+        )
       )}
 
       {partners && partners.length > 0 && (

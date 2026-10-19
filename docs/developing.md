@@ -43,7 +43,8 @@ small script in `index.html` before the first paint.
 ## How a request travels
 
 **Sync own twins** (`POST /api/sync`):
-`api/app.py:trigger_sync` → `ExclusiveRunner` (one sync at a time) →
+`api/app.py:trigger_sync` → `ExclusiveRunner.start` (one sync at a time, in a background thread;
+the API answers 202 and the UI polls `GET /api/sync/status`) →
 `traceability/sync.py:OwnTwinSync.run` → `TwinRegistry.iter_twins` (SDK, paged) → per twin,
 `SubmodelReader.read` for each supported submodel → `aspects.parse` (picks the adapter from the
 `semanticId`) → `PartRepository.upsert_part` / `replace_relations` → a `SyncRunRow` in the

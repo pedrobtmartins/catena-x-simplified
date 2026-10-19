@@ -178,6 +178,19 @@ class SyncReportOut(BaseModel):
     issues: list[SyncIssueOut]
 
 
+class SyncStatusOut(BaseModel):
+    """The own-twin sync going on (``running``), or the last one since the app started, counted
+    up as it goes; ``issues``: how many so far."""
+
+    running: bool
+    started_at: UtcDatetime | None = None
+    finished_at: UtcDatetime | None = None
+    twins: int = 0
+    parts: int = 0
+    issues: int = 0
+    complete: bool = False
+
+
 class SyncRunPage(BaseModel):
     """Recent sync runs, newest first."""
 
@@ -338,6 +351,8 @@ class PartnerOut(BaseModel):
     last_message: str | None
     twins_found: int
     twins_missing: int
+    # Syncs that failed in a row; the periodic sync tries such a partner less often.
+    consecutive_failures: int = 0
     last_check: PartnerCheckOut | None = None
 
 
@@ -394,10 +409,11 @@ class PartnerSyncResultOut(BaseModel):
     linked_twins: int
     twins_found: int
     twins_missing: int
+    twins_fresh: int
     removed_parts: int
     parts_cached: int
     duration_seconds: float
-    status: str
+    status: str  # ok | partial | failed | no_connector | backoff
     issues: list[str]
 
 
@@ -425,8 +441,9 @@ class PartnerSyncProgressPartnerOut(BaseModel):
     twins_cached: int
     twins_missing: int
     twins_failed: int
+    twins_fresh: int
     removed_parts: int
-    current_twin: str | None
+    current_twin: str | None = None
     duration_seconds: float | None
     message: str | None
 
@@ -439,6 +456,8 @@ class PartnerSyncProgressOut(BaseModel):
     run_id: int
     running: bool
     selection: bool
+    trigger: str  # manual | periodic | selection
+    full: bool
     started_at: UtcDatetime
     finished_at: UtcDatetime | None
     elapsed_seconds: float
@@ -451,9 +470,39 @@ class PartnerSyncProgressOut(BaseModel):
     twins_cached: int
     twins_missing: int
     twins_failed: int
+    twins_fresh: int
     removed_parts: int
     partners: list[PartnerSyncProgressPartnerOut]
     report: PartnerSyncReportOut | None
+
+
+class PartnerSyncRunOut(BaseModel):
+    """A past partner sync run, from the history: totals and per partner how it went.
+    ``full``: every twin read (else those read recently were skipped, ``twins_fresh``)."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    started_at: UtcDatetime
+    finished_at: UtcDatetime | None
+    elapsed_seconds: float
+    trigger: str
+    full: bool
+    partners_total: int
+    linked_twins: int
+    twins_cached: int
+    twins_fresh: int
+    twins_missing: int
+    twins_failed: int
+    removed_parts: int
+    error: str | None
+    partners: list[PartnerSyncProgressPartnerOut]
+
+
+class PartnerSyncRunPage(BaseModel):
+    """Recent partner sync runs, newest first."""
+
+    items: list[PartnerSyncRunOut]
 
 
 class PartnerSyncRequest(BaseModel):

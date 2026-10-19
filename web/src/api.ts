@@ -208,6 +208,8 @@ export interface Partner {
   last_message: string | null;
   twins_found: number;
   twins_missing: number;
+  // Syncs that failed in a row; the periodic sync tries such a partner less often.
+  consecutive_failures: number;
   last_check: PartnerCheck | null;
 }
 
@@ -275,6 +277,8 @@ export interface PartnerSyncResult {
   linked_twins: number;
   twins_found: number;
   twins_missing: number;
+  // Not read again: read less than the maximum age ago (a sync that is not full).
+  twins_fresh: number;
   removed_parts: number;
   // Twins found whose SerialPart/Batch submodel was read and cached.
   parts_cached: number;
@@ -283,7 +287,8 @@ export interface PartnerSyncResult {
   issues: string[];
 }
 
-export type PartnerSyncState = "pending" | "running" | "ok" | "partial" | "failed" | "no_connector";
+// "backoff": left alone by the periodic sync after failing several times in a row.
+export type PartnerSyncState = "pending" | "running" | "ok" | "partial" | "failed" | "no_connector" | "backoff";
 
 export interface PartnerSyncProgressPartner {
   bpnl: string;
@@ -294,9 +299,10 @@ export interface PartnerSyncProgressPartner {
   twins_missing: number;
   // Failed lookups and twins whose submodel could not be read.
   twins_failed: number;
+  twins_fresh: number;
   removed_parts: number;
   // One twin being read now (several are, at once).
-  current_twin: string | null;
+  current_twin?: string | null;
   duration_seconds: number | null;
   // The partner's first issue, once done.
   message: string | null;
@@ -307,6 +313,9 @@ export interface PartnerSyncProgress {
   run_id: number;
   running: boolean;
   selection: boolean;
+  trigger: "manual" | "periodic" | "selection";
+  // Every twin read; else those read recently were skipped (twins_fresh).
+  full: boolean;
   started_at: string;
   finished_at: string | null;
   elapsed_seconds: number;
@@ -320,10 +329,41 @@ export interface PartnerSyncProgress {
   twins_cached: number;
   twins_missing: number;
   twins_failed: number;
+  twins_fresh: number;
   removed_parts: number;
   partners: PartnerSyncProgressPartner[];
   // The run's report, once it is done.
   report: PartnerSyncReport | null;
+}
+
+// A past partner sync run, from the history.
+export interface PartnerSyncRun {
+  id: number;
+  started_at: string;
+  finished_at: string | null;
+  elapsed_seconds: number;
+  trigger: "manual" | "periodic" | "selection";
+  full: boolean;
+  partners_total: number;
+  linked_twins: number;
+  twins_cached: number;
+  twins_fresh: number;
+  twins_missing: number;
+  twins_failed: number;
+  removed_parts: number;
+  error: string | null;
+  partners: PartnerSyncProgressPartner[];
+}
+
+// The own-twin sync going on, or the last one since the app started.
+export interface SyncStatus {
+  running: boolean;
+  started_at: string | null;
+  finished_at: string | null;
+  twins: number;
+  parts: number;
+  issues: number;
+  complete: boolean;
 }
 
 export interface PartnerSyncReport {
@@ -482,7 +522,9 @@ export const api = {
   tree: (id: string) => request<PartTree>(`/api/parts/${encodeURIComponent(id)}/tree`),
   structure: (id: string) => request<PartStructure>(`/api/parts/${encodeURIComponent(id)}/structure`),
   whereUsed: (id: string) => request<WhereUsed>(`/api/parts/${encodeURIComponent(id)}/where-used`),
-  sync: () => request<SyncReport>("/api/sync", { method: "POST" }),
+  // Starts the own-twin sync in the background; follow it with syncStatus, then lastSync.
+  sync: () => request<SyncStatus>("/api/sync", { method: "POST" }),
+  syncStatus: () => request<SyncStatus>("/api/sync/status"),
   lastSync: () => request<SyncReport>("/api/sync/last"),
   syncRuns: (limit = 20) => request<{ items: SyncReport[] }>(`/api/sync/runs?limit=${limit}`),
 
@@ -514,10 +556,15 @@ export const api = {
   discoverConnectors: (bpnl: string) =>
     request<{ bpnl: string; endpoints: string[] }>(`/api/partners/${encodeURIComponent(bpnl)}/discovery`),
   // Starts a partner sync in the background; follow it with partnerSyncProgress.
-  syncPartners: (bpnl?: string) =>
-    request<PartnerSyncProgress>(`/api/partners/sync${bpnl ? `?bpnl=${encodeURIComponent(bpnl)}` : ""}`, {
-      method: "POST",
-    }),
+  // full: read every twin (default: for one partner yes, for all no — recently read ones are skipped).
+  syncPartners: (bpnl?: string, full?: boolean) => {
+    const query = new URLSearchParams();
+    if (bpnl) query.set("bpnl", bpnl);
+    if (full !== undefined) query.set("full", String(full));
+    const qs = query.toString();
+    return request<PartnerSyncProgress>(`/api/partners/sync${qs ? `?${qs}` : ""}`, { method: "POST" });
+  },
+  partnerSyncRuns: (limit = 20) => request<{ items: PartnerSyncRun[] }>(`/api/partners/sync/runs?limit=${limit}`),
   partnerSyncProgress: () => request<PartnerSyncProgress | null>("/api/partners/sync/progress"),
   // Reads only these partner twins, in the background; the rest of the cache stays as it is.
   syncPartnerTwins: (twins: string[]) =>

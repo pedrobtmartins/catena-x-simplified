@@ -146,11 +146,11 @@ Own twins first in every company (partners come from the own BoM and usage data)
 partners through the EDCs:
 
 ```bash
-for p in 8012 8011 8013; do curl -s -X POST localhost:$p/api/sync; echo; done
+for p in 8012 8011 8013; do curl -s -X POST "localhost:$p/api/sync?wait=true"; echo; done
 ```
 
 ```bash
-for p in 8012 8011 8013; do curl -s -X POST localhost:$p/api/partners/sync; echo; done
+for p in 8012 8011 8013; do curl -s -X POST "localhost:$p/api/partners/sync?wait=true"; echo; done
 ```
 
 Expected: own sync 18 / 6 / 3 twins without issues; partner sync `ok` for every partner (Tier-1

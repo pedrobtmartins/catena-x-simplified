@@ -10,7 +10,12 @@ const STATE: Record<PartnerSyncState, { label: string; badge: string }> = {
   partial: { label: "Partial", badge: "badge-warn" },
   failed: { label: "Failed", badge: "badge-error" },
   no_connector: { label: "No connector", badge: "badge-warn" },
+  backoff: { label: "Backed off", badge: "badge-outline" },
 };
+
+export function partnerSyncState(state: PartnerSyncState) {
+  return STATE[state];
+}
 
 export function formatDuration(seconds: number): string {
   if (seconds < 10) return `${seconds.toFixed(1)} s`;
@@ -26,8 +31,10 @@ function plural(n: number, word: string): string {
 
 // Time left from the pace so far; only once there is a pace to go by.
 function remaining(p: PartnerSyncProgress): number | null {
-  if (p.twins_done < 3 || p.elapsed_seconds < 3 || p.twins_done >= p.linked_twins) return null;
-  return ((p.linked_twins - p.twins_done) * p.elapsed_seconds) / p.twins_done;
+  // Twins skipped as up to date count as done at once: the pace is that of the twins read.
+  const read = p.twins_done - p.twins_fresh;
+  if (read < 3 || p.elapsed_seconds < 3 || p.twins_done >= p.linked_twins) return null;
+  return ((p.linked_twins - p.twins_done) * p.elapsed_seconds) / read;
 }
 
 function PartnerName({ bpnl, names }: { bpnl: string; names: Map<string, string> }) {
@@ -51,9 +58,18 @@ function Bar({ done, total, label }: { done: number; total: number; label: strin
   );
 }
 
-function Counts({ p }: { p: { twins_cached: number; twins_missing: number; twins_failed: number } }) {
+function Counts({
+  p,
+}: {
+  p: { twins_cached: number; twins_missing: number; twins_failed: number; twins_fresh: number };
+}) {
   return (
     <span className="sync-counts">
+      {p.twins_fresh > 0 && (
+        <>
+          <span className="dot" /> {p.twins_fresh} up to date
+        </>
+      )}
       <span className="dot ok" /> {p.twins_cached} cached
       <span className="dot warn" /> {p.twins_missing} not found
       <span className="dot error" /> {p.twins_failed} failed
@@ -82,7 +98,7 @@ export function SyncLive({ progress, names }: { progress: PartnerSyncProgress | 
     <section className="card sync-panel" aria-live="polite" aria-busy="true">
       <div className="sync-head">
         <h2>
-          <SyncIcon className="spin" /> Syncing partners
+          <SyncIcon className="spin" /> {p.full ? "Syncing partners" : "Syncing partners (recent twins skipped)"}
         </h2>
         <span className="sub">
           {p.partners_done} of {plural(p.partners_total, "partner")}
@@ -134,24 +150,53 @@ export function SyncLive({ progress, names }: { progress: PartnerSyncProgress | 
   );
 }
 
-/** The metrics of a finished run. */
+/** What the summary shows: a finished run's progress, or a run from the history. */
+export type SyncSummaryData = Pick<
+  PartnerSyncProgress,
+  | "full"
+  | "elapsed_seconds"
+  | "finished_at"
+  | "error"
+  | "partners_total"
+  | "linked_twins"
+  | "twins_cached"
+  | "twins_fresh"
+  | "twins_missing"
+  | "twins_failed"
+  | "removed_parts"
+  | "partners"
+> & { selection?: boolean };
+
+/** The metrics of a finished run. ``onFullSync``: offered when twins read recently were skipped. */
 export function SyncSummary({
   progress: p,
   names,
   onDismiss,
+  onFullSync,
 }: {
-  progress: PartnerSyncProgress;
+  progress: SyncSummaryData;
   names: Map<string, string>;
-  onDismiss: () => void;
+  onDismiss?: () => void;
+  onFullSync?: () => void;
 }) {
   const byState = (state: PartnerSyncState) => p.partners.filter((row) => row.state === state).length;
   const ok = byState("ok");
   const partial = byState("partial") + byState("no_connector");
   const failed = byState("failed");
-  const pace = p.elapsed_seconds > 0 ? p.twins_done / p.elapsed_seconds : 0;
-  const resultNote = [ok && `${ok} synced`, partial && `${partial} partial`, failed && `${failed} failed`]
+  const backedOff = byState("backoff");
+  const read = p.twins_cached + p.twins_missing + p.twins_failed;
+  const pace = p.elapsed_seconds > 0 ? read / p.elapsed_seconds : 0;
+  const resultNote = [
+    ok && `${ok} synced`,
+    partial && `${partial} partial`,
+    failed && `${failed} failed`,
+    backedOff && `${backedOff} backed off`,
+  ]
     .filter(Boolean)
     .join(" · ");
+  const hasFresh = p.partners.some((row) => row.twins_fresh > 0);
+  // The twins this run set out to read: the linked ones, less those skipped as up to date.
+  const toRead = p.linked_twins - p.twins_fresh;
   const hasIssues = p.partners.some((row) => row.message);
   const tone = failed ? "error" : partial || p.twins_missing ? "warn" : "ok";
 
@@ -165,10 +210,13 @@ export function SyncSummary({
         <span className="sub">
           {formatDuration(p.elapsed_seconds)}
           {p.finished_at && ` · finished at ${formatTime(p.finished_at)}`}
+          {!p.full && " · twins read recently skipped"}
         </span>
-        <button type="button" className="btn btn-secondary btn-sm sync-dismiss" onClick={onDismiss}>
-          Dismiss
-        </button>
+        {onDismiss && (
+          <button type="button" className="btn btn-secondary btn-sm sync-dismiss" onClick={onDismiss}>
+            Dismiss
+          </button>
+        )}
       </div>
 
       {p.error && <div className="alert alert-error">{p.error}</div>}
@@ -183,10 +231,28 @@ export function SyncSummary({
           <span className="overline">Twins cached</span>
           <span className="stat-value">{p.twins_cached}</span>
           <span className="stat-note">
-            of {p.linked_twins} linked
-            {p.linked_twins > 0 && ` · ${Math.round((p.twins_cached / p.linked_twins) * 100)}%`}
+            {toRead === 0
+              ? "Nothing to read"
+              : `of ${toRead} ${p.full ? "linked" : "read"} · ${Math.round((p.twins_cached / toRead) * 100)}%`}
           </span>
         </div>
+        {!p.full && (
+          <div className="stat">
+            <span className="overline">Up to date</span>
+            <span className="stat-value">{p.twins_fresh}</span>
+            <span className="stat-note">
+              Read recently, skipped
+              {onFullSync && p.twins_fresh > 0 && (
+                <>
+                  {" · "}
+                  <button type="button" className="link-btn" onClick={onFullSync}>
+                    Read them again
+                  </button>
+                </>
+              )}
+            </span>
+          </div>
+        )}
         <div className={`stat${p.twins_missing ? " stat-warn" : ""}`}>
           <span className="overline">Not found</span>
           <span className="stat-value">{p.twins_missing}</span>
@@ -204,8 +270,8 @@ export function SyncSummary({
         </div>
         <div className="stat">
           <span className="overline">Pace</span>
-          <span className="stat-value">{pace >= 10 ? Math.round(pace) : pace.toFixed(1)}</span>
-          <span className="stat-note">twins per second</span>
+          <span className="stat-value">{read === 0 ? "—" : pace >= 10 ? Math.round(pace) : pace.toFixed(1)}</span>
+          <span className="stat-note">twins read per second</span>
         </div>
       </div>
 
@@ -217,6 +283,11 @@ export function SyncSummary({
                 <th scope="col">Partner</th>
                 <th scope="col">Result</th>
                 <th scope="col" className="num">Cached</th>
+                {hasFresh && (
+                  <th scope="col" className="num">
+                    Up to date
+                  </th>
+                )}
                 <th scope="col" className="num">Not found</th>
                 <th scope="col" className="num">Failed</th>
                 <th scope="col" className="num">Removed</th>
@@ -237,8 +308,9 @@ export function SyncSummary({
                     </span>
                   </td>
                   <td className="num">
-                    {row.twins_cached}/{row.linked_twins}
+                    {row.twins_cached}/{row.linked_twins - row.twins_fresh}
                   </td>
+                  {hasFresh && <td className="num">{row.twins_fresh}</td>}
                   <td className="num">{row.twins_missing}</td>
                   <td className="num">{row.twins_failed}</td>
                   <td className="num">{row.removed_parts}</td>

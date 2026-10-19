@@ -110,6 +110,12 @@ class Settings(BaseSettings):
     # the second low: it is load on each partner's registry and data plane.
     partner_sync_parallel_partners: int = Field(default=4, ge=1, le=16)
     partner_sync_parallel_twins: int = Field(default=4, ge=1, le=16)
+    # A partner sync that is not full (the periodic one, "Sync all partners") skips twins read
+    # less than this many hours ago; 0 reads every twin every time.
+    partner_sync_max_age_hours: float = Field(default=24, ge=0)
+    # The periodic sync leaves alone, for a while that doubles each time, a partner whose syncs
+    # failed this many times in a row; 0 never does.
+    partner_sync_backoff_after: int = Field(default=3, ge=0)
 
     # Administration. With CXS_ADMIN_PASSWORD_HASH and CXS_SECRET_KEY set, an admin signs in to
     # change the configuration and the partners; without them partners stay editable by anyone and

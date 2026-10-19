@@ -116,7 +116,7 @@ def test_fill_the_names_of_unnamed_partners():
         {scenario.TIER2: "Tier-2 Cells AG", NEW: "New Cells GmbH"}, failing=[scenario.OEM]
     )
     with _client(directory) as client:
-        client.post("/api/sync")
+        client.post("/api/sync", params={"wait": True})
         client.put(f"/api/partners/{NEW}", json={"name": "Our name for them"})
         results = {r["bpnl"]: r for r in client.post("/api/partners/names").json()}
         assert set(results) == {scenario.TIER2, scenario.OEM}  # NEW already had a name

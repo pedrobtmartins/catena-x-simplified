@@ -1,6 +1,8 @@
-// Sync history: the latest own-twin sync, the recent runs with their issues, the data checks and where the twins come from.
+// Sync history: the latest own-twin sync, the recent runs with their issues, the partner sync runs, the data checks
+// and where the twins come from.
 import { useEffect, useMemo, useState } from "react";
-import { api, formatDateTime, formatTime, syncState, type Health, type SyncReport } from "./api";
+import { api, formatDateTime, formatTime, syncState, type Health, type PartnerSyncRun, type SyncReport } from "./api";
+import { formatDuration, partnerSyncState } from "./PartnerSyncPanel";
 import { CheckIcon } from "./icons";
 import { DataChecksCard } from "./DataChecks";
 import { Skeleton } from "./ui";
@@ -49,9 +51,75 @@ function aspectSummary(keys: string[]): { name: string; versions: string }[] {
   }));
 }
 
+const TRIGGER: Record<PartnerSyncRun["trigger"], string> = {
+  manual: "started here",
+  periodic: "periodic",
+  selection: "selected twins",
+};
+
+function partnerRunState(run: PartnerSyncRun): "ok" | "warn" | "error" {
+  if (run.error || run.partners.some((p) => p.state === "failed")) return "error";
+  if (run.twins_missing || run.partners.some((p) => p.state !== "ok")) return "warn";
+  return "ok";
+}
+
+/** Partner sync runs, newest first, with what went wrong per partner. */
+function PartnerRuns({ runs }: { runs: PartnerSyncRun[] }) {
+  return (
+    <section className="card" aria-labelledby="partner-runs-title">
+      <h2 id="partner-runs-title">Partner syncs</h2>
+      <ol className="timeline">
+        {runs.map((run) => {
+          const state = partnerRunState(run);
+          const problems = run.partners.filter((p) => p.message);
+          return (
+            <li className="run" key={run.id}>
+              <div className="run-rail">
+                <span className={`dot ${state}`} />
+                <span className="run-line" />
+              </div>
+              <div className="run-body">
+                <strong className="semibold">
+                  {formatDateTime(run.started_at)} · {TRIGGER[run.trigger]}
+                  {!run.full && " · recent twins skipped"}
+                </strong>
+                <span className="text-2">
+                  {run.partners_total} {run.partners_total === 1 ? "partner" : "partners"} · {run.twins_cached} cached
+                  {run.twins_fresh > 0 && ` · ${run.twins_fresh} up to date`}
+                  {run.twins_missing > 0 && ` · ${run.twins_missing} not found`}
+                  {run.twins_failed > 0 && ` · ${run.twins_failed} failed`}
+                  {run.removed_parts > 0 && ` · ${run.removed_parts} removed`} · {formatDuration(run.elapsed_seconds)}
+                </span>
+                {run.error && (
+                  <div className="issue">
+                    <span>{run.error}</span>
+                  </div>
+                )}
+                {problems.map((p) => (
+                  <div className="issue" key={p.bpnl}>
+                    <code>
+                      {p.bpnl} · {partnerSyncState(p.state).label.toLowerCase()}
+                    </code>
+                    <span>{p.message}</span>
+                  </div>
+                ))}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
+
 export function SyncHistory({ health, dataVersion }: { health: Health | null; dataVersion: number }) {
   const [runs, setRuns] = useState<SyncReport[] | null>(null);
+  const [partnerRuns, setPartnerRuns] = useState<PartnerSyncRun[] | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.partnerSyncRuns(20).then((page) => setPartnerRuns(page.items), () => setPartnerRuns(null));
+  }, [dataVersion]);
 
   useEffect(() => {
     api.syncRuns(20).then(
@@ -168,6 +236,8 @@ export function SyncHistory({ health, dataVersion }: { health: Health | null; da
               </ol>
             </section>
           )}
+
+          {partnerRuns && partnerRuns.length > 0 && <PartnerRuns runs={partnerRuns} />}
 
           <DataChecksCard dataVersion={dataVersion} />
         </div>
