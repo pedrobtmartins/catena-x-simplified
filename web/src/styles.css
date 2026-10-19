@@ -2939,3 +2939,25 @@ a.ps-step:hover {
     order: 10;
   }
 }
+
+/* ---------- data checks page ---------- */
+
+.field-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.field-inline select {
+  width: auto;
+  max-width: 320px;
+}
+
+.findings.first {
+  margin-top: 0;
+}
+
+.findings.first > li:first-child {
+  border-top: 0;
+  padding-top: 0;
+}

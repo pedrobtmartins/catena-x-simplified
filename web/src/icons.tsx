@@ -71,6 +71,13 @@ export const ClockIcon = ({ size = 18 }: IconProps) => (
   </svg>
 );
 
+export const FlagIcon = ({ size = 18 }: IconProps) => (
+  <svg {...base(size)}>
+    <path d="M5 21V4" />
+    <path d="M5 4h11l-2 4 2 4H5" />
+  </svg>
+);
+
 export const SearchIcon = ({ size = 16 }: IconProps) => (
   <svg {...base(size)} strokeWidth={2}>
     <circle cx="11" cy="11" r="7" />
