@@ -24,7 +24,8 @@
 
 ## Setup
 
-See the [quick start](README.md#quick-start). Python 3.12+ with [uv](https://docs.astral.sh/uv/),
+See [docs/getting-started.md](docs/getting-started.md) (or the short
+[quick start](README.md#quick-start)). Python 3.12+ with [uv](https://docs.astral.sh/uv/),
 Node.js 22.
 
 ## Before you push
