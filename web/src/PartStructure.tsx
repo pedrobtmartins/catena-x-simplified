@@ -1,9 +1,18 @@
 // The part page's structure: everything under the part (own levels all the way down, other
 // companies' parts as leaves grouped per supplier) as a diagram or a table, and where the part is
 // used, path by path up to the products. A part declared in two places is marked: a serialized
-// unit is in one place at a time.
+// unit is in one place at a time. The supplier parts under a selected part can be read from the
+// partners right there, without a full partner sync.
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
-import { api, type PartStructure as Structure, type StructureLink, type StructurePart, type WhereUsed } from "./api";
+import {
+  api,
+  formatDateTime,
+  type PartnerSyncReport,
+  type PartStructure as Structure,
+  type StructureLink,
+  type StructurePart,
+  type WhereUsed,
+} from "./api";
 import { composeHref } from "./Compose";
 import { ChipGroup, ErrorAlert, Skeleton } from "./ui";
 
@@ -70,7 +79,53 @@ function useStructure(id: string, dataVersion: number) {
     setError(null);
     api.structure(id).then(setStructure, (e: Error) => setError(e.message));
   }, [id, dataVersion]);
-  return { structure, error };
+  // Reads it again in place (after reading supplier parts), keeping what is on screen meanwhile.
+  const reload = () => api.structure(id).then(setStructure, (e: Error) => setError(e.message));
+  return { structure, error, reload };
+}
+
+/** Other companies' parts under a part: its own levels walked down, as the structure shows them;
+ * a supplier part is just itself. */
+function supplierPartsUnder(id: string, parts: Map<string, StructurePart>, kids: Map<string, StructureLink[]>): string[] {
+  if (!parts.get(id)?.own) return [id];
+  const out = new Set<string>();
+  const seen = new Set([id]);
+  const walk = (gid: string) => {
+    for (const l of kids.get(gid) ?? []) {
+      if (!parts.get(l.child)?.own) out.add(l.child);
+      else if (!seen.has(l.child)) {
+        seen.add(l.child);
+        walk(l.child);
+      }
+    }
+  };
+  walk(id);
+  return [...out];
+}
+
+type PartnerRead = { busy: boolean; ids: string[]; report: PartnerSyncReport | null; error: string | null };
+
+function PartnerReadResult({ read }: { read: PartnerRead }) {
+  if (read.error) return <div className="alert alert-error">{read.error}</div>;
+  if (!read.report) return null;
+  const found = read.report.partners.reduce((n, p) => n + p.twins_found, 0);
+  const missing = read.report.partners.reduce((n, p) => n + p.twins_missing, 0);
+  const problems = read.report.partners.filter((p) => p.status === "failed" || p.status === "no_connector" || p.issues.length);
+  return (
+    <div className={`alert ${problems.length || missing ? "alert-warn" : "alert-info"}`}>
+      <p>
+        Read {found} of {read.ids.length} supplier {read.ids.length === 1 ? "part" : "parts"}
+        {missing > 0 && ` · ${missing} not in the partner's registry`}
+        {read.report.not_linked.length > 0 && ` · ${read.report.not_linked.length} not linked to an own part`}.
+      </p>
+      {problems.map((p) => (
+        <p key={p.bpnl} className="sub">
+          {p.bpnl}: {p.status === "no_connector" ? "no connector address known" : p.issues[0]}
+          {p.issues.length > 1 && ` (+${p.issues.length - 1} more)`}
+        </p>
+      ))}
+    </div>
+  );
 }
 
 function Diagram({
@@ -364,6 +419,9 @@ function Panel({
   links,
   flags,
   onWhereUsed,
+  supplierParts,
+  read,
+  onRead,
 }: {
   id: string | null;
   rootId: string;
@@ -371,6 +429,9 @@ function Panel({
   links: StructureLink[];
   flags: Map<string, { assembly: string; sub: string }>;
   onWhereUsed: (id: string) => void;
+  supplierParts: string[];
+  read: PartnerRead | null;
+  onRead: (ids: string[]) => void;
 }) {
   if (!id) {
     return (
@@ -393,12 +454,24 @@ function Panel({
         ["Part number", part.part_number ?? "—"],
         ["Contains", `${links.filter((l) => l.parent === id).length} parts`],
       ]
-    : [
-        ["Supplier", maker(part, link)],
-        ["Catena-X ID", id],
-        ["Quantity", quantity(link) || "—"],
-        ["Part data", part?.cached ? [part.serial, part.part_number].filter(Boolean).join(" · ") || "Cached" : "Not read yet: a partner sync reads it through your EDC"],
-      ];
+    : part?.cached
+      ? [
+          ["Supplier", maker(part, link)],
+          ["Type", part.kind === "batch" ? "Batch" : "Serialized part"],
+          [part.kind === "batch" ? "Batch" : "Serial", part.serial ?? "—"],
+          ["Supplier part no.", part.part_number ?? "—"],
+          ["Our part no.", part.customer_part_number ?? "—"],
+          ["Produced", [part.production_date?.slice(0, 10), part.country].filter(Boolean).join(" · ") || "—"],
+          ["Quantity", quantity(link) || "—"],
+          ["Catena-X ID", id],
+          ["Read", part.synced_at ? formatDateTime(part.synced_at) : "—"],
+        ]
+      : [
+          ["Supplier", maker(part, link)],
+          ["Catena-X ID", id],
+          ["Quantity", quantity(link) || "—"],
+          ["Part data", "Not read yet: sync it to read it from the supplier through your EDC"],
+        ];
   return (
     <aside className="ps-panel">
       <span className={`badge ${part?.own ? "badge-own" : "badge-outline"}`}>{part?.own ? "Own part" : "Supplier part"}</span>
@@ -407,7 +480,7 @@ function Panel({
         {rows.map(([k, v]) => (
           <div key={k} className="contents">
             <dt>{k}</dt>
-            <dd className={k === "Catena-X ID" || k === "Serial" ? "mono" : undefined}>{v}</dd>
+            <dd className={["Catena-X ID", "Serial", "Batch"].includes(k) ? "mono" : undefined}>{v}</dd>
           </div>
         ))}
       </dl>
@@ -430,7 +503,25 @@ function Panel({
             Start investigation
           </a>
         )}
+        {supplierParts.length > 0 && (
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            disabled={read?.busy}
+            title="Reads their part data from the partners through your EDC; nothing else is synced"
+            onClick={() => onRead(supplierParts)}
+          >
+            {read?.busy
+              ? "Reading from partners…"
+              : part?.own
+                ? `Sync supplier parts (${supplierParts.length})`
+                : part?.cached
+                  ? "Sync this part again"
+                  : "Sync this part"}
+          </button>
+        )}
       </div>
+      {read && <PartnerReadResult read={read} />}
     </aside>
   );
 }
@@ -545,7 +636,10 @@ function WhereUsedView({
 }
 
 export function PartStructure({ id, dataVersion }: { id: string; dataVersion: number }) {
-  const { structure, error } = useStructure(id, dataVersion);
+  const { structure, error, reload } = useStructure(id, dataVersion);
+  // A reload after reading supplier parts keeps what is open and selected.
+  const keepView = useRef(false);
+  const [read, setRead] = useState<PartnerRead | null>(null);
   const [tab, setTab] = useState<Tab>("structure");
   const [mode, setMode] = useState<Mode>("diagram");
   const [query, setQuery] = useState("");
@@ -564,6 +658,10 @@ export function PartStructure({ id, dataVersion }: { id: string; dataVersion: nu
   // Own levels open; supplier groups closed. A part without contents opens on where-used.
   useEffect(() => {
     if (!structure) return;
+    if (keepView.current) {
+      keepView.current = false;
+      return;
+    }
     const open = new Set<string>();
     const walk = (gid: string, key: string, seen: Set<string>) => {
       open.add(key);
@@ -616,7 +714,7 @@ export function PartStructure({ id, dataVersion }: { id: string; dataVersion: nu
     });
   const canOpen = (r: Row) => r.type === "group" || ((r.type === "own" || r.type === "root") && kids.has(r.id));
   const activate = (r: Row) => {
-    if (r.type !== "group") setSelected(r.id);
+    if (r.type !== "group") select(r.id);
     if (canOpen(r)) toggle(r.key);
   };
   const search = (q: string) => {
@@ -655,6 +753,22 @@ export function PartStructure({ id, dataVersion }: { id: string; dataVersion: nu
     setExpanded(all);
   };
   const collapse = () => setExpanded(new Set([structure?.root ?? id]));
+  const select = (gid: string | null) => {
+    setSelected(gid);
+    if (!read?.busy) setRead(null);
+  };
+  const readFromPartners = async (ids: string[]) => {
+    setRead({ busy: true, ids, report: null, error: null });
+    try {
+      const report = await api.syncPartnerTwins(ids);
+      setRead({ busy: false, ids, report, error: null });
+      keepView.current = true;
+      await reload();
+    } catch (e) {
+      setRead({ busy: false, ids, report: null, error: e instanceof Error ? e.message : String(e) });
+    }
+  };
+  const supplierParts = useMemo(() => (selected ? supplierPartsUnder(selected, parts, kids) : []), [selected, parts, kids]);
   const whereUsed = (gid: string) => {
     setTarget(gid);
     setTab("used");
@@ -731,7 +845,17 @@ export function PartStructure({ id, dataVersion }: { id: string; dataVersion: nu
             ) : (
               <Table rows={rows} parts={parts} flags={flags} expanded={expanded} query={query} selected={selected} canOpen={canOpen} onActivate={activate} />
             )}
-            <Panel id={selected} rootId={structure.root} parts={parts} links={structure.links} flags={flags} onWhereUsed={whereUsed} />
+            <Panel
+              id={selected}
+              rootId={structure.root}
+              parts={parts}
+              links={structure.links}
+              flags={flags}
+              onWhereUsed={whereUsed}
+              supplierParts={supplierParts}
+              read={read}
+              onRead={readFromPartners}
+            />
           </div>
         </>
       )}

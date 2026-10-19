@@ -154,7 +154,7 @@ ignored, and the Setup page asks for them again.
 | POST   | `/api/setup/connection-tests` | Read-only calls to the own DTR and EDC and the core services with the configured credentials; one result each (the Business Partner Explorer: its catalog only, no negotiation) |
 | GET    | `/api/partners/{bpnl}/legal-entity` | A BPNL's legal name from the BPDM Pool or the Business Partner Explorer (nothing is stored) |
 | POST   | `/api/partners/names`        | Name every unnamed partner after its legal name in the BPDM Pool or the Business Partner Explorer |
-| POST   | `/api/partners/sync`         | Cache direct partners' twins through the EDC (`bpnl` for one partner) |
+| POST   | `/api/partners/sync`         | Cache direct partners' twins through the EDC (`bpnl` for one partner; a `{"twins": [...]}` body for only those twins) |
 | GET    | `/api/partners/checks`       | Recorded partner health checks, newest first (`bpnl`, `limit`) |
 | POST   | `/api/partners/checks`       | Check all partners (`level`; `only_unhealthy` defaults to true) |
 | POST   | `/api/partners/{bpnl}/checks` | Check one partner (`level`: `discovery`, `catalog` or `full`) |

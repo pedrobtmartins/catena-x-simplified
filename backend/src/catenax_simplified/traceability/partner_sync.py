@@ -3,12 +3,16 @@
 For every partner named in the own parts' BoM (suppliers) and usage (customers) relations, the
 counterpart twins are looked up in the partner's registry and their SerialPart/Batch submodel is
 read. Partners' own BoM or usage is never read: deeper levels travel through notifications.
+
+A sync can also be limited to a selection of those twins (the supplier parts under one assembly,
+picked in the UI): it then reads only them, and leaves the rest of the cache and the partners'
+last-sync summary as they are.
 """
 
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Collection, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 
@@ -46,6 +50,8 @@ class PartnerSyncReport:
     started_at: datetime
     finished_at: datetime | None = None
     partners: list[PartnerSyncResult] = field(default_factory=list)
+    # The twins asked for that no own part is linked to (a selection only).
+    not_linked: list[str] = field(default_factory=list)
 
 
 class PartnerSync:
@@ -70,24 +76,47 @@ class PartnerSync:
         self._configured = dict(configured_connectors or {})
         self._clock = clock
 
-    def run(self, only_bpnl: str | None = None) -> PartnerSyncReport:
-        """Syncs every direct partner, or only ``only_bpnl``; the own BPNL is never a partner."""
+    def run(
+        self, only_bpnl: str | None = None, only_twins: Collection[str] | None = None
+    ) -> PartnerSyncReport:
+        """Syncs every direct partner, or only ``only_bpnl``; the own BPNL is never a partner.
+        With ``only_twins``, reads only those counterpart twins, from the partners that own
+        them."""
         report = PartnerSyncReport(started_at=self._clock())
         with self._session_factory() as session:
             counterparts = PartRepository(session).partner_counterparts()
             stored = {row.bpnl: row.connector_address for row in PartnerRepository(session).all()}
+        selection = set(only_twins) if only_twins is not None else None
+        if selection is not None:
+            linked = {
+                gid
+                for bpnl, roles in counterparts.items()
+                if bpnl != self._own_bpnl
+                for gid in roles["supplier"] | roles["customer"]
+            }
+            report.not_linked = sorted(selection - linked)
+            counterparts = {
+                bpnl: {role: ids & selection for role, ids in roles.items()}
+                for bpnl, roles in counterparts.items()
+            }
         for bpnl in sorted(counterparts):
             if bpnl == self._own_bpnl or (only_bpnl and bpnl != only_bpnl):
                 continue
             roles = counterparts[bpnl]
+            if selection is not None and not (roles["supplier"] or roles["customer"]):
+                continue
             address = stored.get(bpnl) or self._configured.get(bpnl)
-            report.partners.append(self._sync_partner(bpnl, roles, address))
+            report.partners.append(
+                self._sync_partner(bpnl, roles, address, whole=selection is None)
+            )
         report.finished_at = self._clock()
         return report
 
     def _sync_partner(
-        self, bpnl: str, roles: Mapping[str, set[str]], address: str | None
+        self, bpnl: str, roles: Mapping[str, set[str]], address: str | None, whole: bool = True
     ) -> PartnerSyncResult:
+        """``whole``: every counterpart of the partner, so parts no longer linked are removed
+        and the partner's last-sync summary is updated; a selection does neither."""
         twin_ids = sorted(roles["supplier"] | roles["customer"])
         result = PartnerSyncResult(
             bpnl=bpnl,
@@ -97,7 +126,8 @@ class PartnerSync:
         if not address:
             result.status = "no_connector"
             result.issues.append("no connector address known for this partner")
-            self._record(result)
+            if whole:
+                self._record(result)
             return result
 
         partner = Partner(bpnl=bpnl, connector_address=address)
@@ -125,11 +155,12 @@ class PartnerSync:
                 repository.upsert_part(
                     part, manufacturer_id=bpnl, is_own=False, synced_at=synced_at
                 )
-            if result.status != "failed":
+            if whole and result.status != "failed":
                 result.removed_parts = repository.delete_partner_parts_except(bpnl, set(twin_ids))
         if result.status == "ok" and (result.issues or result.twins_missing):
             result.status = "partial"
-        self._record(result)
+        if whole:
+            self._record(result)
         return result
 
     def _read_part(self, partner: Partner, twin, gid: str, result: PartnerSyncResult):

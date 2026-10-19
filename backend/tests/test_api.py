@@ -177,6 +177,10 @@ def test_partners_listing_update_and_sync(client):
     one = client.post("/api/partners/sync", params={"bpnl": scenario.OEM}).json()
     assert [r["bpnl"] for r in one["partners"]] == [scenario.OEM]
 
+    picked = client.post("/api/partners/sync", json={"twins": [scenario.CELL_1]}).json()
+    assert [(r["bpnl"], r["linked_twins"]) for r in picked["partners"]] == [(scenario.TIER2, 1)]
+    assert client.post("/api/partners/sync", json={"twins": []}).status_code == 422
+
 
 def test_cannot_register_own_bpnl_as_partner(client):
     response = client.put(f"/api/partners/{scenario.TIER1}", json={"name": "me"})

@@ -2977,3 +2977,17 @@ a.ps-step:hover {
   gap: 8px;
   margin: 0 0 8px;
 }
+
+/* ---------- structure: supplier parts read from the panel ---------- */
+
+.ps-panel .alert {
+  margin-top: 12px;
+}
+
+.ps-panel .alert p {
+  margin: 0;
+}
+
+.ps-panel .alert p + p {
+  margin-top: 4px;
+}

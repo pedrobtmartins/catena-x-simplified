@@ -87,6 +87,7 @@ from .schemas import (
     PartnerNameOut,
     PartnerOut,
     PartnerSyncReportOut,
+    PartnerSyncRequest,
     PartnerUpdate,
     PartOut,
     PartPage,
@@ -319,6 +320,10 @@ def _structure_parts(
                 part_number=row.manufacturer_part_id if row else None,
                 manufacturer_id=maker,
                 manufacturer_name=names.get(maker) if maker else None,
+                customer_part_number=row.customer_part_id if row else None,
+                production_date=row.production_date if row else None,
+                country=row.country if row else None,
+                synced_at=row.synced_at if row else None,
             )
         )
     return out
@@ -524,15 +529,20 @@ async def discover_connectors(bpnl: Bpnl, request: Request) -> ConnectorDiscover
 
 
 @router.post("/partners/sync", response_model=PartnerSyncReportOut)
-async def sync_partners(request: Request, bpnl: str | None = None) -> PartnerSyncReportOut:
+async def sync_partners(
+    request: Request, bpnl: str | None = None, body: PartnerSyncRequest | None = None
+) -> PartnerSyncReportOut:
     """Reads the direct partners' counterpart twins through the EDC into the cache (all partners,
-    or only ``bpnl``). Negotiates with the partners' connectors. 409 while another partner sync
+    or only ``bpnl``). With a body, reads only the ``twins`` listed, leaving the rest of the
+    cache and the partners' last-sync summary as they are; IDs no own part is linked to come back
+    in ``not_linked``. Negotiates with the partners' connectors. 409 while another partner sync
     runs; 503 without an EDC.
     """
     runner: ExclusiveRunner = request.app.state.partner_runner
     if not runner.configured:
         raise HTTPException(status_code=503, detail="no EDC configured")
-    report = await run_in_threadpool(runner.run, bpnl)
+    twins = body.twins if body else None
+    report = await run_in_threadpool(runner.run, bpnl, twins)
     if report is None:
         raise HTTPException(status_code=409, detail="a partner sync is already running")
     return PartnerSyncReportOut.model_validate(report)
