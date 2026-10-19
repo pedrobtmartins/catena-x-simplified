@@ -55,6 +55,8 @@ it; the next start begins from fresh data.
 
 - The apps run in **development mode**: partners are reached directly, not through EDCs, and the UI
   says so on every page. It shows the app's behaviour, not dataspace connectivity.
+- `--latency 0.5` makes each mock registry answer half a second late, like one behind a connector:
+  enough to watch a partner sync run on the Partners page.
 - They serve the UI from `web/dist`. After pulling a new version, rebuild the UI **and** restart the
   demo: an old backend serving a new UI gives confusing errors.
 

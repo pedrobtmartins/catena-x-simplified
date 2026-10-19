@@ -1,5 +1,6 @@
 import base64
 import json
+import threading
 from types import SimpleNamespace
 
 import pytest
@@ -8,6 +9,7 @@ from builders import SERIAL_PART_V3, shell_descriptor
 from responses import matchers
 
 from catenax_simplified.dataspace import DataspaceError, SubmodelRef
+from catenax_simplified.dataspace import partners as partners_module
 from catenax_simplified.dataspace.partners import (
     ASSET_ID_KEY,
     DCT_TYPE_KEY,
@@ -15,6 +17,7 @@ from catenax_simplified.dataspace.partners import (
     EdcPartnerClient,
     Partner,
     parse_subprotocol_body,
+    token_lifetime,
 )
 
 PARTNER = Partner(bpnl="BPNL000000000T2A", connector_address="https://edc.tier2/api/v1/dsp")
@@ -76,6 +79,21 @@ class FakeConsumer:
         if filter_expression[0]["operandLeft"] == DCT_TYPE_KEY:
             return DTR_PLANE, "dtr-token"
         return "https://ignored", "submodel-token"
+
+
+@pytest.fixture(autouse=True)
+def pauses(monkeypatch):
+    """Retry pauses are recorded instead of slept."""
+    slept: list[float] = []
+    monkeypatch.setattr(partners_module.time, "sleep", slept.append)
+    return slept
+
+
+def _jwt(exp: float) -> str:
+    def part(value: dict) -> str:
+        return base64.urlsafe_b64encode(json.dumps(value).encode()).decode().rstrip("=")
+
+    return f"{part({'alg': 'none'})}.{part({'exp': exp})}.sig"
 
 
 class Clock:
@@ -349,3 +367,99 @@ def test_calls_match_the_sdk_consumer_signatures():
     assert "oid" in inspect.signature(EdrController.refresh).parameters
     discovery = inspect.signature(ConnectorConsumerService.get_discovery_info).parameters
     assert {"bpnl", "counter_party_address"} <= set(discovery)
+
+
+@responses.activate
+def test_a_passing_failure_is_tried_again_after_a_pause(pauses):
+    responses.get(f"{DTR_PLANE}/lookup/shells", status=503)
+    _mock_dtr()
+
+    twin = EdcPartnerClient(FakeConsumer(), accepted_policies=[POLICY]).find_twin(PARTNER, CELL)
+
+    assert twin.global_asset_id == CELL
+    assert pauses == [1.0]
+
+
+@responses.activate
+def test_a_busy_partner_is_given_the_pause_it_asks_for(pauses):
+    responses.get(f"{DTR_PLANE}/lookup/shells", status=429, headers={"Retry-After": "3"})
+    _mock_dtr()
+
+    EdcPartnerClient(FakeConsumer(), accepted_policies=[POLICY]).find_twin(PARTNER, CELL)
+
+    assert pauses == [3.0]
+
+
+@responses.activate
+def test_a_data_plane_that_cannot_be_reached_is_tried_three_times(pauses):
+    from requests.exceptions import ConnectionError as RequestsConnectionError
+
+    for _ in range(3):
+        responses.get(f"{HREF}/$value", body=RequestsConnectionError("connection refused"))
+    ref = SubmodelRef(SERIAL_PART_V3, HREF, None, "dspEndpoint=https://edc2.tier2/api/v1/dsp;id=x")
+
+    with pytest.raises(DataspaceError, match="connection refused"):
+        EdcPartnerClient(FakeConsumer(), accepted_policies=[POLICY]).read_submodel(PARTNER, ref)
+    assert pauses == [1.0, 2.0]
+    assert len(responses.calls) == 3
+
+
+@responses.activate
+def test_a_failure_that_will_not_pass_is_not_tried_again(pauses):
+    responses.get(f"{DTR_PLANE}/lookup/shells", status=400)
+
+    with pytest.raises(DataspaceError, match="HTTP 400"):
+        EdcPartnerClient(FakeConsumer(), accepted_policies=[POLICY]).find_twin(PARTNER, CELL)
+    assert pauses == []
+
+
+def test_token_lifetime_reads_the_jwt_expiry():
+    assert token_lifetime(_jwt(1300), now=1000) == 300
+    assert token_lifetime(f"Bearer {_jwt(1300)}", now=1000) == 300
+    assert token_lifetime("dtr-token", now=1000) is None
+    assert token_lifetime("a.b.c", now=1000) is None
+
+
+@responses.activate
+def test_a_token_is_reused_until_shortly_before_it_expires():
+    for _ in range(3):
+        _mock_dtr(token=_jwt(1000 + 600))
+
+    class JwtConsumer(FakeConsumer):
+        def do_dsp(self, **kwargs):
+            endpoint, _ = super().do_dsp(**kwargs)
+            return endpoint, _jwt(1000 + 600)
+
+    consumer, clock = JwtConsumer(), Clock()
+    client = EdcPartnerClient(
+        consumer, accepted_policies=[POLICY], clock=clock, wall_clock=lambda: 1000 + clock.now
+    )
+
+    client.find_twin(PARTNER, CELL)
+    clock.now = 560  # past the 60 s used for a token that names no expiry
+    client.find_twin(PARTNER, CELL)
+    assert len(consumer.negotiations) == 1
+    clock.now = 575  # within 30 s of the expiry
+    client.find_twin(PARTNER, CELL)
+    assert len(consumer.negotiations) == 2
+
+
+@responses.activate
+def test_threads_reading_the_same_registry_share_one_negotiation():
+    for _ in range(6):
+        _mock_dtr()
+
+    class SlowConsumer(FakeConsumer):
+        def do_dsp(self, **kwargs):
+            threading.Event().wait(0.1)  # time.sleep is recorded, not slept, in this module
+            return super().do_dsp(**kwargs)
+
+    consumer = SlowConsumer()
+    client = EdcPartnerClient(consumer, accepted_policies=[POLICY])
+    threads = [threading.Thread(target=client.find_twin, args=(PARTNER, CELL)) for _ in range(6)]
+    for thread in threads:
+        thread.start()
+    for thread in threads:
+        thread.join()
+
+    assert len(consumer.negotiations) == 1

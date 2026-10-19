@@ -106,6 +106,10 @@ class Settings(BaseSettings):
     # Periodic sync of own twins (and partners, when an EDC is configured); 0 disables it
     # (both can still be triggered through the API).
     sync_interval_seconds: int = 0
+    # Partner sync: how many partners are read at once, and how many twins of one partner. Keep
+    # the second low: it is load on each partner's registry and data plane.
+    partner_sync_parallel_partners: int = Field(default=4, ge=1, le=16)
+    partner_sync_parallel_twins: int = Field(default=4, ge=1, le=16)
 
     # Administration. With CXS_ADMIN_PASSWORD_HASH and CXS_SECRET_KEY set, an admin signs in to
     # change the configuration and the partners; without them partners stay editable by anyone and

@@ -1,3 +1,6 @@
+import threading
+import time
+
 import pytest
 import responses
 import scenario
@@ -138,8 +141,23 @@ def test_settings_reject_invalid_bpnl():
         Settings(own_bpnl="BPNS000000000001")
 
 
+def _sync_partners(client, **kwargs) -> dict:
+    """Starts a partner sync and waits for it; returns the finished progress."""
+    started = client.post("/api/partners/sync", **kwargs)
+    assert started.status_code == 202, started.text
+    run_id = started.json()["run_id"]
+    deadline = time.monotonic() + 10
+    while time.monotonic() < deadline:
+        progress = client.get("/api/partners/sync/progress").json()
+        if progress["run_id"] == run_id and not progress["running"]:
+            return progress
+        time.sleep(0.02)
+    raise AssertionError("the partner sync did not finish")
+
+
 def test_partners_listing_update_and_sync(client):
     client.post("/api/sync")
+    assert client.get("/api/partners/sync/progress").json() is None
     partners = {p["bpnl"]: p for p in client.get("/api/partners").json()}
     assert set(partners) == {scenario.TIER2, scenario.OEM}
     assert partners[scenario.TIER2]["roles"] == ["supplier"]
@@ -157,13 +175,22 @@ def test_partners_listing_update_and_sync(client):
         "api",
     )
 
-    report = client.post("/api/partners/sync").json()
+    progress = _sync_partners(client)
+    report = progress["report"]
     results = {r["bpnl"]: r for r in report["partners"]}
     assert (results[scenario.TIER2]["status"], results[scenario.TIER2]["twins_found"]) == (
         "partial",
         2,
     )
     assert results[scenario.OEM]["status"] == "no_connector"
+    assert results[scenario.TIER2]["parts_cached"] == 2
+
+    assert (progress["running"], progress["partners_done"], progress["twins_cached"]) == (
+        False,
+        2,
+        2,
+    )
+    assert progress["finished_at"].endswith("Z")
 
     tier2 = next(p for p in client.get("/api/partners").json() if p["bpnl"] == scenario.TIER2)
     assert (tier2["cached_parts"], tier2["last_status"]) == (2, "partial")
@@ -174,12 +201,41 @@ def test_partners_listing_update_and_sync(client):
     assert cell["part"]["name_at_manufacturer"] == "Li-ion cell"
     assert cell["part"]["is_own"] is False
 
-    one = client.post("/api/partners/sync", params={"bpnl": scenario.OEM}).json()
+    one = _sync_partners(client, params={"bpnl": scenario.OEM})["report"]
     assert [r["bpnl"] for r in one["partners"]] == [scenario.OEM]
 
-    picked = client.post("/api/partners/sync", json={"twins": [scenario.CELL_1]}).json()
+    picked = _sync_partners(client, json={"twins": [scenario.CELL_1]})["report"]
     assert [(r["bpnl"], r["linked_twins"]) for r in picked["partners"]] == [(scenario.TIER2, 1)]
     assert client.post("/api/partners/sync", json={"twins": []}).status_code == 422
+
+
+def test_a_partner_sync_runs_in_the_background_one_at_a_time(client):
+    client.post("/api/sync")
+    client.put(
+        f"/api/partners/{scenario.TIER2}", json={"connector_address": scenario.TIER2_CONNECTOR}
+    )
+    release = threading.Event()
+    fake = client.app.state.partner_runner.job._client
+    find_twin = fake.find_twin
+
+    def held(partner, gid):
+        release.wait(5)
+        return find_twin(partner, gid)
+
+    fake.find_twin = held
+    try:
+        started = client.post("/api/partners/sync")
+        assert started.status_code == 202
+        assert started.json()["running"] is True
+        assert started.json()["report"] is None
+        assert client.post("/api/partners/sync").status_code == 409
+    finally:
+        release.set()
+    deadline = time.monotonic() + 10
+    while client.get("/api/partners/sync/progress").json()["running"]:
+        assert time.monotonic() < deadline
+        time.sleep(0.02)
+    assert _sync_partners(client)["report"]["partners"]
 
 
 def test_cannot_register_own_bpnl_as_partner(client):

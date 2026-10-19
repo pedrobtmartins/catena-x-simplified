@@ -1,10 +1,21 @@
 // Direct partners found in the own BoM and usage data: connector addresses (editable by an
-// admin), partner sync per partner or for all, and each connector's health with its checks.
-import { useEffect, useState } from "react";
-import { api, ApiError, formatDateTime, type CheckLevel, type CheckStatus, type Health, type Partner } from "./api";
+// admin), partner sync per partner or for all — followed live while it runs, with its metrics
+// once done — and each connector's health with its checks.
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  api,
+  ApiError,
+  formatDateTime,
+  type CheckLevel,
+  type CheckStatus,
+  type Health,
+  type Partner,
+  type PartnerSyncProgress,
+} from "./api";
 import { ConnectorOverview, healthOf, type HealthFilter } from "./ConnectorOverview";
 import { CheckIcon, ChevronIcon, SyncIcon } from "./icons";
 import { HealthBadge, HealthPanel, STATUS as CHECK_STATUS } from "./PartnerHealth";
+import { partnerNames, SyncLive, SyncSummary } from "./PartnerSyncPanel";
 import { EmptyState, ErrorAlert, SkeletonRows } from "./ui";
 
 const STATUS: Record<NonNullable<Partner["last_status"]>, { label: string; badge: string }> = {
@@ -219,24 +230,58 @@ export function Partners({
   const [checking, setChecking] = useState<CheckLevel | null>(null);
   const [checkSummary, setCheckSummary] = useState<string | null>(null);
   const [healthFilter, setHealthFilter] = useState<HealthFilter>(null);
+  const [progress, setProgress] = useState<PartnerSyncProgress | null>(null);
+  const [summaryOpen, setSummaryOpen] = useState(false);
+  const wasRunning = useRef(false);
   const canSync = Boolean(health?.edc_configured);
   const canCheck = Boolean(health?.can_check_partners);
   const visible = healthFilter === null ? partners : partners?.filter((p) => healthOf(p) === healthFilter);
+
+  const names = useMemo(() => partnerNames(partners), [partners]);
+  // A sync being started here, or one running (started here, by the periodic sync, in another
+  // tab): follow it.
+  const running = progress?.running ?? false;
+  const polling = syncing !== null || running;
 
   useEffect(() => {
     api.partners().then(setPartners, (e: Error) => setError(e.message));
   }, [dataVersion, version]);
 
+  // Often while a sync runs; now and then otherwise, to notice one started elsewhere.
+  useEffect(() => {
+    if (!canSync) return;
+    const load = () => api.partnerSyncProgress().then(setProgress, () => undefined);
+    if (!polling) load();
+    const timer = window.setInterval(load, polling ? 700 : 5000);
+    return () => window.clearInterval(timer);
+  }, [polling, canSync]);
+
+  // A run has ended (started here or elsewhere): show its metrics and the partners' new state.
+  useEffect(() => {
+    if (wasRunning.current && !running) {
+      setSummaryOpen(true);
+      setVersion((v) => v + 1);
+    }
+    wasRunning.current = running;
+  }, [running]);
+
+  // Starts the sync in the background; the polling above follows it to its end.
   const sync = async (bpnl?: string) => {
     setSyncing(bpnl ?? "*");
+    setSummaryOpen(false);
     setError(null);
     try {
-      const report = await api.syncPartners(bpnl);
-      const failed = report.partners.filter((p) => p.status === "failed");
-      if (failed.length) setError(failed.map((p) => `${p.bpnl}: ${p.issues[0] ?? "failed"}`).join(" · "));
-      setVersion((v) => v + 1);
+      const started = await api.syncPartners(bpnl);
+      setProgress(started);
+      if (!started.running) {
+        // Over before it could be followed.
+        setSummaryOpen(true);
+        setVersion((v) => v + 1);
+      }
     } catch (e) {
       setError(e instanceof ApiError ? e.message : String(e));
+      // 409: another sync runs — follow that one.
+      api.partnerSyncProgress().then(setProgress, () => undefined);
     } finally {
       setSyncing(null);
     }
@@ -292,12 +337,12 @@ export function Partners({
           <button
             type="button"
             className="btn btn-primary"
-            disabled={!canSync || syncing !== null}
-            title={canSync ? undefined : "No EDC configured"}
+            disabled={!canSync || polling}
+            title={canSync ? (running && syncing === null ? "A partner sync is running" : undefined) : "No EDC configured"}
             onClick={() => sync()}
           >
-            <SyncIcon className={syncing === "*" ? "spin" : undefined} />
-            {syncing === "*" ? "Syncing…" : "Sync all partners"}
+            <SyncIcon className={polling ? "spin" : undefined} />
+            {polling ? "Syncing…" : "Sync all partners"}
           </button>
         </div>
       </div>
@@ -310,6 +355,13 @@ export function Partners({
       )}
       <ErrorAlert error={error} />
       {checkSummary && <div className="alert alert-info">{checkSummary}</div>}
+
+      {polling ? (
+        <SyncLive progress={progress} names={names} />
+      ) : (
+        summaryOpen &&
+        progress && <SyncSummary progress={progress} names={names} onDismiss={() => setSummaryOpen(false)} />
+      )}
 
       {partners && partners.length > 0 && (
         <ConnectorOverview partners={partners} filter={healthFilter} onFilter={setHealthFilter} />
@@ -336,7 +388,10 @@ export function Partners({
                 key={partner.bpnl}
                 partner={partner}
                 canSync={canSync}
-                busy={syncing === partner.bpnl}
+                busy={
+                  syncing === partner.bpnl ||
+                  Boolean(running && progress?.partners.some((p) => p.bpnl === partner.bpnl && p.state === "running"))
+                }
                 onSync={() => sync(partner.bpnl)}
                 onSaved={() => setVersion((v) => v + 1)}
                 canEdit={canEdit}

@@ -395,6 +395,8 @@ class PartnerSyncResultOut(BaseModel):
     twins_found: int
     twins_missing: int
     removed_parts: int
+    parts_cached: int
+    duration_seconds: float
     status: str
     issues: list[str]
 
@@ -408,6 +410,50 @@ class PartnerSyncReportOut(BaseModel):
     finished_at: UtcDatetime | None
     partners: list[PartnerSyncResultOut]
     not_linked: list[str] = []
+
+
+class PartnerSyncProgressPartnerOut(BaseModel):
+    """One partner in a running (or the last) partner sync. ``state`` is pending, running, or
+    the partner's result status once done; ``twins_failed`` counts failed lookups and twins whose
+    submodel could not be read; ``current_twin``: one being read now (several are, at once);
+    ``message``: the partner's first issue, once done."""
+
+    bpnl: str
+    state: str
+    linked_twins: int
+    twins_done: int
+    twins_cached: int
+    twins_missing: int
+    twins_failed: int
+    removed_parts: int
+    current_twin: str | None
+    duration_seconds: float | None
+    message: str | None
+
+
+class PartnerSyncProgressOut(BaseModel):
+    """Where the running partner sync is, or how the last one ended (``running`` false), with
+    totals over its partners. ``report``: the run's report once it is done; ``error``: why the
+    run broke off, if it did."""
+
+    run_id: int
+    running: bool
+    selection: bool
+    started_at: UtcDatetime
+    finished_at: UtcDatetime | None
+    elapsed_seconds: float
+    error: str | None
+    partners_total: int
+    partners_running: int
+    partners_done: int
+    linked_twins: int
+    twins_done: int
+    twins_cached: int
+    twins_missing: int
+    twins_failed: int
+    removed_parts: int
+    partners: list[PartnerSyncProgressPartnerOut]
+    report: PartnerSyncReportOut | None
 
 
 class PartnerSyncRequest(BaseModel):

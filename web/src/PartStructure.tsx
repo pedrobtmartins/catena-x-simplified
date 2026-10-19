@@ -8,6 +8,7 @@ import {
   api,
   formatDateTime,
   type PartnerSyncReport,
+  waitForPartnerSync,
   type PartStructure as Structure,
   type StructureLink,
   type StructurePart,
@@ -760,7 +761,7 @@ export function PartStructure({ id, dataVersion }: { id: string; dataVersion: nu
   const readFromPartners = async (ids: string[]) => {
     setRead({ busy: true, ids, report: null, error: null });
     try {
-      const report = await api.syncPartnerTwins(ids);
+      const report = await waitForPartnerSync(await api.syncPartnerTwins(ids));
       setRead({ busy: false, ids, report, error: null });
       keepView.current = true;
       await reload();

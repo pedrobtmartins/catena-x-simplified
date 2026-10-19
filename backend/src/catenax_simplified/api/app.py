@@ -17,7 +17,7 @@ import threading
 from collections.abc import AsyncIterator, Callable, Iterator
 from datetime import UTC, datetime
 from pathlib import Path as FsPath
-from typing import Annotated, Any
+from typing import Annotated, Any, TypeVar
 
 from fastapi import APIRouter, Depends, FastAPI, HTTPException, Path, Query, Request, Response
 from fastapi.staticfiles import StaticFiles
@@ -49,6 +49,7 @@ from ..traceability import (
     OwnTwinSync,
     PartnerHealth,
     PartnerSync,
+    PartnerSyncProgress,
     bom_findings,
     parse_twin_ids,
     part_structure,
@@ -86,7 +87,7 @@ from .schemas import (
     PartnerCheckRequest,
     PartnerNameOut,
     PartnerOut,
-    PartnerSyncReportOut,
+    PartnerSyncProgressOut,
     PartnerSyncRequest,
     PartnerUpdate,
     PartOut,
@@ -103,6 +104,8 @@ from .schemas import (
 )
 
 log = logging.getLogger(__name__)
+
+T = TypeVar("T")
 
 
 class ExclusiveRunner:
@@ -127,6 +130,32 @@ class ExclusiveRunner:
             return self.job(*args, **kwargs)
         finally:
             self._lock.release()
+
+    def start(self, prepare: Callable[[Any], T], work: Callable[[Any, T], Any]) -> T | None:
+        """Runs ``prepare(job)`` here and ``work(job, prepared)`` in a background thread,
+        holding the lock until the work is done; returns what ``prepare`` returned, or ``None``
+        if the job is already running."""
+        job = self.job
+        if job is None:
+            raise RuntimeError("not configured")
+        if not self._lock.acquire(blocking=False):
+            return None
+        try:
+            prepared = prepare(job)
+        except BaseException:
+            self._lock.release()
+            raise
+
+        def background() -> None:
+            try:
+                work(job, prepared)
+            except Exception:
+                log.exception("background job failed")
+            finally:
+                self._lock.release()
+
+        threading.Thread(target=background, name="exclusive-runner", daemon=True).start()
+        return prepared
 
 
 def _session(request: Request) -> Iterator[Session]:
@@ -528,24 +557,40 @@ async def discover_connectors(bpnl: Bpnl, request: Request) -> ConnectorDiscover
     return ConnectorDiscoveryOut(bpnl=bpnl, endpoints=endpoints)
 
 
-@router.post("/partners/sync", response_model=PartnerSyncReportOut)
-async def sync_partners(
+@router.post("/partners/sync", response_model=PartnerSyncProgressOut, status_code=202)
+def sync_partners(
     request: Request, bpnl: str | None = None, body: PartnerSyncRequest | None = None
-) -> PartnerSyncReportOut:
-    """Reads the direct partners' counterpart twins through the EDC into the cache (all partners,
-    or only ``bpnl``). With a body, reads only the ``twins`` listed, leaving the rest of the
-    cache and the partners' last-sync summary as they are; IDs no own part is linked to come back
-    in ``not_linked``. Negotiates with the partners' connectors. 409 while another partner sync
-    runs; 503 without an EDC.
+) -> PartnerSyncProgressOut:
+    """Starts reading the direct partners' counterpart twins through the EDC into the cache (all
+    partners, or only ``bpnl``) and answers at once with the run's progress; follow it on
+    ``/api/partners/sync/progress``, which holds the run's report once it is done. With a body,
+    reads only the ``twins`` listed, leaving the rest of the cache and the partners' last-sync
+    summary as they are; IDs no own part is linked to come back in the report's ``not_linked``.
+    409 while another partner sync runs; 503 without an EDC.
     """
     runner: ExclusiveRunner = request.app.state.partner_runner
     if not runner.configured:
         raise HTTPException(status_code=503, detail="no EDC configured")
     twins = body.twins if body else None
-    report = await run_in_threadpool(runner.run, bpnl, twins)
-    if report is None:
+    plan = runner.start(
+        lambda sync: sync.prepare(bpnl, twins), lambda sync, plan: sync.execute(plan)
+    )
+    if plan is None:
         raise HTTPException(status_code=409, detail="a partner sync is already running")
-    return PartnerSyncReportOut.model_validate(report)
+    return PartnerSyncProgressOut.model_validate(
+        request.app.state.partner_progress.snapshot(), from_attributes=True
+    )
+
+
+@router.get("/partners/sync/progress", response_model=PartnerSyncProgressOut | None)
+def partner_sync_progress(request: Request) -> PartnerSyncProgressOut | None:
+    """Where the running partner sync is (whoever started it, the periodic sync included), or
+    how the last one ended; ``null`` before the first since the app started. For the UI to poll
+    while a sync runs."""
+    state = request.app.state.partner_progress.snapshot()
+    if state is None:
+        return None
+    return PartnerSyncProgressOut.model_validate(state, from_attributes=True)
 
 
 def _health_runner(request: Request, body: PartnerCheckRequest) -> ExclusiveRunner:
@@ -672,6 +717,8 @@ class Runtime:
         self.overrides = overrides
         self.sync_runner = ExclusiveRunner(None)
         self.partner_runner = ExclusiveRunner(None)
+        # Outlives rebuilds, like the runner: a sync that is running keeps reporting into it.
+        self.partner_progress = PartnerSyncProgress()
         # One check at a time, so a batch does not flood our own connector.
         self.health_runner = ExclusiveRunner(None)
         self._tasks: list[asyncio.Task] = []
@@ -724,6 +771,9 @@ class Runtime:
                 session_factory,
                 settings.own_bpnl,
                 configured_connectors=settings.partner_connectors,
+                progress=self.partner_progress,
+                parallel_partners=settings.partner_sync_parallel_partners,
+                parallel_twins=settings.partner_sync_parallel_twins,
             )
             if partner_client is not None
             else None
@@ -746,7 +796,7 @@ class Runtime:
         # The own EDC's consumer side, for one-off catalog reads (api/policies.py); None without.
         state.consumer = consumer if consumer is not None else build_edc_consumer(settings)
         self.sync_runner.job = sync.run if sync is not None else None
-        self.partner_runner.job = partner_sync.run if partner_sync is not None else None
+        self.partner_runner.job = partner_sync
         self.health_runner.job = partner_health.run if partner_health is not None else None
         state.notifications = NotificationService(
             session_factory,
@@ -842,6 +892,7 @@ def create_app(
     runtime.build()
     app.state.runtime = runtime
     app.state.sync_runner = runtime.sync_runner
+    app.state.partner_progress = runtime.partner_progress
     app.state.partner_runner = runtime.partner_runner
     app.state.health_runner = runtime.health_runner
     app.include_router(router)

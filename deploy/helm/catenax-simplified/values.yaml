@@ -29,6 +29,8 @@ config:
   # CXS_BP_EXPLORER_BPNL: BPNLCOFINITYEZFA
   # CXS_SYNC_TWIN_IDS: "urn:uuid:…\nurn:uuid:…"   # load only these own twins (a test subset)
   # CXS_SYNC_INTERVAL_SECONDS: "900"
+  # CXS_PARTNER_SYNC_PARALLEL_PARTNERS: "4"   # partners a partner sync reads at once
+  # CXS_PARTNER_SYNC_PARALLEL_TWINS: "4"      # twins of one partner at once (load on its DTR)
 
 # Secret settings → Secret created by the chart (e.g. CXS_EDC_API_KEY, CXS_NOTIFICATION_API_KEY,
 # CXS_OAUTH_CLIENT_SECRET, CXS_EDC_OAUTH_CLIENT_SECRET, CXS_CENTRAL_IDP_CLIENT_SECRET, CXS_DATABASE_URL with credentials).
