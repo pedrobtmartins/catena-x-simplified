@@ -89,6 +89,7 @@ class OwnTwinSync:
         self._session_factory = session_factory
         self._own_bpnl = own_bpnl
         self._clock = clock
+        self.current: SyncReport | None = None
         self._twin_ids = list(twin_ids or [])
 
     @property
@@ -96,9 +97,14 @@ class OwnTwinSync:
         """The twins a subset sync starts from; empty: the whole registry."""
         return list(self._twin_ids)
 
+    def __call__(self) -> SyncReport:
+        return self.run()
+
     def run(self) -> SyncReport:
-        """One sync run, recorded in the history."""
+        """One sync run, recorded in the history. ``current`` is the run going on (or the last
+        one), counted up as it goes."""
         report = SyncReport(started_at=self._clock())
+        self.current = report
         seen: set[str] = set()
         try:
             if self._twin_ids:

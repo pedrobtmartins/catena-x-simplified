@@ -131,7 +131,9 @@ def main() -> None:
         for _, (_, _, port, _) in COMPANIES.items():
             base = f"http://127.0.0.1:{port}"
             _wait(f"{base}/api/health")
-            requests.post(f"{base}/api/sync", timeout=60).raise_for_status()
+            requests.post(
+                f"{base}/api/sync", params={"wait": "true"}, timeout=120
+            ).raise_for_status()
             # Partners come from the company's own BoM/usage data; give them readable names.
             for partner in requests.get(f"{base}/api/partners", timeout=10).json():
                 requests.put(

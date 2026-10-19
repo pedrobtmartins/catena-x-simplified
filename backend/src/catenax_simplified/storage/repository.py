@@ -21,6 +21,7 @@ from .tables import (
     NotificationRow,
     PartnerCheckRow,
     PartnerRow,
+    PartnerSyncRunRow,
     PartRow,
     RelationRow,
     SyncRunRow,
@@ -335,6 +336,17 @@ class PartRepository:
             ).all()
         )
 
+    def partner_parts_synced_at(self, manufacturer_id: str) -> dict[str, datetime]:
+        """When each of a partner's cached parts was last read, by Catena-X ID."""
+        return {
+            gid: synced_at
+            for gid, synced_at in self._session.execute(
+                select(PartRow.global_asset_id, PartRow.synced_at).where(
+                    PartRow.is_own.is_(False), PartRow.manufacturer_id == manufacturer_id
+                )
+            )
+        }
+
     def delete_partner_parts_except(self, manufacturer_id: str, keep: Collection[str]) -> int:
         """Remove a partner's cached parts that are no longer linked to an own part."""
         stale = [
@@ -424,6 +436,26 @@ class SyncRunRepository:
         return self._session.scalars(
             select(SyncRunRow)
             .order_by(SyncRunRow.started_at.desc(), SyncRunRow.id.desc())
+            .limit(limit)
+        ).all()
+
+
+class PartnerSyncRunRepository:
+    """The history of partner sync runs."""
+
+    def __init__(self, session: Session):
+        self._session = session
+
+    def add(self, run: PartnerSyncRunRow) -> PartnerSyncRunRow:
+        self._session.add(run)
+        self._session.flush()
+        return run
+
+    def recent(self, limit: int = 20) -> Sequence[PartnerSyncRunRow]:
+        """Recent runs, newest first."""
+        return self._session.scalars(
+            select(PartnerSyncRunRow)
+            .order_by(PartnerSyncRunRow.started_at.desc(), PartnerSyncRunRow.id.desc())
             .limit(limit)
         ).all()
 

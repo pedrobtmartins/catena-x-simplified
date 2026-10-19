@@ -55,7 +55,7 @@ def client(sender):
         asset_publisher=FakePublisher(),
     )
     with TestClient(app) as test_client:
-        assert test_client.post("/api/sync").status_code == 200
+        assert test_client.post("/api/sync", params={"wait": True}).status_code == 200
         yield test_client
 
 

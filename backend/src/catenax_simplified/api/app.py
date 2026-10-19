@@ -15,7 +15,7 @@ import contextlib
 import logging
 import threading
 from collections.abc import AsyncIterator, Callable, Iterator
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path as FsPath
 from typing import Annotated, Any, TypeVar
 
@@ -39,6 +39,7 @@ from ..notifications import NotificationService
 from ..storage import (
     PartnerCheckRepository,
     PartnerRepository,
+    PartnerSyncRunRepository,
     PartRepository,
     SyncRunRepository,
     init_schema,
@@ -89,6 +90,8 @@ from .schemas import (
     PartnerOut,
     PartnerSyncProgressOut,
     PartnerSyncRequest,
+    PartnerSyncRunOut,
+    PartnerSyncRunPage,
     PartnerUpdate,
     PartOut,
     PartPage,
@@ -100,6 +103,7 @@ from .schemas import (
     StructurePartOut,
     SyncReportOut,
     SyncRunPage,
+    SyncStatusOut,
     WhereUsedOut,
 )
 
@@ -120,14 +124,25 @@ class ExclusiveRunner:
         """Whether there is a job to run (its adapters are configured)."""
         return self.job is not None
 
+    @property
+    def running(self) -> bool:
+        """Whether the job is running now."""
+        return self._lock.locked()
+
     def run(self, *args: Any, **kwargs: Any) -> Any | None:
         """Run the job; returns ``None`` if it is already running."""
-        if self.job is None:
+        return self.run_with(lambda job: job(*args, **kwargs))
+
+    def run_with(self, call: Callable[[Any], T]) -> T | None:
+        """``call(job)`` here, holding the lock; returns ``None`` if the job is already
+        running."""
+        job = self.job
+        if job is None:
             raise RuntimeError("not configured")
         if not self._lock.acquire(blocking=False):
             return None
         try:
-            return self.job(*args, **kwargs)
+            return call(job)
         finally:
             self._lock.release()
 
@@ -392,18 +407,53 @@ def get_where_used(global_asset_id: str, session: SessionDep, request: Request) 
     )
 
 
-@router.post("/sync", response_model=SyncReportOut)
-async def trigger_sync(request: Request) -> SyncReportOut:
-    """Reads the own twins from the DTR into the cache now, and waits for the result. 409 while
-    another sync runs; 503 without a DTR.
+@router.post(
+    "/sync",
+    response_model=SyncReportOut | SyncStatusOut,
+    status_code=202,
+    responses={200: {"model": SyncReportOut, "description": "With wait: the finished run"}},
+)
+async def trigger_sync(
+    request: Request, response: Response, wait: bool = False
+) -> SyncReportOut | SyncStatusOut:
+    """Starts reading the own twins from the DTR into the cache and answers at once (202) with
+    its status; follow it on ``/api/sync/status``, then ``/api/sync/last`` has the run. With
+    ``wait``, answers when it is done, with the run (scripts; a proxy may cut a long request
+    off). 409 while another sync runs; 503 without a DTR.
     """
     runner: ExclusiveRunner = request.app.state.sync_runner
     if not runner.configured:
         raise HTTPException(status_code=503, detail="no Digital Twin Registry configured")
-    report = await run_in_threadpool(runner.run)
-    if report is None:
+    if wait:
+        report = await run_in_threadpool(runner.run)
+        if report is None:
+            raise HTTPException(status_code=409, detail="a sync is already running")
+        response.status_code = 200
+        return SyncReportOut.model_validate(report)
+    if runner.start(lambda job: True, lambda job, _: job.run()) is None:
         raise HTTPException(status_code=409, detail="a sync is already running")
-    return SyncReportOut.model_validate(report)
+    return _sync_status(runner)
+
+
+def _sync_status(runner: ExclusiveRunner) -> SyncStatusOut:
+    current = getattr(runner.job, "current", None)
+    if current is None:
+        return SyncStatusOut(running=runner.running)
+    return SyncStatusOut(
+        running=runner.running,
+        started_at=current.started_at,
+        finished_at=current.finished_at,
+        twins=current.twins,
+        parts=current.parts,
+        issues=len(current.issues),
+        complete=current.complete,
+    )
+
+
+@router.get("/sync/status", response_model=SyncStatusOut)
+def sync_status(request: Request) -> SyncStatusOut:
+    """Whether an own-twin sync is running, and how far it is (twins and parts read so far)."""
+    return _sync_status(request.app.state.sync_runner)
 
 
 @router.get("/sync/last", response_model=SyncReportOut)
@@ -454,6 +504,7 @@ def list_partners(session: SessionDep, request: Request) -> list[PartnerOut]:
                 last_message=row.last_message if row else None,
                 twins_found=row.twins_found if row else 0,
                 twins_missing=row.twins_missing if row else 0,
+                consecutive_failures=(row.consecutive_failures or 0) if row else 0,
                 last_check=PartnerCheckOut.model_validate(checks[bpnl]) if bpnl in checks else None,
             )
         )
@@ -558,28 +609,53 @@ async def discover_connectors(bpnl: Bpnl, request: Request) -> ConnectorDiscover
 
 
 @router.post("/partners/sync", response_model=PartnerSyncProgressOut, status_code=202)
-def sync_partners(
-    request: Request, bpnl: str | None = None, body: PartnerSyncRequest | None = None
+async def sync_partners(
+    request: Request,
+    response: Response,
+    bpnl: str | None = None,
+    body: PartnerSyncRequest | None = None,
+    full: bool | None = None,
+    wait: bool = False,
 ) -> PartnerSyncProgressOut:
     """Starts reading the direct partners' counterpart twins through the EDC into the cache (all
-    partners, or only ``bpnl``) and answers at once with the run's progress; follow it on
-    ``/api/partners/sync/progress``, which holds the run's report once it is done. With a body,
-    reads only the ``twins`` listed, leaving the rest of the cache and the partners' last-sync
-    summary as they are; IDs no own part is linked to come back in the report's ``not_linked``.
+    partners, or only ``bpnl``) and answers at once (202) with the run's progress; follow it on
+    ``/api/partners/sync/progress``, which holds the run's report once it is done. ``full``:
+    read every twin; otherwise twins read recently are skipped (default: full for one partner,
+    not for all). With a body, reads only the ``twins`` listed, in full, leaving the rest of
+    the cache and the partners' last-sync summary as they are; IDs no own part is linked to come
+    back in the report's ``not_linked``. With ``wait``, answers when the run is done (scripts).
     409 while another partner sync runs; 503 without an EDC.
     """
     runner: ExclusiveRunner = request.app.state.partner_runner
     if not runner.configured:
         raise HTTPException(status_code=503, detail="no EDC configured")
     twins = body.twins if body else None
-    plan = runner.start(
-        lambda sync: sync.prepare(bpnl, twins), lambda sync, plan: sync.execute(plan)
-    )
-    if plan is None:
+    full = full if full is not None else bpnl is not None
+
+    def prepare(sync: PartnerSync):
+        return sync.prepare(bpnl, twins, full=full)
+
+    if wait:
+        done = await run_in_threadpool(
+            runner.run_with, lambda sync: sync.execute(prepare(sync)) is not None
+        )
+        response.status_code = 200
+    else:
+        done = runner.start(prepare, lambda sync, plan: sync.execute(plan))
+    if done is None:
         raise HTTPException(status_code=409, detail="a partner sync is already running")
     return PartnerSyncProgressOut.model_validate(
         request.app.state.partner_progress.snapshot(), from_attributes=True
     )
+
+
+@router.get("/partners/sync/runs", response_model=PartnerSyncRunPage)
+def partner_sync_runs(
+    session: SessionDep, limit: Annotated[int, Query(ge=1, le=200)] = 20
+) -> PartnerSyncRunPage:
+    """Recent partner sync runs, newest first: totals and per partner how it went."""
+    runs = PartnerSyncRunRepository(session).recent(limit=limit)
+    return PartnerSyncRunPage(items=[PartnerSyncRunOut.model_validate(r) for r in runs])
 
 
 @router.get("/partners/sync/progress", response_model=PartnerSyncProgressOut | None)
@@ -774,6 +850,8 @@ class Runtime:
                 progress=self.partner_progress,
                 parallel_partners=settings.partner_sync_parallel_partners,
                 parallel_twins=settings.partner_sync_parallel_twins,
+                max_age=timedelta(hours=settings.partner_sync_max_age_hours),
+                backoff_after=settings.partner_sync_backoff_after,
             )
             if partner_client is not None
             else None
@@ -795,7 +873,7 @@ class Runtime:
         state.settings = settings
         # The own EDC's consumer side, for one-off catalog reads (api/policies.py); None without.
         state.consumer = consumer if consumer is not None else build_edc_consumer(settings)
-        self.sync_runner.job = sync.run if sync is not None else None
+        self.sync_runner.job = sync
         self.partner_runner.job = partner_sync
         self.health_runner.job = partner_health.run if partner_health is not None else None
         state.notifications = NotificationService(

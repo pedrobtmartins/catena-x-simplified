@@ -8,6 +8,11 @@ A sync can also be limited to a selection of those twins (the supplier parts und
 picked in the UI): it then reads only them, and leaves the rest of the cache and the partners'
 last-sync summary as they are.
 
+A sync that is not full skips the twins whose part was read less than ``max_age`` ago (they still
+count as linked, so their parts are kept). The periodic sync is such a sync, and it also leaves
+alone for a while a partner whose syncs failed several times in a row, trying it less and less
+often. Every run is stored in the history (``partner_sync_runs``).
+
 Several partners are read at once, and several twins of one partner (both bounded: the second is
 load on the partner's registry and data plane). The parts read are saved in batches, so a run
 that breaks off keeps what it has read. A run is planned (``prepare``) before it is carried out
@@ -24,7 +29,7 @@ from collections import deque
 from collections.abc import Callable, Collection, Mapping
 from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass, field
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -32,7 +37,12 @@ from .. import aspects
 from ..aspects.ids import normalize_global_asset_id
 from ..dataspace import DataspaceError
 from ..dataspace.partners import DataPlaneError, Partner, PartnerDataClient
-from ..storage import PartnerRepository, PartRepository
+from ..storage import (
+    PartnerRepository,
+    PartnerSyncRunRepository,
+    PartnerSyncRunRow,
+    PartRepository,
+)
 
 log = logging.getLogger(__name__)
 
@@ -42,6 +52,15 @@ PART_ASPECTS = {aspects.AspectType.SERIAL_PART, aspects.AspectType.BATCH}
 MAX_LOOKUP_ERRORS_IN_A_ROW = 5
 # Parts read are saved this many at a time: a run that breaks off keeps what it has read.
 SAVE_BATCH = 50
+# A partner backed off after failing is tried again after this long, doubled with every further
+# failure, up to the maximum.
+BACKOFF_BASE = timedelta(minutes=15)
+BACKOFF_MAX = timedelta(hours=24)
+
+
+def _utc(value: datetime) -> datetime:
+    """SQLite hands back naive datetimes; they are stored in UTC."""
+    return value if value.tzinfo else value.replace(tzinfo=UTC)
 
 
 @dataclass
@@ -53,11 +72,14 @@ class PartnerSyncResult:
     linked_twins: int
     twins_found: int = 0
     twins_missing: int = 0
+    # Twins not read again: their part was read less than ``max_age`` ago (not a full sync).
+    twins_fresh: int = 0
     removed_parts: int = 0
     # Twins found whose SerialPart/Batch submodel was read and cached.
     parts_cached: int = 0
     duration_seconds: float = 0.0
-    status: str = "ok"  # ok | partial | failed | no_connector
+    # ok | partial | failed | no_connector | backoff (left alone after failing in a row)
+    status: str = "ok"
     issues: list[str] = field(default_factory=list)
 
 
@@ -75,7 +97,8 @@ class PartnerSyncReport:
 @dataclass
 class PartnerSyncPlan:
     """A run as planned: the partners to read, in order, their counterpart twins by role and
-    their connector addresses. ``whole``: every counterpart (not a selection)."""
+    their connector addresses. ``whole``: every counterpart (not a selection); ``fresh``: per
+    partner, the twins not read again; ``backed_off``: partners left alone, with why."""
 
     run_id: int
     started_at: datetime
@@ -83,6 +106,10 @@ class PartnerSyncPlan:
     counterparts: dict[str, dict[str, set[str]]]
     addresses: dict[str, str | None]
     whole: bool
+    trigger: str = "manual"  # manual | periodic | selection
+    full: bool = True
+    fresh: dict[str, set[str]] = field(default_factory=dict)
+    backed_off: dict[str, str] = field(default_factory=dict)
     not_linked: list[str] = field(default_factory=list)
 
 
@@ -98,7 +125,14 @@ class PartnerSyncProgress:
         self._t0 = 0.0
         self._partner_t0: dict[str, float] = {}
 
-    def start(self, started_at: datetime, plan: list[tuple[str, int]], selection: bool) -> int:
+    def start(
+        self,
+        started_at: datetime,
+        plan: list[tuple[str, int]],
+        selection: bool,
+        trigger: str = "manual",
+        full: bool = True,
+    ) -> int:
         """``plan``: the partners to sync, in order, with how many twins each. Returns the
         run's ID."""
         with self._lock:
@@ -109,6 +143,8 @@ class PartnerSyncProgress:
                 "run_id": self._runs,
                 "running": True,
                 "selection": selection,
+                "trigger": trigger,
+                "full": full,
                 "started_at": started_at,
                 "finished_at": None,
                 "error": None,
@@ -122,6 +158,7 @@ class PartnerSyncProgress:
                         "twins_cached": 0,
                         "twins_missing": 0,
                         "twins_failed": 0,
+                        "twins_fresh": 0,
                         "removed_parts": 0,
                         "current_twin": None,
                         "duration_seconds": None,
@@ -137,6 +174,13 @@ class PartnerSyncProgress:
             if row := self._row(bpnl):
                 row["state"] = "running"
                 self._partner_t0[bpnl] = self._monotonic()
+
+    def twins_fresh(self, bpnl: str, n: int) -> None:
+        """``n`` twins of the partner are not read again: done at once."""
+        with self._lock:
+            if row := self._row(bpnl):
+                row["twins_done"] += n
+                row["twins_fresh"] += n
 
     def twin_started(self, bpnl: str, gid: str) -> None:
         with self._lock:
@@ -198,6 +242,7 @@ class PartnerSyncProgress:
             "twins_cached",
             "twins_missing",
             "twins_failed",
+            "twins_fresh",
             "removed_parts",
         ):
             state[key] = sum(r[key] for r in rows)
@@ -237,11 +282,16 @@ class PartnerSync:
         progress: PartnerSyncProgress | None = None,
         parallel_partners: int = 4,
         parallel_twins: int = 4,
+        max_age: timedelta | None = timedelta(hours=24),
+        backoff_after: int = 3,
     ):
         """``configured_connectors``: BPNL → DSP address from the settings; an address stored
         for the partner (set through the API) takes precedence. ``progress`` is kept up to date
         while a run goes (one is made when not given). ``parallel_partners``: partners read at
-        once; ``parallel_twins``: twins of one partner read at once."""
+        once; ``parallel_twins``: twins of one partner read at once. ``max_age``: a sync that is
+        not full skips twins read more recently (``None``: never skips). ``backoff_after``: the
+        periodic sync leaves a partner alone for a while after this many failures in a row
+        (0: never)."""
         self._client = client
         self._session_factory = session_factory
         self._own_bpnl = own_bpnl
@@ -250,30 +300,46 @@ class PartnerSync:
         self.progress = progress or PartnerSyncProgress()
         self._parallel_partners = max(1, parallel_partners)
         self._parallel_twins = max(1, parallel_twins)
+        self._max_age = max_age if max_age and max_age > timedelta(0) else None
+        self._backoff_after = backoff_after
         # One writer at a time: partners read in parallel save through the same database.
         self._db_lock = threading.Lock()
 
-    def __call__(
-        self, only_bpnl: str | None = None, only_twins: Collection[str] | None = None
-    ) -> PartnerSyncReport:
-        return self.run(only_bpnl, only_twins)
+    def __call__(self) -> PartnerSyncReport:
+        """The periodic sync: not full, and leaving alone partners that keep failing."""
+        return self.run(full=False, back_off=True, trigger="periodic")
 
     def run(
-        self, only_bpnl: str | None = None, only_twins: Collection[str] | None = None
+        self,
+        only_bpnl: str | None = None,
+        only_twins: Collection[str] | None = None,
+        full: bool = True,
+        back_off: bool = False,
+        trigger: str = "manual",
     ) -> PartnerSyncReport:
         """Syncs every direct partner, or only ``only_bpnl``; the own BPNL is never a partner.
         With ``only_twins``, reads only those counterpart twins, from the partners that own
-        them."""
-        return self.execute(self.prepare(only_bpnl, only_twins))
+        them (always in full). Not ``full``: twins read less than ``max_age`` ago are skipped.
+        ``back_off``: partners that failed ``backoff_after`` times in a row are left alone for a
+        while."""
+        return self.execute(self.prepare(only_bpnl, only_twins, full, back_off, trigger))
 
     def prepare(
-        self, only_bpnl: str | None = None, only_twins: Collection[str] | None = None
+        self,
+        only_bpnl: str | None = None,
+        only_twins: Collection[str] | None = None,
+        full: bool = True,
+        back_off: bool = False,
+        trigger: str = "manual",
     ) -> PartnerSyncPlan:
         """Plans a run (see ``run``) and starts following it in ``progress``."""
         started_at = self._clock()
+        if only_twins is not None:
+            full, trigger = True, "selection"
         with self._session_factory() as session:
             counterparts = PartRepository(session).partner_counterparts()
-            stored = {row.bpnl: row.connector_address for row in PartnerRepository(session).all()}
+            partner_rows = {row.bpnl: row for row in PartnerRepository(session).all()}
+            stored = {bpnl: row.connector_address for bpnl, row in partner_rows.items()}
         selection = set(only_twins) if only_twins is not None else None
         not_linked: list[str] = []
         if selection is not None:
@@ -299,10 +365,23 @@ class PartnerSync:
                 or counterparts[bpnl]["customer"]
             )
         ]
+        backed_off = (
+            {b: why for b in partners if (why := self._backed_off(partner_rows.get(b), started_at))}
+            if back_off
+            else {}
+        )
+        with self._session_factory() as session:
+            fresh = (
+                {b: self._fresh(session, b, counterparts[b], started_at) for b in partners}
+                if not full and self._max_age
+                else {}
+            )
         run_id = self.progress.start(
             started_at,
             [(b, len(counterparts[b]["supplier"] | counterparts[b]["customer"])) for b in partners],
             selection=selection is not None,
+            trigger=trigger,
+            full=full or not self._max_age,
         )
         return PartnerSyncPlan(
             run_id=run_id,
@@ -311,7 +390,40 @@ class PartnerSync:
             counterparts={b: counterparts[b] for b in partners},
             addresses={b: stored.get(b) or self._configured.get(b) for b in partners},
             whole=selection is None,
+            trigger=trigger,
+            full=full or not self._max_age,
+            fresh=fresh,
+            backed_off=backed_off,
             not_linked=not_linked,
+        )
+
+    def _fresh(
+        self, session: Session, bpnl: str, roles: Mapping[str, set[str]], now: datetime
+    ) -> set[str]:
+        """The partner's linked twins whose part was read less than ``max_age`` ago."""
+        assert self._max_age is not None
+        linked = roles["supplier"] | roles["customer"]
+        read_at = PartRepository(session).partner_parts_synced_at(bpnl)
+        return {
+            gid for gid in linked if gid in read_at and now - _utc(read_at[gid]) < self._max_age
+        }
+
+    def _backed_off(self, row, now: datetime) -> str | None:
+        """Why the partner is left alone now, or ``None``: after ``backoff_after`` failures in
+        a row it waits ``BACKOFF_BASE``, doubled with each further failure (at most
+        ``BACKOFF_MAX``), counted from its last sync."""
+        if not self._backoff_after or row is None or row.last_sync_at is None:
+            return None
+        failures = row.consecutive_failures or 0
+        if failures < self._backoff_after:
+            return None
+        wait = min(BACKOFF_BASE * 2 ** (failures - self._backoff_after), BACKOFF_MAX)
+        next_try = _utc(row.last_sync_at) + wait
+        if now >= next_try:
+            return None
+        return (
+            f"left alone after {failures} failed syncs in a row; "
+            f"next try after {next_try.isoformat(timespec='minutes')}"
         )
 
     def execute(self, plan: PartnerSyncPlan) -> PartnerSyncReport:
@@ -330,7 +442,39 @@ class PartnerSync:
         finally:
             report.finished_at = self._clock()
             self.progress.finish(report.finished_at, report, error)
+            self._store_run(plan)
         return report
+
+    def _store_run(self, plan: PartnerSyncPlan) -> None:
+        """Adds the finished run to the history; failing to is logged, not raised."""
+        state = self.progress.snapshot()
+        if state is None or state["run_id"] != plan.run_id:
+            return
+        try:
+            with self._db_lock, self._session_factory.begin() as session:
+                PartnerSyncRunRepository(session).add(
+                    PartnerSyncRunRow(
+                        started_at=state["started_at"],
+                        finished_at=state["finished_at"],
+                        elapsed_seconds=round(state["elapsed_seconds"], 3),
+                        trigger=plan.trigger,
+                        full=plan.full,
+                        partners_total=state["partners_total"],
+                        linked_twins=state["linked_twins"],
+                        twins_cached=state["twins_cached"],
+                        twins_fresh=state["twins_fresh"],
+                        twins_missing=state["twins_missing"],
+                        twins_failed=state["twins_failed"],
+                        removed_parts=state["removed_parts"],
+                        error=(state["error"] or "")[:2000] or None,
+                        partners=[
+                            {k: v for k, v in row.items() if k != "current_twin"}
+                            for row in state["partners"]
+                        ],
+                    )
+                )
+        except Exception:
+            log.exception("could not store the partner sync run")
 
     def _sync_one(self, plan: PartnerSyncPlan, bpnl: str) -> PartnerSyncResult:
         """One partner of the run; an unexpected error fails that partner, not the run."""
@@ -338,7 +482,18 @@ class PartnerSync:
         t0 = time.monotonic()
         roles = plan.counterparts[bpnl]
         try:
-            result = self._sync_partner(bpnl, roles, plan.addresses[bpnl], plan.whole)
+            if bpnl in plan.backed_off:
+                result = PartnerSyncResult(
+                    bpnl=bpnl,
+                    roles=[role for role in ("supplier", "customer") if roles[role]],
+                    linked_twins=len(roles["supplier"] | roles["customer"]),
+                    status="backoff",
+                    issues=[plan.backed_off[bpnl]],
+                )
+            else:
+                result = self._sync_partner(
+                    bpnl, roles, plan.addresses[bpnl], plan.whole, plan.fresh.get(bpnl, set())
+                )
         except Exception as exc:
             log.exception("partner sync of %s failed", bpnl)
             result = PartnerSyncResult(
@@ -353,10 +508,17 @@ class PartnerSync:
         return result
 
     def _sync_partner(
-        self, bpnl: str, roles: Mapping[str, set[str]], address: str | None, whole: bool
+        self,
+        bpnl: str,
+        roles: Mapping[str, set[str]],
+        address: str | None,
+        whole: bool,
+        fresh: set[str] | None = None,
     ) -> PartnerSyncResult:
         """``whole``: every counterpart of the partner, so parts no longer linked are removed
-        and the partner's last-sync summary is updated; a selection does neither."""
+        and the partner's last-sync summary is updated; a selection does neither. ``fresh``:
+        twins not read again (their cached parts are kept)."""
+        fresh = fresh or set()
         twin_ids = sorted(roles["supplier"] | roles["customer"])
         result = PartnerSyncResult(
             bpnl=bpnl,
@@ -372,7 +534,10 @@ class PartnerSync:
 
         partner = Partner(bpnl=bpnl, connector_address=address)
         parts: list[aspects.Part] = []
-        not_tried = self._read_twins(partner, twin_ids, result, parts)
+        result.twins_fresh = len(fresh)
+        self.progress.twins_fresh(bpnl, len(fresh))
+        to_read = [gid for gid in twin_ids if gid not in fresh]
+        not_tried = self._read_twins(partner, to_read, result, parts)
         if not_tried and result.status == "failed":
             result.issues.append(f"{not_tried} twins not tried")
         self._save(bpnl, parts)
@@ -512,8 +677,12 @@ class PartnerSync:
             row.last_sync_at = self._clock()
             row.last_status = result.status
             row.last_message = "; ".join(result.issues)[:2000] or None
-            row.twins_found = result.twins_found
+            row.twins_found = result.twins_found + result.twins_fresh
             row.twins_missing = result.twins_missing
+            if result.status == "failed":
+                row.consecutive_failures = (row.consecutive_failures or 0) + 1
+            else:
+                row.consecutive_failures = 0
         log.info(
             "partner %s: %s (%d found, %d missing)",
             result.bpnl,

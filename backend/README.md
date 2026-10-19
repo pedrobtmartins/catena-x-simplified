@@ -76,6 +76,8 @@ started from. [`.env.example`](.env.example) lists them all with comments; see a
 | `CXS_SYNC_INTERVAL_SECONDS`     | Periodic sync (own twins, then partners); `0` (default) disables it   |
 | `CXS_PARTNER_SYNC_PARALLEL_PARTNERS` | Partners a partner sync reads at once (1–16, default 4)          |
 | `CXS_PARTNER_SYNC_PARALLEL_TWINS` | Twins of one partner read at once (1–16, default 4); keep it low: it is load on the partner's registry and data plane |
+| `CXS_PARTNER_SYNC_MAX_AGE_HOURS` | A partner sync that is not full (the periodic one, **Sync all partners**) skips twins read less than this many hours ago (default 24); `0` reads every twin every time |
+| `CXS_PARTNER_SYNC_BACKOFF_AFTER` | The periodic sync leaves alone a partner whose syncs failed this many times in a row (default 3): 15 min, doubled after each further failure, at most 24 h; `0` never does |
 | `CXS_WEB_DIST_DIR`              | Directory of the built UI, served at `/`                             |
 | `CXS_ADMIN_PASSWORD_HASH`       | Enables the admin login (with `CXS_SECRET_KEY`); create it with `uv run python -m catenax_simplified.admin hash-password`. `CXS_ADMIN_USERNAME` defaults to `admin` |
 | `CXS_SECRET_KEY`                | At least 32 characters (`uv run python -m catenax_simplified.admin secret-key`): signs admin sessions and encrypts the secrets entered in the UI. Keep it stable — another key cannot read them |

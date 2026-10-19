@@ -149,7 +149,7 @@ def test_configuration_entered_in_the_ui_applies_at_once(tmp_path):
         health = client.get("/api/health").json()
         assert (health["edc_configured"], health["edc_auth"]) == (True, ["api_key"])
         # The sync still uses the injected registry after the rebuild.
-        assert client.post("/api/sync").json()["complete"] is True
+        assert client.post("/api/sync", params={"wait": True}).json()["complete"] is True
 
         # Removing a value takes effect at once too.
         client.put("/api/setup/config", json={"values": {"edc_management_url": None}})
@@ -270,7 +270,7 @@ def test_a_twin_subset_pasted_as_csv(tmp_path):
         assert (field["value"], field["twin_ids"]) == (scenario.MODULE_B, True)
         assert client.get("/api/health").json()["sync_subset"] == 1
         # Found by its globalAssetId; MODULE_A is not loaded.
-        report = client.post("/api/sync").json()
+        report = client.post("/api/sync", params={"wait": True}).json()
         assert (report["twins"], report["parts"]) == (1, 1)
 
         too_many = "\n".join(f"aas-{i}" for i in range(10_001))

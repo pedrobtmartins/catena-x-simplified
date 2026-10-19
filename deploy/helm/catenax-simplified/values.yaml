@@ -31,6 +31,8 @@ config:
   # CXS_SYNC_INTERVAL_SECONDS: "900"
   # CXS_PARTNER_SYNC_PARALLEL_PARTNERS: "4"   # partners a partner sync reads at once
   # CXS_PARTNER_SYNC_PARALLEL_TWINS: "4"      # twins of one partner at once (load on its DTR)
+  # CXS_PARTNER_SYNC_MAX_AGE_HOURS: "24"      # skip twins read more recently (not a full sync)
+  # CXS_PARTNER_SYNC_BACKOFF_AFTER: "3"       # periodic sync: back off after this many failures
 
 # Secret settings → Secret created by the chart (e.g. CXS_EDC_API_KEY, CXS_NOTIFICATION_API_KEY,
 # CXS_OAUTH_CLIENT_SECRET, CXS_EDC_OAUTH_CLIENT_SECRET, CXS_CENTRAL_IDP_CLIENT_SECRET, CXS_DATABASE_URL with credentials).

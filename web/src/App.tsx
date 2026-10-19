@@ -3,8 +3,8 @@
 // health of the backend on every route change, so pages can show only what is configured, and
 // opens Setup on first use while no Digital Twin Registry is connected. A sync bumps
 // `dataVersion`, which makes every page reload its data.
-import { useCallback, useEffect, useState } from "react";
-import { api, ApiError, formatTime, syncState, type Health, type Me, type NotificationSummary, type SyncReport } from "./api";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { api, ApiError, formatTime, syncState, type Health, type Me, type NotificationSummary, type SyncReport, type SyncStatus } from "./api";
 import { Compose } from "./Compose";
 import { DataChecksPage } from "./DataChecks";
 import { ThemeSwitch } from "./Theme";
@@ -89,7 +89,11 @@ export function App() {
   const route = useRoute();
   const [health, setHealth] = useState<Health | null>(null);
   const [lastRun, setLastRun] = useState<SyncReport | null>(null);
-  const [syncing, setSyncing] = useState(false);
+  const [starting, setStarting] = useState(false);
+  const [ownStatus, setOwnStatus] = useState<SyncStatus | null>(null);
+  const ownRunning = ownStatus?.running ?? false;
+  const syncing = starting || ownRunning;
+  const wasOwnRunning = useRef(false);
   const [error, setError] = useState<string | null>(null);
   // Bumped after every sync so pages reload their data.
   const [dataVersion, setDataVersion] = useState(0);
@@ -119,7 +123,24 @@ export function App() {
       if (!h.dtr_configured && ["", "#", "#/"].includes(window.location.hash)) window.location.hash = "#/setup";
     }, (e: Error) => setError(e.message));
     api.lastSync().then(setLastRun, () => setLastRun(null));
+    api.syncStatus().then(setOwnStatus, () => undefined);
   }, []);
+
+  // The own sync runs in the background: follow it while it runs.
+  useEffect(() => {
+    if (!syncing) return;
+    const timer = window.setInterval(() => api.syncStatus().then(setOwnStatus, () => undefined), 1000);
+    return () => window.clearInterval(timer);
+  }, [syncing]);
+
+  // It has ended: show the run and let the pages reload their data.
+  useEffect(() => {
+    if (wasOwnRunning.current && !ownRunning) {
+      api.lastSync().then(setLastRun, () => undefined);
+      setDataVersion((v) => v + 1);
+    }
+    wasOwnRunning.current = ownRunning;
+  }, [ownRunning]);
 
   // New notifications arrive from partners at any time: refresh the inbox counter.
   useEffect(() => {
@@ -141,15 +162,21 @@ export function App() {
     : 0;
 
   const sync = useCallback(async () => {
-    setSyncing(true);
+    setStarting(true);
     setError(null);
     try {
-      setLastRun(await api.sync());
-      setDataVersion((v) => v + 1);
+      const started = await api.sync();
+      setOwnStatus(started);
+      if (!started.running) {
+        // Over before it could be followed.
+        setLastRun(await api.lastSync());
+        setDataVersion((v) => v + 1);
+      }
     } catch (e) {
       setError(e instanceof ApiError ? `Sync failed: ${e.message}` : String(e));
+      api.syncStatus().then(setOwnStatus, () => undefined);
     } finally {
-      setSyncing(false);
+      setStarting(false);
     }
   }, []);
 
@@ -180,7 +207,12 @@ export function App() {
             </a>
           ))}
         <span className="sync-status" aria-live="polite">
-          {lastRun ? (
+          {ownRunning && ownStatus ? (
+            <>
+              <span className="dot" />
+              Syncing · {ownStatus.twins} twins · {ownStatus.parts} parts so far
+            </>
+          ) : lastRun ? (
             <>
               <span className={`dot ${syncState(lastRun)}`} />
               Synced {formatTime(lastRun.finished_at ?? lastRun.started_at)} · {lastRun.twins} twins ·{" "}

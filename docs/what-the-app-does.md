@@ -37,7 +37,7 @@ It does **not**:
 
 ### 1. Loads the company's own parts
 
-*UI: **Parts**, **Sync history** · API: `POST /api/sync`, `GET /api/sync/last`, `GET /api/sync/runs`*
+*UI: **Parts**, **Sync history** · API: `POST /api/sync`, `GET /api/sync/status`, `GET /api/sync/last`, `GET /api/sync/runs`*
 
 - Reads every twin of the own DTR (AAS API v3, paged), or only a **selection** for a test
   (`CXS_SYNC_TWIN_IDS`, also pasteable as a CSV on the Setup page): the listed twins plus, through
@@ -60,7 +60,9 @@ It does **not**:
 - Stores the parts and their one-level relations locally, removes parts that disappeared from the
   registry, and records every run: twins, parts, relations, unsupported submodels and each
   problem, with the submodel it concerns.
-- Runs on demand (**Sync own twins**) or periodically (`CXS_SYNC_INTERVAL_SECONDS`).
+- Runs on demand (**Sync own twins**) or periodically (`CXS_SYNC_INTERVAL_SECONDS`), in the
+  background: the API answers at once (HTTP 202), the top bar counts twins and parts as they are
+  read (`GET /api/sync/status`), and `?wait=true` waits for the run, for scripts.
 - **Checks the bills of material** it has read (`GET /api/data-checks`, on the **Data checks** page with a counter in
   the menu, filters and a report to copy, in Sync history and on the affected parts): a serialized unit is in one place at a time, so the app reports a part declared
   in an assembly and again in one of its sub-assemblies, or in two own parts that do not contain one
@@ -101,8 +103,16 @@ It does **not**:
   reads that fail in a passing way (connection, timeout, HTTP 429/502/503/504) are tried again
   after a pause, an access token is reused until shortly before it expires, and the parts read are
   saved in batches, so a sync that breaks off keeps what it has read.
+  **Sync all partners** and the periodic sync skip the twins read in the last 24 hours
+  (`CXS_PARTNER_SYNC_MAX_AGE_HOURS`); a partner's own sync button, a selection and **Read them
+  again** read every twin (`?full=true`). The periodic sync also leaves alone, for a while, a
+  partner whose syncs failed three times in a row (`CXS_PARTNER_SYNC_BACKOFF_AFTER`): 15 minutes,
+  doubled after each further failure, at most a day; a sync started by hand still tries it.
+  Every run is kept, with its totals and per partner how it went, under **Sync history**
+  (`GET /api/partners/sync/runs`).
   The sync runs in the background: the API answers at once (HTTP 202) and the run is followed on
-  `GET /api/partners/sync/progress`, so a proxy's timeout cannot cut it off. While it runs, the
+  `GET /api/partners/sync/progress`, so a proxy's timeout cannot cut it off (`?wait=true` waits,
+  for scripts). While it runs, the
   Partners page shows where it is — partner by partner, twin by twin, with the time left —
   whoever started it (a click, the periodic sync, another tab); when it ends, the run's metrics:
   twins cached, not found and failed, cached parts removed, time and pace, per partner with its

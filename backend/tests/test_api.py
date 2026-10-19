@@ -51,7 +51,7 @@ def test_health(client):
 def test_sync_then_browse(client):
     assert client.get("/api/sync/last").status_code == 404
 
-    report = client.post("/api/sync").json()
+    report = client.post("/api/sync", params={"wait": True}).json()
     assert report["complete"] is True
     assert (report["parts"], report["relation_sets"], report["issues"]) == (2, 3, [])
     assert report["id"] == 1
@@ -85,7 +85,7 @@ def test_sync_then_browse(client):
 
 
 def test_search_and_filters(client):
-    client.post("/api/sync")
+    client.post("/api/sync", params={"wait": True})
     assert client.get("/api/parts", params={"search": "mod-1"}).json()["total"] == 2
     assert client.get("/api/parts", params={"search": "000000000002"}).json()["total"] == 1
     assert client.get("/api/parts", params={"kind": "batch"}).json()["total"] == 0
@@ -99,7 +99,7 @@ def test_search_and_filters(client):
 
 
 def test_stats(client):
-    client.post("/api/sync")
+    client.post("/api/sync", params={"wait": True})
     assert client.get("/api/stats").json() == {
         "own_parts": 2,
         "own_parts_by_kind": {"serial": 2},
@@ -116,8 +116,8 @@ def test_stats(client):
 
 def test_sync_runs_are_recorded_newest_first(client):
     assert client.get("/api/sync/runs").json() == {"items": []}
-    first = client.post("/api/sync").json()
-    second = client.post("/api/sync").json()
+    first = client.post("/api/sync", params={"wait": True}).json()
+    second = client.post("/api/sync", params={"wait": True}).json()
     runs = client.get("/api/sync/runs").json()["items"]
     assert [r["id"] for r in runs] == [second["id"], first["id"]]
     assert client.get("/api/sync/runs", params={"limit": 1}).json()["items"] == [second]
@@ -131,7 +131,7 @@ def test_unknown_part(client):
 def test_sync_without_dtr_is_unavailable():
     with TestClient(create_app(_settings())) as client:
         assert client.get("/api/health").json()["dtr_configured"] is False
-        assert client.post("/api/sync").status_code == 503
+        assert client.post("/api/sync", params={"wait": True}).status_code == 503
         assert client.get("/api/health").json()["edc_configured"] is False
         assert client.post("/api/partners/sync").status_code == 503
 
@@ -156,7 +156,7 @@ def _sync_partners(client, **kwargs) -> dict:
 
 
 def test_partners_listing_update_and_sync(client):
-    client.post("/api/sync")
+    client.post("/api/sync", params={"wait": True})
     assert client.get("/api/partners/sync/progress").json() is None
     partners = {p["bpnl"]: p for p in client.get("/api/partners").json()}
     assert set(partners) == {scenario.TIER2, scenario.OEM}
@@ -210,7 +210,7 @@ def test_partners_listing_update_and_sync(client):
 
 
 def test_a_partner_sync_runs_in_the_background_one_at_a_time(client):
-    client.post("/api/sync")
+    client.post("/api/sync", params={"wait": True})
     client.put(
         f"/api/partners/{scenario.TIER2}", json={"connector_address": scenario.TIER2_CONNECTOR}
     )
@@ -256,12 +256,12 @@ def test_web_ui_cache_headers(tmp_path):
 
 
 def test_the_endpoint_reports_nothing_for_consistent_boms(client):
-    client.post("/api/sync")
+    client.post("/api/sync", params={"wait": True})
     assert client.get("/api/data-checks").json() == {"total": 0, "findings": []}
 
 
 def test_structure_and_where_used_endpoints(client):
-    client.post("/api/sync")
+    client.post("/api/sync", params={"wait": True})
     assert client.get("/api/parts/urn:uuid:unknown/structure").status_code == 404
     structure = client.get(f"/api/parts/{scenario.MODULE_A}/structure").json()
     assert structure["root"] == scenario.MODULE_A
@@ -273,3 +273,53 @@ def test_structure_and_where_used_endpoints(client):
     )
     used = client.get(f"/api/parts/{scenario.MODULE_A}/where-used").json()
     assert used["paths"] and all(path[0] == scenario.MODULE_A for path in used["paths"])
+
+
+def test_the_own_sync_runs_in_the_background(client):
+    assert client.get("/api/sync/status").json()["running"] is False
+    release = threading.Event()
+    registry = client.app.state.sync_runner.job._registry
+    iter_twins = registry.iter_twins
+
+    def held():
+        release.wait(5)
+        return iter_twins()
+
+    registry.iter_twins = held
+    try:
+        started = client.post("/api/sync")
+        assert started.status_code == 202
+        assert started.json()["running"] is True
+        assert client.post("/api/sync").status_code == 409
+    finally:
+        release.set()
+    deadline = time.monotonic() + 10
+    while (status := client.get("/api/sync/status").json())["running"]:
+        assert time.monotonic() < deadline
+        time.sleep(0.02)
+    assert status["complete"] is True and status["twins"] > 0
+    assert client.get("/api/sync/last").json()["twins"] == status["twins"]
+
+
+def test_partner_sync_runs_are_listed_and_a_script_can_wait(client):
+    client.post("/api/sync", params={"wait": True})
+    client.put(
+        f"/api/partners/{scenario.TIER2}", json={"connector_address": scenario.TIER2_CONNECTOR}
+    )
+    assert client.get("/api/partners/sync/runs").json() == {"items": []}
+
+    done = client.post("/api/partners/sync", params={"wait": True})
+    assert done.status_code == 200
+    assert done.json()["running"] is False
+    assert done.json()["report"]["partners"]
+    # All partners: not full by default; one partner: full.
+    assert done.json()["full"] is False
+    one = client.post("/api/partners/sync", params={"wait": True, "bpnl": scenario.TIER2})
+    assert one.json()["full"] is True
+
+    runs = client.get("/api/partners/sync/runs").json()["items"]
+    assert [r["full"] for r in runs] == [True, False]
+    assert runs[1]["twins_cached"] == 2
+    assert runs[1]["partners"][0]["bpnl"] in (scenario.TIER2, scenario.OEM)
+    partner = next(p for p in client.get("/api/partners").json() if p["bpnl"] == scenario.TIER2)
+    assert partner["consecutive_failures"] == 0
