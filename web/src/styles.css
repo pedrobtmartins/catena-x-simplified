@@ -2991,3 +2991,208 @@ a.ps-step:hover {
 .ps-panel .alert p + p {
   margin-top: 4px;
 }
+
+/* ---------- partner sync: live progress and the metrics of the finished run ---------- */
+
+.sync-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 16px;
+  padding: 20px 24px;
+}
+
+.sync-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+}
+
+.sync-head h2 {
+  margin: 0;
+  font-size: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sync-dismiss {
+  margin-left: auto;
+  align-self: center;
+}
+
+.sync-bar {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--surface-subtle);
+  box-shadow: inset 0 0 0 1px var(--divider);
+  overflow: hidden;
+}
+
+.sync-bar span {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+.sync-now {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 6px 16px;
+  font-size: 13px;
+}
+
+.sync-reading {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1 1 320px;
+}
+
+.sync-reading li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 12px;
+  min-width: 0;
+}
+
+.sync-reading .cell-id {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+
+.sync-counts {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+  color: var(--text-2);
+  white-space: nowrap;
+}
+
+.sync-counts .dot + * {
+  margin-right: 0;
+}
+
+.sync-counts .dot:not(:first-child) {
+  margin-left: 10px;
+}
+
+.sync-partners {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--divider);
+}
+
+.sync-partner {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(80px, 1.5fr) auto 110px;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--divider);
+}
+
+.sync-partner .part-link {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.sync-partner .badge {
+  justify-self: end;
+}
+
+.sync-pending {
+  color: var(--text-3);
+}
+
+.sync-partner.sync-ok .sync-bar span {
+  background: var(--success);
+}
+
+.sync-partner.sync-partial .sync-bar span,
+.sync-partner.sync-no_connector .sync-bar span {
+  background: var(--orange);
+}
+
+.sync-partner.sync-failed .sync-bar span {
+  background: var(--danger);
+}
+
+.sync-done {
+  border-top-width: 4px;
+}
+
+.sync-done-ok {
+  border-top-color: var(--success);
+}
+
+.sync-done-warn {
+  border-top-color: var(--orange);
+}
+
+.sync-done-error {
+  border-top-color: var(--danger);
+}
+
+.sync-stats {
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 10px;
+}
+
+.sync-stats .stat {
+  padding: 12px 14px;
+  gap: 2px;
+  border-top-width: 4px;
+}
+
+.sync-stats .stat-value {
+  font-size: 24px;
+}
+
+.sync-stats .stat-note {
+  font-size: 12px;
+}
+
+.sync-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.sync-issue {
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text-2);
+}
+
+@media (max-width: 760px) {
+  .sync-partner {
+    grid-template-columns: minmax(0, 1fr) auto auto;
+  }
+
+  .sync-partner .sync-bar {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+
+  .sync-counts {
+    margin-left: 0;
+  }
+}

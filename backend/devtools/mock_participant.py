@@ -13,7 +13,10 @@ submodels of one of three companies of a small battery supply chain:
 It is not a test of Catena-X conformance; integration tests use the Tractus-X umbrella
 environment.
 
-    python devtools/mock_participant.py --port 8081 [--participant tier1]
+    python devtools/mock_participant.py --port 8081 [--participant tier1] [--latency 0.5]
+
+``--latency`` makes every answer that much slower, like a remote registry behind a connector: it
+shows what a long partner sync looks like.
 
     CXS_OWN_BPNL=BPNL000000000T1A \
     CXS_DTR_BASE_URL=http://localhost:8081 \
@@ -25,6 +28,7 @@ from __future__ import annotations
 import argparse
 import base64
 import json
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from typing import Any
 from urllib.parse import parse_qs, urlparse
@@ -269,6 +273,7 @@ def build_dataset(
 class Handler(BaseHTTPRequestHandler):
     shells: list[dict] = []
     submodels: dict[str, dict] = {}
+    latency: float = 0.0
 
     def _send(self, status: int, body: Any) -> None:
         data = json.dumps(body).encode()
@@ -279,6 +284,8 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(data)
 
     def do_GET(self) -> None:  # noqa: N802 (http.server API)
+        if self.latency:
+            time.sleep(self.latency)
         url = urlparse(self.path)
         base = f"http://{self.headers['Host']}"
         query = parse_qs(url.query)
@@ -329,8 +336,10 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--port", type=int, default=8081)
     parser.add_argument("--participant", choices=sorted(PARTICIPANTS), default="tier1")
+    parser.add_argument("--latency", type=float, default=0.0, help="seconds added to each answer")
     args = parser.parse_args()
     Handler.shells, Handler.submodels = build_dataset(args.participant)
+    Handler.latency = args.latency
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
     print(
         f"mock {args.participant} ({PARTICIPANTS[args.participant]}) on "

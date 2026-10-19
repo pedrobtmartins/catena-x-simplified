@@ -97,6 +97,16 @@ It does **not**:
   Batch. It reads nothing else: no partner bill of materials, no partner usage.
   A lookup the partner's registry fails is reported for that twin and the sync goes on; it stops
   for that partner only when its registry cannot be reached, or after five lookups failed in a row.
+  Several partners are read at once, and a few twins of each (`CXS_PARTNER_SYNC_PARALLEL_*`);
+  reads that fail in a passing way (connection, timeout, HTTP 429/502/503/504) are tried again
+  after a pause, an access token is reused until shortly before it expires, and the parts read are
+  saved in batches, so a sync that breaks off keeps what it has read.
+  The sync runs in the background: the API answers at once (HTTP 202) and the run is followed on
+  `GET /api/partners/sync/progress`, so a proxy's timeout cannot cut it off. While it runs, the
+  Partners page shows where it is — partner by partner, twin by twin, with the time left —
+  whoever started it (a click, the periodic sync, another tab); when it ends, the run's metrics:
+  twins cached, not found and failed, cached parts removed, time and pace, per partner with its
+  first issue.
 - **Only some partner parts**: in a part's structure, selecting an own part offers to read just
   the supplier parts under it (every own level down), and selecting a supplier part offers to read
   that one. The same partner sync runs for those twins only (`POST /api/partners/sync` with

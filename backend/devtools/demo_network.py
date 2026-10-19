@@ -78,6 +78,12 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--host", default="127.0.0.1", help="interface the apps listen on")
     parser.add_argument("--data-dir", help="keep the databases here (default: a temp dir)")
+    parser.add_argument(
+        "--latency",
+        type=float,
+        default=0.0,
+        help="seconds each mock registry takes to answer, to watch a partner sync run",
+    )
     args = parser.parse_args()
 
     data_dir = Path(args.data_dir or tempfile.mkdtemp(prefix="cxs-demo-"))
@@ -97,6 +103,8 @@ def main() -> None:
                         str(mock_port),
                         "--participant",
                         key,
+                        "--latency",
+                        str(args.latency),
                     ],
                     stdout=subprocess.DEVNULL,
                 )

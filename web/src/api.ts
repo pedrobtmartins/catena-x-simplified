@@ -276,8 +276,54 @@ export interface PartnerSyncResult {
   twins_found: number;
   twins_missing: number;
   removed_parts: number;
+  // Twins found whose SerialPart/Batch submodel was read and cached.
+  parts_cached: number;
+  duration_seconds: number;
   status: string;
   issues: string[];
+}
+
+export type PartnerSyncState = "pending" | "running" | "ok" | "partial" | "failed" | "no_connector";
+
+export interface PartnerSyncProgressPartner {
+  bpnl: string;
+  state: PartnerSyncState;
+  linked_twins: number;
+  twins_done: number;
+  twins_cached: number;
+  twins_missing: number;
+  // Failed lookups and twins whose submodel could not be read.
+  twins_failed: number;
+  removed_parts: number;
+  // One twin being read now (several are, at once).
+  current_twin: string | null;
+  duration_seconds: number | null;
+  // The partner's first issue, once done.
+  message: string | null;
+}
+
+// Where the running partner sync is, or how the last one ended (running false).
+export interface PartnerSyncProgress {
+  run_id: number;
+  running: boolean;
+  selection: boolean;
+  started_at: string;
+  finished_at: string | null;
+  elapsed_seconds: number;
+  // Why the run broke off, if it did.
+  error: string | null;
+  partners_total: number;
+  partners_running: number;
+  partners_done: number;
+  linked_twins: number;
+  twins_done: number;
+  twins_cached: number;
+  twins_missing: number;
+  twins_failed: number;
+  removed_parts: number;
+  partners: PartnerSyncProgressPartner[];
+  // The run's report, once it is done.
+  report: PartnerSyncReport | null;
 }
 
 export interface PartnerSyncReport {
@@ -402,6 +448,23 @@ export interface PartQuery {
   offset: number;
 }
 
+/** Waits for the partner sync that `started` began; resolves with its report. */
+export async function waitForPartnerSync(
+  started: PartnerSyncProgress,
+  onProgress?: (p: PartnerSyncProgress) => void,
+): Promise<PartnerSyncReport> {
+  let progress = started;
+  while (progress.running) {
+    await new Promise((resolve) => setTimeout(resolve, 700));
+    const now = await api.partnerSyncProgress();
+    if (now && now.run_id === started.run_id) progress = now;
+    else throw new ApiError(500, "lost track of the partner sync");
+    onProgress?.(progress);
+  }
+  if (!progress.report) throw new ApiError(500, progress.error ?? "the partner sync broke off");
+  return progress.report;
+}
+
 /** One function per backend endpoint the UI uses. */
 export const api = {
   health: () => request<Health>("/api/health"),
@@ -450,13 +513,15 @@ export const api = {
     ),
   discoverConnectors: (bpnl: string) =>
     request<{ bpnl: string; endpoints: string[] }>(`/api/partners/${encodeURIComponent(bpnl)}/discovery`),
+  // Starts a partner sync in the background; follow it with partnerSyncProgress.
   syncPartners: (bpnl?: string) =>
-    request<PartnerSyncReport>(`/api/partners/sync${bpnl ? `?bpnl=${encodeURIComponent(bpnl)}` : ""}`, {
+    request<PartnerSyncProgress>(`/api/partners/sync${bpnl ? `?bpnl=${encodeURIComponent(bpnl)}` : ""}`, {
       method: "POST",
     }),
-  // Reads only these partner twins; the rest of the cache stays as it is.
+  partnerSyncProgress: () => request<PartnerSyncProgress | null>("/api/partners/sync/progress"),
+  // Reads only these partner twins, in the background; the rest of the cache stays as it is.
   syncPartnerTwins: (twins: string[]) =>
-    request<PartnerSyncReport>("/api/partners/sync", {
+    request<PartnerSyncProgress>("/api/partners/sync", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ twins }),
