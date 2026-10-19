@@ -25,6 +25,15 @@ section th, section td { text-align: left; padding: 18px 28px; border-bottom: 1p
 section aside { display: none; }
 body.notes section aside { display: block; position: absolute; left: 0; right: 0; bottom: 0;
   background: rgba(20,24,29,.92); color: #f4f6f8; font-size: 26px; line-height: 1.4; padding: 24px 40px; }
+.note { display: none; max-width: 1600px; margin: -16px auto 32px; color: #c9ced4; font-size: 15px;
+  line-height: 1.5; }
+@media (max-width: 900px) {
+  header { padding: 16px; }
+  header label { margin-left: 0; }
+  .frame { margin-bottom: 20px; border-radius: 4px; }
+  body.notes section aside { display: none; }
+  body.notes .note { display: block; padding: 0 16px; margin-top: -8px; }
+}
 x-shape { display: block; flex: none; }
 x-shape[kind="ellipse"] { border-radius: 50%; }
 x-shape[kind="arrow-right"] { clip-path: polygon(0 30%, 60% 30%, 60% 0, 100% 50%, 60% 100%, 60% 70%, 0 70%); }
@@ -53,6 +62,7 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 <aside>Open with the one-line idea: the Traceability use case is alive and standardized, the reference app that was meant to carry it is not. We built a small app that follows the KIT and avoids the architectural choice that made Trace-X slow.</aside>
 </section>
 </div></div>
+<div class="note">Open with the one-line idea: the Traceability use case is alive and standardized, the reference app that was meant to carry it is not. We built a small app that follows the KIT and avoids the architectural choice that made Trace-X slow.</div>
 <div class="frame"><div class="slide">
 <section id="problem" data-section="Why traceability matters and what the network already tried" style="background:#F7F7F5;color:#14181D;font-family:'Libre Franklin', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:56px">
 <div style="display:flex;flex-direction:column;gap:20px">
@@ -81,6 +91,7 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 <aside>This is the business question behind the Traceability KIT: precise recall scope instead of broad recalls. The answer is spread over many companies; each knows only its own level. Alerts go to customers, investigations to suppliers — that is the KIT's notification model.</aside>
 </section>
 </div></div>
+<div class="note">This is the business question behind the Traceability KIT: precise recall scope instead of broad recalls. The answer is spread over many companies; each knows only its own level. Alerts go to customers, investigations to suppliers — that is the KIT's notification model.</div>
 <div class="frame"><div class="slide">
 <section id="tracex" data-section="What happened to Trace-X and why it stalled" style="background:#F7F7F5;color:#14181D;font-family:'Libre Franklin', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:56px">
 <div style="display:flex;flex-direction:column;gap:20px">
@@ -115,6 +126,7 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 <aside>Be fair to Trace-X: it proved the use case and its notification model became the KIT standard. The point is the architecture: the app shipped together with IRS and expected the whole stack around it.</aside>
 </section>
 </div></div>
+<div class="note">Be fair to Trace-X: it proved the use case and its notification model became the KIT standard. The point is the architecture: the app shipped together with IRS and expected the whole stack around it.</div>
 <div class="frame"><div class="slide">
 <section id="status" data-transition="fade" style="background:#10212F;color:#F4F6F8;font-family:'Libre Franklin', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:72px">
 <div style="display:flex;flex-direction:column;gap:20px">
@@ -140,6 +152,7 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 <aside>All three numbers are from public sources: the repository history and the Tractus-X release changelog. The repo is not archived and there was no formal deprecation notice; it simply dropped out of the release package after 25.06. Meanwhile the Traceability KIT kept evolving (7.0.0 in 25.09, 8.0.0 in 26.03).</aside>
 </section>
 </div></div>
+<div class="note">All three numbers are from public sources: the repository history and the Tractus-X release changelog. The repo is not archived and there was no formal deprecation notice; it simply dropped out of the release package after 25.06. Meanwhile the Traceability KIT kept evolving (7.0.0 in 25.09, 8.0.0 in 26.03).</div>
 <div class="frame"><div class="slide">
 <section id="why" style="background:#F7F7F5;color:#14181D;font-family:'Libre Franklin', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:56px">
 <div style="display:flex;flex-direction:column;gap:20px">
@@ -165,6 +178,7 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 <aside>Field feedback we heard: performance was the blocker in daily use. We cannot point to a public benchmark, so the slide shows the architectural reason instead — a recursive walk that pays a full dataspace round trip per hop — and the public facts: no load tests in the release notes, and IRS left behind by the move to Saturn policies. [Add your own field evidence here if you have it.]</aside>
 </section>
 </div></div>
+<div class="note">Field feedback we heard: performance was the blocker in daily use. We cannot point to a public benchmark, so the slide shows the architectural reason instead — a recursive walk that pays a full dataspace round trip per hop — and the public facts: no load tests in the release notes, and IRS left behind by the move to Saturn policies. [Add your own field evidence here if you have it.]</div>
 <div class="frame"><div class="slide">
 <section id="hops" style="background:#F7F7F5;color:#14181D;font-family:'Libre Franklin', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
 <div style="display:flex;flex-direction:column;gap:20px">
@@ -207,6 +221,7 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 <aside>This is the slide to slow down on. Left: one question triggers a recursive walk; the cost grows with the depth of the chain and every hop is a full dataspace round trip. Right: nobody walks the chain. Each company answers its own level from a local cache and decides to forward — exactly the hop-by-hop model the Traceability KIT describes for alerts and investigations.</aside>
 </section>
 </div></div>
+<div class="note">This is the slide to slow down on. Left: one question triggers a recursive walk; the cost grows with the depth of the chain and every hop is a full dataspace round trip. Right: nobody walks the chain. Each company answers its own level from a local cache and decides to forward — exactly the hop-by-hop model the Traceability KIT describes for alerts and investigations.</div>
 <div class="frame"><div class="slide">
 <section id="principles" data-section="Our approach and why it fits the network as it is" style="background:#F7F7F5;color:#14181D;font-family:'Libre Franklin', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:56px">
 <div style="display:flex;flex-direction:column;gap:20px">
@@ -224,7 +239,7 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 </div>
 <div style="display:flex;flex-direction:column;gap:16px;background:#FFFFFF;border:1px solid #DCDCDC;border-left:6px solid #0F71CB;border-radius:16px;padding:36px 40px">
 <h3 style="font-size:36px;font-weight:600;line-height:1.2">Negotiate once, reuse</h3>
-<p style="font-size:28px;line-height:1.45;color:#4A5563">Contract agreements and access tokens are kept per partner and asset; twins live in a local cache.</p>
+<p style="font-size:28px;line-height:1.45;color:#4A5563">Agreements and tokens are reused per partner and asset; twins live in a local cache, read again only when stale.</p>
 </div>
 <div style="display:flex;flex-direction:column;gap:16px;background:#FFFFFF;border:1px solid #DCDCDC;border-left:6px solid #0F71CB;border-radius:16px;padding:36px 40px">
 <h3 style="font-size:36px;font-weight:600;line-height:1.2">Read every version in use</h3>
@@ -232,9 +247,10 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 </div>
 </div>
 <p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6A7480">Catena-X Traceability · 7</p>
-<aside>Each choice answers one of the reasons Trace-X stalled. Prerequisite infrastructure answers the heavy bundled stack. One level answers the recursive walk. Negotiate-once answers the per-request round trips: in a local test against a production EDC, 303 twins sharing a handful of assets synced in 7.5 minutes through the EDC. Tolerant reading answers version churn: the network does not upgrade in lockstep.</aside>
+<aside>Each choice answers one of the reasons Trace-X stalled. Prerequisite infrastructure answers the heavy bundled stack. One level answers the recursive walk. Negotiate-once answers the per-request round trips: in a local test against a production EDC, 303 twins sharing a handful of assets synced in 7.5 minutes through the EDC. Partner syncs now read several partners and twins at once, retry passing failures, skip twins read in the last day and leave alone for a while a partner that keeps failing. Tolerant reading answers version churn: the network does not upgrade in lockstep.</aside>
 </section>
 </div></div>
+<div class="note">Each choice answers one of the reasons Trace-X stalled. Prerequisite infrastructure answers the heavy bundled stack. One level answers the recursive walk. Negotiate-once answers the per-request round trips: in a local test against a production EDC, 303 twins sharing a handful of assets synced in 7.5 minutes through the EDC. Partner syncs now read several partners and twins at once, retry passing failures, skip twins read in the last day and leave alone for a while a partner that keeps failing. Tolerant reading answers version churn: the network does not upgrade in lockstep.</div>
 <div class="frame"><div class="slide">
 <section id="architecture" style="background:#F7F7F5;color:#14181D;font-family:'Libre Franklin', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
 <div style="display:flex;flex-direction:column;gap:20px">
@@ -244,7 +260,7 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 <div style="display:flex;flex-direction:row;gap:24px;align-items:center">
 <div style="flex:1.5;display:flex;flex-direction:column;gap:14px;background:#0F71CB;color:#FFFFFF;border-radius:16px;padding:32px 36px">
 <h3 style="font-size:32px;font-weight:600;color:#FFFFFF">Traceability app</h3>
-<p style="font-size:26px;background:#0D55AF;padding:10px 18px;border-radius:8px">Core: sync, one-level tree, affected parts</p>
+<p style="font-size:26px;background:#0D55AF;padding:10px 18px;border-radius:8px">Core: sync, part structure, where-used, checks</p>
 <p style="font-size:26px;background:#0D55AF;padding:10px 18px;border-radius:8px">Aspect adapters: v3 · v4 · industry_core</p>
 <p style="font-size:26px;background:#0D55AF;padding:10px 18px;border-radius:8px">Notifications: KIT API 1.2.1 + 2.0.0</p>
 <p style="font-size:26px;background:#0D55AF;padding:10px 18px;border-radius:8px">Dataspace client: Tractus-X SDK</p>
@@ -273,9 +289,10 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 </div>
 <p style="font-size:28px;color:#4A5563">Python · FastAPI · Tractus-X SDK · PostgreSQL · React — one container, on Docker Compose or Helm, configured in the browser.</p>
 <p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6A7480">Catena-X Traceability · 8</p>
-<aside>The app is the only new component. The EDC, the registry, the submodel server and the identity are what every participant runs anyway. All dataspace access goes through the official Tractus-X SDK behind our own interfaces, so moving to the next release (26.09: EDC 0.13) is a configuration and adapter change, not a rewrite. Setting it up takes an admin sign-in and a guided checklist on the Setup page: connector, registry, IdP, discovery and the company's own root CA, each with a connection test.</aside>
+<aside>The app is the only new component. The EDC, the registry, the submodel server and the identity are what every participant runs anyway. All dataspace access goes through the official Tractus-X SDK behind our own interfaces, so moving to the next release (26.09: EDC 0.13) is a configuration and adapter change, not a rewrite. Setting it up takes an admin sign-in and a guided checklist on the Setup page: connector, registry, IdP, discovery and the company's own root CA, each with a connection test, and the usage policies the company accepts. Next to the one-level read across companies, the core shows a part's structure through every own level and where a part is used, and checks the own bills of material and the partners' connectors.</aside>
 </section>
 </div></div>
+<div class="note">The app is the only new component. The EDC, the registry, the submodel server and the identity are what every participant runs anyway. All dataspace access goes through the official Tractus-X SDK behind our own interfaces, so moving to the next release (26.09: EDC 0.13) is a configuration and adapter change, not a rewrite. Setting it up takes an admin sign-in and a guided checklist on the Setup page: connector, registry, IdP, discovery and the company's own root CA, each with a connection test, and the usage policies the company accepts. Next to the one-level read across companies, the core shows a part's structure through every own level and where a part is used, and checks the own bills of material and the partners' connectors.</div>
 <div class="frame"><div class="slide">
 <section id="reality" style="background:#F7F7F5;color:#14181D;font-family:'Libre Franklin', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
 <div style="display:flex;flex-direction:column;gap:20px">
@@ -294,6 +311,7 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 <aside>The network does not upgrade in lockstep. SerialPart 3.0.x is still in release status in the official models repository, so tolerating it is correct, not a workaround. The end of Jupiter support at the end of 2026 is why Saturn comes first; in practice some partners have not moved yet, so the app still negotiates with them over DSP 0.8. The KIT itself says 1.2.1 is mandatory and 2.0.0 optional; 2.0.0 is a superset, so we receive both.</aside>
 </section>
 </div></div>
+<div class="note">The network does not upgrade in lockstep. SerialPart 3.0.x is still in release status in the official models repository, so tolerating it is correct, not a workaround. The end of Jupiter support at the end of 2026 is why Saturn comes first; in practice some partners have not moved yet, so the app still negotiates with them over DSP 0.8. The KIT itself says 1.2.1 is mandatory and 2.0.0 optional; 2.0.0 is a superset, so we receive both.</div>
 <div class="frame"><div class="slide">
 <section id="compare" data-transition="fade" style="background:#10212F;color:#F4F6F8;font-family:'Libre Franklin', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
 <div style="display:flex;flex-direction:column;gap:20px">
@@ -313,6 +331,7 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 <aside>Keep this factual, not a takedown. The notification model is the same — it is the KIT standard and Trace-X helped define it. What differs is where the work happens: in a recursive walk through the network, or locally at each company. [Check the "Aspect versions" row against your own experience with Trace-X before presenting.]</aside>
 </section>
 </div></div>
+<div class="note">Keep this factual, not a takedown. The notification model is the same — it is the KIT standard and Trace-X helped define it. What differs is where the work happens: in a recursive walk through the network, or locally at each company. [Check the "Aspect versions" row against your own experience with Trace-X before presenting.]</div>
 <div class="frame"><div class="slide">
 <section id="today" data-section="Where we are, what comes next and what we need" style="background:#F7F7F5;color:#14181D;font-family:'Libre Franklin', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:48px">
 <div style="display:flex;flex-direction:column;gap:20px">
@@ -326,27 +345,28 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 <p style="font-size:28px;line-height:1.35;color:#4A5563">synced in a local test against a production registry and EDC, in 7.5 minutes</p>
 </div>
 <div style="display:flex;flex-direction:column;gap:4px;border-left:6px solid #B3CB2D;padding:0 0 0 24px">
-<p style="font-size:56px;font-weight:700;line-height:1.1">2,192 · 204</p>
-<p style="font-size:28px;line-height:1.35;color:#4A5563">links to 9 suppliers and 1 customer, from bills of material and usage</p>
+<p style="font-size:56px;font-weight:700;line-height:1.1">356 supplier parts</p>
+<p style="font-size:28px;line-height:1.35;color:#4A5563">read through the suppliers' own production connectors, from 1,988 links to 8 suppliers</p>
 </div>
 <div style="display:flex;flex-direction:column;gap:4px;border-left:6px solid #B3CB2D;padding:0 0 0 24px">
 <p style="font-size:36px;font-weight:600;line-height:1.2">Three companies, real EDCs</p>
 <p style="font-size:28px;line-height:1.35;color:#4A5563">An alert travels Tier-2 → Tier-1 → OEM on the Tractus-X umbrella, and back</p>
 </div>
 <div style="display:flex;flex-direction:column;gap:4px;border-left:6px solid #B3CB2D;padding:0 0 0 24px">
-<p style="font-size:36px;font-weight:600;line-height:1.2">252 automated tests</p>
+<p style="font-size:36px;font-weight:600;line-height:1.2">296 automated tests</p>
 <p style="font-size:28px;line-height:1.35;color:#4A5563">14 official aspect payload versions, v3 to industry_core v4</p>
 </div>
 </div>
 <div style="flex:1;display:flex;flex-direction:column;gap:12px">
-<img src="parts-production.jpg" alt="The app's parts page after a local test sync: 302 own parts, 2192 supplier links, 204 customer links, 0 issues" style="width:960px;height:600px;object-fit:contain;background:#E9ECEF;border:1px solid #DCDCDC;border-radius:16px">
+<img src="parts-production.jpg" alt="The app's parts page after a local test sync: 302 own parts, 1988 supplier links to 8 suppliers, 0 issues" style="width:960px;height:600px;object-fit:contain;background:#E9ECEF;border:1px solid #DCDCDC;border-radius:16px">
 <p style="font-size:24px;color:#6A7480">A local test against a production connector — names, serials and BPNL blurred</p>
 </div>
 </div>
 <p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6A7480">Catena-X Traceability · 11</p>
-<aside>Be precise about what is proven. In a one-off local test against a production EDC and registry (a local instance, not a production deployment), the app synced a selection of 200 vehicles (303 twins with their children) from a real Digital Twin Registry; the data plane wanted an EDR, so every submodel was read through the company's own EDC — one negotiation per shared asset, then plain reads — and nothing failed. In the Tractus-X umbrella lab: three companies, each with its own EDC, registry and app, read their direct partners and pass a quality alert Tier-2 → Tier-1 → OEM with the acceptance coming back. Not yet proven: notifications with a real partner in production — that is the pilot.</aside>
+<aside>Be precise about what is proven. In a one-off local test against a production EDC and registry (a local instance, not a production deployment), the app synced a selection of 200 vehicles (303 twins with their children) from a real Digital Twin Registry; the data plane wanted an EDR, so every submodel was read through the company's own EDC — one negotiation per shared asset, then plain reads — and nothing failed. In the Tractus-X umbrella lab: three companies, each with its own EDC, registry and app, read their direct partners and pass a quality alert Tier-2 → Tier-1 → OEM with the acceptance coming back. In the same local test, the app read its direct suppliers' parts through their own production connectors: 356 supplier parts are cached, from three suppliers. Of the six suppliers synced so far, two delivered every linked twin, three answered but publish none of the linked twins yet — a data question to settle with them, not a connectivity one — and one refused the negotiation. The links figure is 1,988 to 8 suppliers: an earlier count also included links between the company's own parts. The 7.5 minutes were measured before partners and twins were read in parallel and tokens reused until they expire; it has not been measured again. Not yet proven: notifications with a real partner in production — that is the pilot.</aside>
 </section>
 </div></div>
+<div class="note">Be precise about what is proven. In a one-off local test against a production EDC and registry (a local instance, not a production deployment), the app synced a selection of 200 vehicles (303 twins with their children) from a real Digital Twin Registry; the data plane wanted an EDR, so every submodel was read through the company's own EDC — one negotiation per shared asset, then plain reads — and nothing failed. In the Tractus-X umbrella lab: three companies, each with its own EDC, registry and app, read their direct partners and pass a quality alert Tier-2 → Tier-1 → OEM with the acceptance coming back. In the same local test, the app read its direct suppliers' parts through their own production connectors: 356 supplier parts are cached, from three suppliers. Of the six suppliers synced so far, two delivered every linked twin, three answered but publish none of the linked twins yet — a data question to settle with them, not a connectivity one — and one refused the negotiation. The links figure is 1,988 to 8 suppliers: an earlier count also included links between the company's own parts. The 7.5 minutes were measured before partners and twins were read in parallel and tokens reused until they expire; it has not been measured again. Not yet proven: notifications with a real partner in production — that is the pilot.</div>
 <div class="frame"><div class="slide">
 <section id="roadmap" style="background:#F7F7F5;color:#14181D;font-family:'Libre Franklin', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:56px">
 <div style="display:flex;flex-direction:column;gap:20px">
@@ -367,7 +387,7 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 <div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#F0F5D5;border:1px solid #B3CB2D;border-radius:16px;padding:36px">
 <p style="font-size:24px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#4F5A12">Phase 3 · done</p>
 <h3 style="font-size:36px;font-weight:600;line-height:1.2">Real connectors</h3>
-<p style="font-size:28px;line-height:1.4;color:#3F4A10">Three-company umbrella lab; local test against a production EDC</p>
+<p style="font-size:28px;line-height:1.4;color:#3F4A10">Umbrella lab; local test with production EDCs, own and suppliers'</p>
 </div>
 <div style="flex:1;display:flex;flex-direction:column;gap:16px;background:#FFFFFF;border:2px solid #0F71CB;border-radius:16px;padding:36px">
 <p style="font-size:24px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:#0D55AF">Phase 4 · next</p>
@@ -377,9 +397,10 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 </div>
 <p style="font-size:28px;line-height:1.4;color:#4A5563">Timeline: [weeks per phase] · Team: [people]</p>
 <p style="position:absolute;left:128px;bottom:64px;width:1664px;font-size:24px;color:#6A7480">Catena-X Traceability · 12</p>
-<aside>Phase 3 was the proof point and it is done: three participants in the Tractus-X umbrella environment, one of them deliberately still on SerialPart 3, pass an alert Tier-2 to Tier-1 to OEM while each company only looks at its own level; and, in a local test, the app has synced twins from a production registry through a real EDC. What is left is the pilot: the same alerts with real partners. Fill in the timeline and team before presenting.</aside>
+<aside>Phase 3 was the proof point and it is done: three participants in the Tractus-X umbrella environment, one of them deliberately still on SerialPart 3, pass an alert Tier-2 to Tier-1 to OEM while each company only looks at its own level; and, in a local test, the app has synced twins from a production registry through a real EDC and read its suppliers' parts through their own production connectors. Since then it has been made ready to run unattended: syncs run in the background with live progress and stored metrics, read in parallel, retry passing failures and back off from partners that keep failing. What is left is the pilot: the same alerts with real partners. Fill in the timeline and team before presenting.</aside>
 </section>
 </div></div>
+<div class="note">Phase 3 was the proof point and it is done: three participants in the Tractus-X umbrella environment, one of them deliberately still on SerialPart 3, pass an alert Tier-2 to Tier-1 to OEM while each company only looks at its own level; and, in a local test, the app has synced twins from a production registry through a real EDC and read its suppliers' parts through their own production connectors. Since then it has been made ready to run unattended: syncs run in the background with live progress and stored metrics, read in parallel, retry passing failures and back off from partners that keep failing. What is left is the pilot: the same alerts with real partners. Fill in the timeline and team before presenting.</div>
 <div class="frame"><div class="slide">
 <section id="ask" style="background:#F7F7F5;color:#14181D;font-family:'Libre Franklin', Arial, sans-serif;padding:128px 128px 160px;display:flex;flex-direction:column;gap:56px">
 <div style="display:flex;flex-direction:column;gap:20px">
@@ -413,6 +434,7 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 <aside>Replace the bracketed items with the concrete ask for this audience. Pilot partners matter most: the whole point is that the app works with partners as they are today, including those still on SerialPart 3 or on Jupiter. The connectors and the registry are no longer the open question: the app has already been tested locally against production ones.</aside>
 </section>
 </div></div>
+<div class="note">Replace the bracketed items with the concrete ask for this audience. Pilot partners matter most: the whole point is that the app works with partners as they are today, including those still on SerialPart 3 or on Jupiter. The connectors and the registry are no longer the open question: the app has already been tested locally against production ones.</div>
 <div class="frame"><div class="slide">
 <section id="close" data-transition="fade" style="background:#FFA600;color:#14181D;font-family:'Libre Franklin', Arial, sans-serif;padding:128px;display:flex;flex-direction:column;justify-content:space-between">
 <div style="display:flex;flex-direction:row;gap:16px;align-items:center">
@@ -428,9 +450,11 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 <aside>Close on the two-sentence summary and open for questions. Likely questions: How do you handle partners without notifications? (The app publishes the KIT notification assets and policies in its own EDC, in both API versions.) What about IRS for deep trees? (Not needed: each hop is answered by the company that owns that level.) Why not fix Trace-X? (Its design depends on IRS; we would be fighting the architecture.)</aside>
 </section>
 </div></div>
+<div class="note">Close on the two-sentence summary and open for questions. Likely questions: How do you handle partners without notifications? (The app publishes the KIT notification assets and policies in its own EDC, in both API versions.) What about IRS for deep trees? (Not needed: each hop is answered by the company that owns that level.) Why not fix Trace-X? (Its design depends on IRS; we would be fighting the architecture.)</div>
 <script>
 function fit() {
-  const width = Math.min(window.innerWidth - 64, 1600);
+  const gutter = window.innerWidth <= 900 ? 32 : 64;
+  const width = Math.min(window.innerWidth - gutter, 1600);
   const scale = width / 1920;
   document.querySelectorAll('.frame').forEach((f) => {
     f.style.width = width + 'px';
