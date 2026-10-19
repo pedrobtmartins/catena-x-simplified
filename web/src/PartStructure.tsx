@@ -116,7 +116,7 @@ function PartnerReadResult({ read }: { read: PartnerRead }) {
       <p>
         Read {found} of {read.ids.length} supplier {read.ids.length === 1 ? "part" : "parts"}
         {missing > 0 && ` · ${missing} not in the partner's registry`}
-        {read.report.not_linked.length > 0 && ` · ${read.report.not_linked.length} not linked to an own part`}.
+        {(read.report.not_linked ?? []).length > 0 && ` · ${read.report.not_linked.length} not linked to an own part`}.
       </p>
       {problems.map((p) => (
         <p key={p.bpnl} className="sub">

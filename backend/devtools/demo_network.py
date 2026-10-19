@@ -53,6 +53,9 @@ def _env(key: str, data_dir: Path, host: str) -> dict[str, str]:
             {b: f"http://127.0.0.1:{mport}/api/v3" for b, _, _, mport in others.values()}
         ),
         "CXS_SYNC_INTERVAL_SECONDS": "0",
+        # No admin login in the demo, even if backend/.env sets one: the script names the
+        # partners through the API.
+        "CXS_ADMIN_PASSWORD_HASH": "",
     }
     if WEB_DIST.is_dir():
         env["CXS_WEB_DIST_DIR"] = str(WEB_DIST)
