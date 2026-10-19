@@ -320,6 +320,10 @@ def _structure_parts(
                 part_number=row.manufacturer_part_id if row else None,
                 manufacturer_id=maker,
                 manufacturer_name=names.get(maker) if maker else None,
+                customer_part_number=row.customer_part_id if row else None,
+                production_date=row.production_date if row else None,
+                country=row.country if row else None,
+                synced_at=row.synced_at if row else None,
             )
         )
     return out

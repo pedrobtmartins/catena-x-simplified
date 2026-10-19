@@ -6,6 +6,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import {
   api,
+  formatDateTime,
   type PartnerSyncReport,
   type PartStructure as Structure,
   type StructureLink,
@@ -453,12 +454,24 @@ function Panel({
         ["Part number", part.part_number ?? "—"],
         ["Contains", `${links.filter((l) => l.parent === id).length} parts`],
       ]
-    : [
-        ["Supplier", maker(part, link)],
-        ["Catena-X ID", id],
-        ["Quantity", quantity(link) || "—"],
-        ["Part data", part?.cached ? [part.serial, part.part_number].filter(Boolean).join(" · ") || "Cached" : "Not read yet: a partner sync reads it through your EDC"],
-      ];
+    : part?.cached
+      ? [
+          ["Supplier", maker(part, link)],
+          ["Type", part.kind === "batch" ? "Batch" : "Serialized part"],
+          [part.kind === "batch" ? "Batch" : "Serial", part.serial ?? "—"],
+          ["Supplier part no.", part.part_number ?? "—"],
+          ["Our part no.", part.customer_part_number ?? "—"],
+          ["Produced", [part.production_date?.slice(0, 10), part.country].filter(Boolean).join(" · ") || "—"],
+          ["Quantity", quantity(link) || "—"],
+          ["Catena-X ID", id],
+          ["Read", part.synced_at ? formatDateTime(part.synced_at) : "—"],
+        ]
+      : [
+          ["Supplier", maker(part, link)],
+          ["Catena-X ID", id],
+          ["Quantity", quantity(link) || "—"],
+          ["Part data", "Not read yet: sync it to read it from the supplier through your EDC"],
+        ];
   return (
     <aside className="ps-panel">
       <span className={`badge ${part?.own ? "badge-own" : "badge-outline"}`}>{part?.own ? "Own part" : "Supplier part"}</span>
@@ -467,7 +480,7 @@ function Panel({
         {rows.map(([k, v]) => (
           <div key={k} className="contents">
             <dt>{k}</dt>
-            <dd className={k === "Catena-X ID" || k === "Serial" ? "mono" : undefined}>{v}</dd>
+            <dd className={["Catena-X ID", "Serial", "Batch"].includes(k) ? "mono" : undefined}>{v}</dd>
           </div>
         ))}
       </dl>

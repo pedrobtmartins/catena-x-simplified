@@ -113,6 +113,11 @@ class StructurePartOut(BaseModel):
     part_number: str | None
     manufacturer_id: str | None
     manufacturer_name: str | None
+    # The company's own number for it (customerPartId), as the maker published it.
+    customer_part_number: str | None = None
+    production_date: str | None = None
+    country: str | None = None
+    synced_at: UtcDatetime | None = None
 
 
 class StructureLinkOut(BaseModel):

@@ -106,6 +106,11 @@ export interface StructurePart {
   part_number: string | null;
   manufacturer_id: string | null;
   manufacturer_name: string | null;
+  // The company's own number for it (customerPartId), as the maker published it.
+  customer_part_number: string | null;
+  production_date: string | null;
+  country: string | null;
+  synced_at: string | null;
 }
 
 export interface StructureLink {
