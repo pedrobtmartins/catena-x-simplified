@@ -29,6 +29,10 @@ See [what has been verified](docs/what-the-app-does.md#what-has-been-verified) a
 
 ## Quick start
 
+New here? [docs/getting-started.md](docs/getting-started.md) walks through the three ways to run
+the app (mock, three-company demo, next to a real EDC and DTR), what to ask your company for, and
+what to check when something does not work.
+
 Runs the app against a mock participant (a small DTR and submodel server with six battery
 modules, mixing SerialPart 3.0.0 and 4.0.0) — no dataspace needed.
 
@@ -101,6 +105,7 @@ with Compose, `caCertificates` in the Helm chart): see
 - [`backend/`](backend/README.md) — FastAPI application (Python, Tractus-X SDK)
 - [`web/`](web/README.md) — React UI
 - [`deploy/`](deploy/compose.yaml) — Docker Compose (app + Postgres) and the Helm chart for one participant
+- [`docs/getting-started.md`](docs/getting-started.md) — running it, from a demo to a real EDC, and troubleshooting
 - [`docs/what-the-app-does.md`](docs/what-the-app-does.md) — what the app does, step by step
 - [`docs/developing.md`](docs/developing.md) — code map, how a request travels, common changes
 - [`docs/architecture.md`](docs/architecture.md) — architecture and decisions
