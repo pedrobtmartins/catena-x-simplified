@@ -3,10 +3,13 @@
     python3 docs/pitch/build.py
 
 The slide files use the 1920×1080 slide format of the Slides artifact the deck was made in; this
-viewer only adds the CSS needed to show them in a browser (fonts, scaling, the x-shape kinds).
+viewer only adds the CSS needed to show them in a browser (fonts, scaling, the x-shape kinds). On a
+narrow screen (a phone) the speaker notes show as text under each slide instead of over it, where
+they would be too small to read.
 """
 
 import json
+import re
 from html import escape
 from pathlib import Path
 
@@ -31,6 +34,15 @@ section th, section td { text-align: left; padding: 18px 28px; border-bottom: 1p
 section aside { display: none; }
 body.notes section aside { display: block; position: absolute; left: 0; right: 0; bottom: 0;
   background: rgba(20,24,29,.92); color: #f4f6f8; font-size: 26px; line-height: 1.4; padding: 24px 40px; }
+.note { display: none; max-width: 1600px; margin: -16px auto 32px; color: #c9ced4; font-size: 15px;
+  line-height: 1.5; }
+@media (max-width: 900px) {
+  header { padding: 16px; }
+  header label { margin-left: 0; }
+  .frame { margin-bottom: 20px; border-radius: 4px; }
+  body.notes section aside { display: none; }
+  body.notes .note { display: block; padding: 0 16px; margin-top: -8px; }
+}
 x-shape { display: block; flex: none; }
 x-shape[kind="ellipse"] { border-radius: 50%; }
 x-shape[kind="arrow-right"] { clip-path: polygon(0 30%, 60% 30%, 60% 0, 100% 50%, 60% 100%, 60% 70%, 0 70%); }
@@ -41,7 +53,8 @@ x-shape[kind="arrow-up"] { clip-path: polygon(30% 100%, 70% 100%, 70% 40%, 100% 
 
 SCRIPT = """
 function fit() {
-  const width = Math.min(window.innerWidth - 64, 1600);
+  const gutter = window.innerWidth <= 900 ? 32 : 64;
+  const width = Math.min(window.innerWidth - gutter, 1600);
   const scale = width / 1920;
   document.querySelectorAll('.frame').forEach((f) => {
     f.style.width = width + 'px';
@@ -57,6 +70,13 @@ document.getElementById('notes').addEventListener('change', (e) => {
 """
 
 
+def _slide(html: str) -> str:
+    """One slide in its frame, followed by its speaker notes for narrow screens."""
+    notes = re.search(r"<aside>(.*?)</aside>", html, re.S)
+    note = f'<div class="note">{notes.group(1)}</div>\n' if notes else ""
+    return f'<div class="frame"><div class="slide">\n{html}</div></div>\n{note}'
+
+
 def build() -> str:
     deck = json.loads((HERE / "deck.json").read_text())
     fonts = "".join(
@@ -64,10 +84,7 @@ def build() -> str:
         for face in deck["faces"].values()
         if "href" in face
     )
-    slides = "".join(
-        f'<div class="frame"><div class="slide">\n{(HERE / "slides" / f"{sid}.html").read_text()}</div></div>\n'
-        for sid in deck["order"]
-    )
+    slides = "".join(_slide((HERE / "slides" / f"{sid}.html").read_text()) for sid in deck["order"])
     title = escape(deck["title"])
     return f"""<!doctype html>
 <html lang="en">
