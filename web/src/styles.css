@@ -2961,3 +2961,19 @@ a.ps-step:hover {
   border-top: 0;
   padding-top: 0;
 }
+
+/* ---------- partner checks: connector and notifications apart ---------- */
+
+.check-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.check-group-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 8px;
+}

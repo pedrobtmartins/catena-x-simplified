@@ -3,8 +3,9 @@
 Flow per the Industry Core / Digital Twin KITs:
 
 1. negotiate for the partner's Digital Twin Registry asset (``dct:type`` DigitalTwinRegistry);
-2. look the twin up by its Catena-X ID (``/lookup/shells``) and read its shell descriptor
-   through the partner's data plane;
+2. look the twin up by its Catena-X ID (``/lookup/shells``, or ``POST
+   /lookup/shellsByAssetLink`` where the GET fails on the partner's side) and read its shell
+   descriptor through the partner's data plane;
 3. negotiate for the submodel's asset (``id`` in the descriptor's ``subprotocolBody``) at the
    ``dspEndpoint`` it names, and read ``{href}/$value`` with the access token.
 
@@ -75,6 +76,28 @@ def parse_subprotocol_body(body: str | None) -> dict[str, str]:
     return result
 
 
+class DataPlaneError(DataspaceError):
+    """A partner's data plane answered with an HTTP error."""
+
+    def __init__(self, message: str, status: int):
+        super().__init__(message)
+        self.status = status
+
+
+def _data_plane_error(url: str, status: int, method: str = "GET") -> str:
+    """A failed read through the partner's data plane, saying where it failed: this call already
+    went through the EDC (the URL and token come from the EDR)."""
+    message = (
+        f"{method} {url} returned HTTP {status} "
+        "from the partner's data plane (reached with the EDR)"
+    )
+    if status >= 500:
+        return f"{message}: the partner's data plane or the service behind it failed"
+    if status in (401, 403):
+        return f"{message}: it refused the access token"
+    return message
+
+
 class EdcPartnerClient:
     """Reads direct partners' twins through the own EDC: negotiates for the partner's DTR,
     looks twins up by Catena-X ID, then negotiates for each submodel's asset at the
@@ -118,34 +141,59 @@ class EdcPartnerClient:
         )
 
     def _get_json(self, url: str, token: str, params: Any = None) -> Any:
+        return self._call("GET", url, token, params=params)
+
+    def _call(self, method: str, url: str, token: str, **kwargs: Any) -> Any:
         try:
-            response = self._session.get(
+            response = self._session.request(
+                method,
                 url,
-                params=params,
                 headers={"Authorization": token, "Accept": "application/json"},
                 timeout=self._timeout,
+                **kwargs,
             )
         except requests.RequestException as exc:
-            raise DataspaceError(f"GET {url} failed: {exc}") from exc
+            raise DataspaceError(f"{method} {url} failed: {exc}") from exc
         if response.status_code == 404:
             return None
         if not response.ok:
-            raise DataspaceError(f"GET {url} returned HTTP {response.status_code}")
+            raise DataPlaneError(
+                _data_plane_error(url, response.status_code, method), response.status_code
+            )
         try:
             return response.json()
         except ValueError as exc:
-            raise DataspaceError(f"GET {url} did not return JSON") from exc
+            raise DataspaceError(f"{method} {url} did not return JSON") from exc
+
+    def _lookup(self, base: str, token: str, global_asset_id: str) -> Any:
+        """The AAS IDs for a Catena-X ID. Some registries fail on the GET lookup while the
+        POST one (same AAS API v3, body instead of a base64 query) works, so a 5xx is retried
+        that way."""
+        asset_id = {"name": "globalAssetId", "value": global_asset_id}
+        try:
+            return self._get_json(
+                f"{base}/lookup/shells",
+                token,
+                params={"assetIds": encode_as_base64_url_safe(json.dumps(asset_id))},
+            )
+        except DataPlaneError as exc:
+            if exc.status < 500:
+                raise
+            log.warning("%s; trying POST /lookup/shellsByAssetLink", exc)
+            try:
+                return self._call(
+                    "POST", f"{base}/lookup/shellsByAssetLink", token, json=[asset_id]
+                )
+            except DataspaceError as retry:
+                raise DataspaceError(f"{exc}; the POST lookup failed too: {retry}") from retry
 
     # -- PartnerDataClient ---------------------------------------------------------------
 
     def find_twin(self, partner: Partner, global_asset_id: str) -> TwinRef | None:
-        """The partner's twin with this Catena-X ID (``/lookup/shells``), or ``None``."""
+        """The partner's twin with this Catena-X ID, or ``None``."""
         endpoint, token = self._dtr(partner)
         base = endpoint.rstrip("/")
-        asset_id = json.dumps({"name": "globalAssetId", "value": global_asset_id})
-        lookup = self._get_json(
-            f"{base}/lookup/shells", token, params={"assetIds": encode_as_base64_url_safe(asset_id)}
-        )
+        lookup = self._lookup(base, token, global_asset_id)
         aas_ids = (lookup or {}).get("result") or []
         if not aas_ids:
             return None

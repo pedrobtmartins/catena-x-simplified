@@ -212,9 +212,11 @@ class EdcHealthChecker:
             offers = offers_in(self._catalog_ids(edc, partner, asset_type))
         except DataspaceError as exc:
             return CheckStep(key, name, "failed", scrub(str(exc)))
+        if not offers:
+            return CheckStep(key, name, "warn", "not offered in the partner's catalog")
         offer = choose_offer(offers)
         if offer is None:
-            offered = ", ".join(sorted({o.offered_version or "?" for o in offers})) or "none"
+            offered = ", ".join(sorted({o.offered_version or "?" for o in offers}))
             return CheckStep(key, name, "warn", f"no compatible version (offered: {offered})")
         return CheckStep(key, name, "ok", f"Notification API {offer.api_version}")
 
@@ -279,10 +281,10 @@ class DirectHealthChecker:
             raise ValueError(f"unknown level {level!r}")
         ok, detail = self._get(f"{partner.connector_address.rstrip('/')}/api/health")
         steps = [CheckStep("discovery", "Partner app", "ok" if ok else "failed", detail)]
-        if level == "discovery":
-            steps.append(
-                _skipped("edc_discovery", "Connector discovery (EDC)", "no EDC in development mode")
-            )
+        # At every level: nothing went through an EDC, so the connector is never "healthy" here.
+        steps.append(
+            _skipped("edc_discovery", "Connector discovery (EDC)", "no EDC in development mode")
+        )
         if level in ("catalog", "full"):
             registry = self._registries.get(partner.bpnl)
             if not registry:

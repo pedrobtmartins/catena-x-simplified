@@ -139,6 +139,43 @@ def test_unknown_twin_returns_none():
 
 
 @responses.activate
+def test_a_failing_get_lookup_is_retried_as_a_post():
+    _mock_dtr()
+    responses.replace(responses.GET, f"{DTR_PLANE}/lookup/shells", status=500)
+    responses.post(
+        f"{DTR_PLANE}/lookup/shellsByAssetLink",
+        match=[
+            matchers.json_params_matcher([{"name": "globalAssetId", "value": CELL}]),
+            matchers.header_matcher({"Authorization": "dtr-token"}),
+        ],
+        json={"paging_metadata": {}, "result": ["urn:uuid:aas-cell-1"]},
+    )
+
+    twin = EdcPartnerClient(FakeConsumer(), accepted_policies=[POLICY]).find_twin(PARTNER, CELL)
+
+    assert twin.global_asset_id == CELL
+
+
+@responses.activate
+def test_a_refused_lookup_is_not_retried():
+    _mock_dtr()
+    responses.replace(responses.GET, f"{DTR_PLANE}/lookup/shells", status=403)
+
+    with pytest.raises(DataspaceError, match="refused the access token"):
+        EdcPartnerClient(FakeConsumer(), accepted_policies=[POLICY]).find_twin(PARTNER, CELL)
+
+
+@responses.activate
+def test_when_both_lookups_fail_the_error_names_both():
+    _mock_dtr()
+    responses.replace(responses.GET, f"{DTR_PLANE}/lookup/shells", status=500)
+    responses.post(f"{DTR_PLANE}/lookup/shellsByAssetLink", status=502)
+
+    with pytest.raises(DataspaceError, match="GET .*500.*POST .*502"):
+        EdcPartnerClient(FakeConsumer(), accepted_policies=[POLICY]).find_twin(PARTNER, CELL)
+
+
+@responses.activate
 def test_read_submodel_negotiates_for_its_asset_at_its_dsp_endpoint():
     responses.get(
         HREF + "/$value",

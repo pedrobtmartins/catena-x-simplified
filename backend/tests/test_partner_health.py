@@ -370,3 +370,22 @@ def test_a_5xx_from_the_own_connector_says_so():
         own_connector_hint("negotiation failed: no valid policy")
         == "negotiation failed: no valid policy"
     )
+
+
+def test_notification_offers_do_not_change_the_connectors_status():
+    from catenax_simplified.traceability.partner_health import notifications_status
+
+    core_ok = [
+        CheckStep("discovery", "Connector discovery", "ok", ""),
+        CheckStep("dtr_offer", "Digital Twin Registry offer", "ok", ""),
+        CheckStep("registry_access", "Registry access (EDR)", "ok", ""),
+    ]
+    missing = CheckStep("notification:ReceiveQualityAlertNotification", "x", "warn", "not offered")
+    ready = CheckStep("notification:UpdateQualityAlertNotification", "x", "ok", "API 2.0.0")
+
+    assert overall_status([*core_ok, missing]) == "healthy"
+    assert notifications_status([*core_ok, missing, ready]) == "incomplete"
+    assert notifications_status([*core_ok, ready]) == "ready"
+    assert notifications_status(core_ok) == "unchecked"
+    failed_registry = [core_ok[0], CheckStep("dtr_offer", "x", "warn", "no offer")]
+    assert overall_status([*failed_registry, ready]) == "degraded"
