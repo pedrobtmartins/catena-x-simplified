@@ -19,7 +19,8 @@ from .ports import DataspaceError
 DCT_TYPE_KEY = "'http://purl.org/dc/terms/type'.'@id'"
 # The KIT's asset examples use the https form of the Dublin Core namespace; partners publish both.
 DCT_TYPE_KEYS = (DCT_TYPE_KEY, "'https://purl.org/dc/terms/type'.'@id'")
-ASSET_ID_KEY = "https://w3id.org/edc/v0.0.1/ns/id"
+EDC_NAMESPACE = "https://w3id.org/edc/v0.0.1/ns/"
+ASSET_ID_KEY = f"{EDC_NAMESPACE}id"
 # Jupiter's DSP. Negotiations over it need Jupiter's JSON-LD context: the Saturn one (Catena-X
 # 2025-9) does not define the ``cx-policy:`` prefix of their offers, and the provider then sees
 # another policy than it offered and terminates the negotiation. Their offers also use ``edc:``
@@ -67,6 +68,18 @@ class ConnectorConsumer(Protocol):
         policies: list | None,
         protocol: str = ...,
     ) -> tuple[str, str]: ...
+
+    def get_transfer_id(
+        self,
+        counter_party_id: str,
+        counter_party_address: str,
+        filter_expression: list[dict],
+        policies: list | None = ...,
+        protocol: str = ...,
+    ) -> str: ...
+
+    # The EDR controller of the own EDC (``refresh(oid=...)``).
+    edrs: Any
 
 
 def equals(key: str, value: str) -> dict:
@@ -177,8 +190,14 @@ class EdcNegotiator:
         except Exception as exc:
             raise DataspaceError(f"catalog request to {bpnl} failed: {exc}") from exc
 
-    def negotiate(self, bpnl: str, address: str, filter_expression: list[dict]) -> tuple[str, str]:
-        """Negotiate (or reuse) access to the matching asset; returns (endpoint, token)."""
+    def negotiate(
+        self, bpnl: str, address: str, filter_expression: list[dict], refresh: bool = False
+    ) -> tuple[str, str]:
+        """Negotiate (or reuse) access to the matching asset; returns (endpoint, token).
+
+        ``refresh``: the partner refused the token it had, so the own EDC renews the EDR of the
+        same transfer (the SDK still holds its ID) instead of handing back the one it has, which
+        it only renews once it has expired by its own clock."""
         if self._policies is not None and not self._policies:
             raise DataspaceError("no accepted usage policies configured (CXS_ACCEPTED_POLICIES)")
         dsp_address, counter_party_id, protocol = self.counter_party(bpnl, address)
@@ -190,15 +209,21 @@ class EdcNegotiator:
         jupiter = (
             {"negotiation_context": JUPITER_NEGOTIATION_CONTEXT} if protocol == DSP_0_8 else {}
         )
+        request = {
+            "counter_party_id": counter_party_id,
+            "counter_party_address": dsp_address,
+            "filter_expression": filter_expression,
+            "policies": policies,
+            "protocol": protocol,
+            **jupiter,
+        }
         try:
-            endpoint, token = self.consumer.do_dsp(
-                counter_party_id=counter_party_id,
-                counter_party_address=dsp_address,
-                filter_expression=filter_expression,
-                policies=policies,
-                protocol=protocol,
-                **jupiter,
-            )
+            if refresh:
+                endpoint, token = self._refreshed(self.consumer.get_transfer_id(**request))
+            else:
+                endpoint, token = self.consumer.do_dsp(**request)
+        except DataspaceError:
+            raise
         except Exception as exc:
             message = f"negotiation with {bpnl} failed: {exc}"
             if offered and not matched:
@@ -208,6 +233,20 @@ class EdcNegotiator:
         if not endpoint or not token:
             raise DataspaceError(f"negotiation with {bpnl} returned no endpoint or token")
         return endpoint, token
+
+    def _refreshed(self, transfer_id: str) -> tuple[str, str]:
+        """(endpoint, token) of a renewed EDR for the transfer."""
+        failed = f"renewing the EDR of transfer {transfer_id} failed"
+        try:
+            response = self.consumer.edrs.refresh(
+                oid=transfer_id, verify=getattr(self.consumer, "verify_ssl", True)
+            )
+        except Exception as exc:
+            raise DataspaceError(f"{failed}: {exc}") from exc
+        if response is None or not response.ok:
+            raise DataspaceError(f"{failed}: HTTP {getattr(response, 'status_code', None)}")
+        address = response.json()
+        return _edr_field(address, "endpoint"), _edr_field(address, "authorization")
 
     def _equivalent_offers(
         self, bpnl: str, address: str, filter_expression: list[dict]
@@ -238,3 +277,8 @@ class EdcNegotiator:
                     if body not in policies:
                         policies.append(body)
         return filter_expression, policies, list(dict.fromkeys(offered)), matched
+
+
+def _edr_field(address: dict, name: str) -> str:
+    """A field of an EDR data address, plain or in the EDC namespace."""
+    return str(address.get(name) or address.get(f"{EDC_NAMESPACE}{name}") or "")

@@ -21,12 +21,15 @@ from sqlalchemy.orm import Session, sessionmaker
 from .. import aspects
 from ..aspects.ids import normalize_global_asset_id
 from ..dataspace import DataspaceError
-from ..dataspace.partners import Partner, PartnerDataClient
+from ..dataspace.partners import DataPlaneError, Partner, PartnerDataClient
 from ..storage import PartnerRepository, PartRepository
 
 log = logging.getLogger(__name__)
 
 PART_ASPECTS = {aspects.AspectType.SERIAL_PART, aspects.AspectType.BATCH}
+# The partner's registry answering one twin's lookup with an error is that twin's problem; this
+# many in a row means it is failing for all of them, so the rest are not tried.
+MAX_LOOKUP_ERRORS_IN_A_ROW = 5
 
 
 @dataclass
@@ -132,14 +135,29 @@ class PartnerSync:
 
         partner = Partner(bpnl=bpnl, connector_address=address)
         parts: list[aspects.Part] = []
-        for gid in twin_ids:
+        errors_in_a_row = 0
+        for n, gid in enumerate(twin_ids):
             try:
                 twin = self._client.find_twin(partner, gid)
+            except DataPlaneError as exc:
+                result.issues.append(f"{gid}: {exc}")
+                errors_in_a_row += 1
+                if errors_in_a_row >= MAX_LOOKUP_ERRORS_IN_A_ROW:
+                    result.status = "failed"
+                    result.issues.append(
+                        f"stopped after {errors_in_a_row} lookups failed in a row; "
+                        f"{len(twin_ids) - n - 1} twins not tried"
+                    )
+                    break
+                continue
             except DataspaceError as exc:
                 # The registry itself is unreachable: no point trying the remaining twins.
                 result.status = "failed"
                 result.issues.append(str(exc))
+                if len(twin_ids) - n - 1:
+                    result.issues.append(f"{len(twin_ids) - n - 1} twins not tried")
                 break
+            errors_in_a_row = 0
             if twin is None:
                 result.twins_missing += 1
                 continue

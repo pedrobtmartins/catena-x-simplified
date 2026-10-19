@@ -1,5 +1,6 @@
 import base64
 import json
+from types import SimpleNamespace
 
 import pytest
 import responses
@@ -23,11 +24,32 @@ HREF = "https://edc.tier2/api/public/cells/1/submodel"
 POLICY = {"odrl:permission": {"odrl:action": "odrl:use"}}
 
 
+class FakeEdrs:
+    """The own EDC's EDR controller: a renewed EDR carries the next token."""
+
+    def __init__(self):
+        self.refreshed: list[str] = []
+
+    def refresh(self, oid, verify=True):
+        self.refreshed.append(oid)
+        endpoint = DTR_PLANE if oid == "transfer-dtr" else "https://ignored"
+        prefix = "dtr" if oid == "transfer-dtr" else "submodel"
+        token = f"{prefix}-token-{len(self.refreshed) + 1}"
+        return SimpleNamespace(ok=True, json=lambda: {"endpoint": endpoint, "authorization": token})
+
+
 class FakeConsumer:
     def __init__(self, fail_on=None):
         self.discoveries: list[tuple[str, str]] = []
         self.negotiations: list[dict] = []
         self.fail_on = fail_on
+        self.edrs = FakeEdrs()
+
+    def get_transfer_id(
+        self, counter_party_id, counter_party_address, filter_expression, policies, protocol
+    ):
+        # The SDK hands back the cached transfer of the same asset: no new negotiation.
+        return "transfer-dtr" if filter_expression[0]["operandLeft"] == DCT_TYPE_KEY else "t-sub"
 
     def get_discovery_info(self, bpnl, counter_party_address=None):
         self.discoveries.append((bpnl, counter_party_address))
@@ -68,13 +90,13 @@ def _b64(value: str) -> str:
     return base64.urlsafe_b64encode(value.encode()).decode().rstrip("=")
 
 
-def _mock_dtr(found: bool = True):
+def _mock_dtr(found: bool = True, token: str = "dtr-token"):
     lookup_param = _b64(json.dumps({"name": "globalAssetId", "value": CELL}))
     responses.get(
         f"{DTR_PLANE}/lookup/shells",
         match=[
             matchers.query_param_matcher({"assetIds": lookup_param}),
-            matchers.header_matcher({"Authorization": "dtr-token"}),
+            matchers.header_matcher({"Authorization": token}),
         ],
         json={"paging_metadata": {}, "result": ["urn:uuid:aas-cell-1"] if found else []},
     )
@@ -84,7 +106,7 @@ def _mock_dtr(found: bool = True):
     ] = "dspEndpoint=https://edc2.tier2/api/v1/dsp;id=cells-serialpart"
     responses.get(
         f"{DTR_PLANE}/shell-descriptors/{_b64('urn:uuid:aas-cell-1')}",
-        match=[matchers.header_matcher({"Authorization": "dtr-token"})],
+        match=[matchers.header_matcher({"Authorization": token})],
         json=descriptor,
     )
 
@@ -157,12 +179,47 @@ def test_a_failing_get_lookup_is_retried_as_a_post():
 
 
 @responses.activate
-def test_a_refused_lookup_is_not_retried():
-    _mock_dtr()
-    responses.replace(responses.GET, f"{DTR_PLANE}/lookup/shells", status=403)
+def test_a_refused_token_is_renewed_and_the_call_repeated():
+    responses.get(f"{DTR_PLANE}/lookup/shells", status=403)  # the expired token
+    _mock_dtr(token="dtr-token-2")
+    consumer = FakeConsumer()
+
+    twin = EdcPartnerClient(consumer, accepted_policies=[POLICY]).find_twin(PARTNER, CELL)
+
+    assert twin.global_asset_id == CELL
+    assert consumer.edrs.refreshed == ["transfer-dtr"]
+    assert len(consumer.negotiations) == 1  # renewed, not negotiated again
+
+
+@responses.activate
+def test_a_token_refused_again_is_reported_and_not_retried_as_a_post():
+    responses.get(f"{DTR_PLANE}/lookup/shells", status=403)
+    consumer = FakeConsumer()
 
     with pytest.raises(DataspaceError, match="refused the access token"):
-        EdcPartnerClient(FakeConsumer(), accepted_policies=[POLICY]).find_twin(PARTNER, CELL)
+        EdcPartnerClient(consumer, accepted_policies=[POLICY]).find_twin(PARTNER, CELL)
+    assert consumer.edrs.refreshed == ["transfer-dtr"]  # once
+
+
+@responses.activate
+def test_a_submodel_read_with_a_refused_token_is_repeated_with_a_renewed_one():
+    responses.get(
+        f"{HREF}/$value",
+        match=[matchers.header_matcher({"Authorization": "submodel-token"})],
+        status=401,
+    )
+    responses.get(
+        f"{HREF}/$value",
+        match=[matchers.header_matcher({"Authorization": "submodel-token-2"})],
+        json={"ok": True},
+    )
+    ref = SubmodelRef(SERIAL_PART_V3, HREF, None, "dspEndpoint=https://edc2.tier2/api/v1/dsp;id=x")
+    consumer = FakeConsumer()
+
+    payload = EdcPartnerClient(consumer, accepted_policies=[POLICY]).read_submodel(PARTNER, ref)
+
+    assert payload == {"ok": True}
+    assert consumer.edrs.refreshed == ["t-sub"]
 
 
 @responses.activate
@@ -285,5 +342,10 @@ def test_calls_match_the_sdk_consumer_signatures():
         "policies",
         "protocol",
     } <= set(do_dsp)
+    transfer = inspect.signature(ConnectorConsumerService.get_transfer_id).parameters
+    assert set(do_dsp) - {"max_wait", "poll_interval"} <= set(transfer)
+    from tractusx_sdk.dataspace.controllers.connector.saturn.edr_controller import EdrController
+
+    assert "oid" in inspect.signature(EdrController.refresh).parameters
     discovery = inspect.signature(ConnectorConsumerService.get_discovery_info).parameters
     assert {"bpnl", "counter_party_address"} <= set(discovery)

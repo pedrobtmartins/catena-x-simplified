@@ -22,7 +22,7 @@ import json
 import logging
 import time
 from collections.abc import Callable
-from typing import Any, Protocol
+from typing import Any, Protocol, TypeVar
 
 import requests
 from tractusx_sdk.dataspace.tools.encoding_tools import encode_as_base64_url_safe
@@ -40,6 +40,8 @@ from .ports import DataspaceError, SubmodelRef, TwinRef
 from .submodels import value_url
 
 log = logging.getLogger(__name__)
+
+T = TypeVar("T")
 
 DTR_ASSET_TYPE = "https://w3id.org/catenax/taxonomy#DigitalTwinRegistry"
 
@@ -125,20 +127,33 @@ class EdcPartnerClient:
 
     # -- dataspace -----------------------------------------------------------------------
 
-    def _negotiated(self, bpnl: str, address: str, key: str, value: str) -> tuple[str, str]:
-        """(endpoint, token) for the asset with ``key`` = ``value``, reused within the TTL."""
+    def _negotiated(
+        self, bpnl: str, address: str, key: str, value: str, refresh: bool = False
+    ) -> tuple[str, str]:
+        """(endpoint, token) for the asset with ``key`` = ``value``, reused within the TTL;
+        ``refresh`` renews the EDR instead."""
         cache_key = (bpnl, address, key, value)
         cached = self._access.get(cache_key)
-        if cached and self._clock() - cached[0] < self._token_ttl:
+        if cached and not refresh and self._clock() - cached[0] < self._token_ttl:
             return cached[1], cached[2]
-        endpoint, token = self._edc.negotiate(bpnl, address, [equals(key, value)])
+        endpoint, token = self._edc.negotiate(bpnl, address, [equals(key, value)], refresh=refresh)
         self._access[cache_key] = (self._clock(), endpoint, token)
         return endpoint, token
 
-    def _dtr(self, partner: Partner) -> tuple[str, str]:
-        return self._negotiated(
-            partner.bpnl, partner.connector_address, DCT_TYPE_KEY, DTR_ASSET_TYPE
-        )
+    def _with_access(
+        self, bpnl: str, address: str, key: str, value: str, call: Callable[[str, str], T]
+    ) -> T:
+        """``call(endpoint, token)`` with the asset's access. A token the partner refuses (it
+        can expire while the cache still holds it) is renewed once and the call repeated."""
+        endpoint, token = self._negotiated(bpnl, address, key, value)
+        try:
+            return call(endpoint, token)
+        except DataPlaneError as exc:
+            if exc.status not in (401, 403):
+                raise
+            log.info("%s; renewing the EDR and trying again", exc)
+        endpoint, token = self._negotiated(bpnl, address, key, value, refresh=True)
+        return call(endpoint, token)
 
     def _get_json(self, url: str, token: str, params: Any = None) -> Any:
         return self._call("GET", url, token, params=params)
@@ -191,7 +206,17 @@ class EdcPartnerClient:
 
     def find_twin(self, partner: Partner, global_asset_id: str) -> TwinRef | None:
         """The partner's twin with this Catena-X ID, or ``None``."""
-        endpoint, token = self._dtr(partner)
+        return self._with_access(
+            partner.bpnl,
+            partner.connector_address,
+            DCT_TYPE_KEY,
+            DTR_ASSET_TYPE,
+            lambda endpoint, token: self._find_twin(endpoint, token, partner, global_asset_id),
+        )
+
+    def _find_twin(
+        self, endpoint: str, token: str, partner: Partner, global_asset_id: str
+    ) -> TwinRef | None:
         base = endpoint.rstrip("/")
         lookup = self._lookup(base, token, global_asset_id)
         aas_ids = (lookup or {}).get("result") or []
@@ -217,8 +242,13 @@ class EdcPartnerClient:
         if "id" not in body:
             raise DataspaceError(f"submodel descriptor at {ref.href} names no asset id")
         address = body.get("dspEndpoint") or partner.connector_address
-        _, token = self._negotiated(partner.bpnl, address, ASSET_ID_KEY, body["id"])
-        payload = self._get_json(value_url(ref), token)
+        payload = self._with_access(
+            partner.bpnl,
+            address,
+            ASSET_ID_KEY,
+            body["id"],
+            lambda _, token: self._get_json(value_url(ref), token),
+        )
         if not isinstance(payload, dict):
             raise DataspaceError(f"submodel at {ref.href} is missing or not a JSON object")
         return payload

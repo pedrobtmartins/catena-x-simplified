@@ -95,6 +95,8 @@ It does **not**:
 - **Partner sync** (`POST /api/partners/sync`): for every partner, negotiates access to its DTR,
   looks up the counterpart twins of the own relations by Catena-X ID and reads their SerialPart or
   Batch. It reads nothing else: no partner bill of materials, no partner usage.
+  A lookup the partner's registry fails is reported for that twin and the sync goes on; it stops
+  for that partner only when its registry cannot be reached, or after five lookups failed in a row.
 - **Only some partner parts**: in a part's structure, selecting an own part offers to read just
   the supplier parts under it (every own level down), and selecting a supplier part offers to read
   that one. The same partner sync runs for those twins only (`POST /api/partners/sync` with
@@ -166,7 +168,9 @@ send to the partner.
   were offered. Policies spelled the Jupiter or the Saturn way are compared by meaning.
 - **Reuse**: a negotiation happens once per partner, asset and policy set; the access token of an
   asset is reused for a minute, so reading many submodels of one shared asset is a series of
-  plain reads. Tokens live in memory: after a restart, the app negotiates again.
+  plain reads. A token the partner refuses (it can expire while it is being reused) is renewed
+  through the company's EDC, for the same transfer, and the call repeated once. Tokens live in
+  memory: after a restart, the app negotiates again.
 - **All dataspace access** goes through the official Tractus-X SDK behind the app's own
   interfaces.
 
