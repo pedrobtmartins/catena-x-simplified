@@ -5,6 +5,7 @@ from typing import Any
 
 from catenax_simplified.dataspace import DataspaceError, SubmodelRef, TwinRef
 from catenax_simplified.dataspace.dtr import twin_from_descriptor
+from catenax_simplified.dataspace.partners import DataPlaneError
 from catenax_simplified.dataspace.submodels import value_url
 
 
@@ -52,16 +53,26 @@ class FakeReader:
 class FakePartnerClient:
     """Partner twins by (bpnl, globalAssetId); payloads by value URL, as FakeReader."""
 
-    def __init__(self, twins: dict, payloads: dict, unreachable: set | None = None):
+    def __init__(
+        self,
+        twins: dict,
+        payloads: dict,
+        unreachable: set | None = None,
+        failing: set | None = None,
+    ):
+        """``failing``: Catena-X IDs whose lookup the partner's data plane answers with 500."""
         self.twins = twins
         self.reader = FakeReader(payloads)
         self.unreachable = unreachable or set()
+        self.failing = failing or set()
         self.lookups: list[tuple[str, str]] = []
 
     def find_twin(self, partner, global_asset_id):
         if partner.bpnl in self.unreachable:
             raise DataspaceError(f"negotiation with {partner.bpnl} failed: timeout")
         self.lookups.append((partner.bpnl, global_asset_id))
+        if global_asset_id in self.failing:
+            raise DataPlaneError("GET /lookup/shells returned HTTP 500", 500)
         shell = self.twins.get((partner.bpnl, global_asset_id))
         return twin_from_descriptor(shell) if shell else None
 
