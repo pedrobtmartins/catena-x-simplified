@@ -73,6 +73,23 @@ class PartnerHealthChecker(Protocol):
         ...
 
 
+# The SDK reports the answer of the own EDC's management API as the "EDC provider's" response
+# code; a 5xx there means the own connector failed or timed out, whoever the partner is.
+_OWN_CONNECTOR_ERROR = re.compile(r"Response code: \[(5\d\d)\]")
+
+
+def own_connector_hint(detail: str) -> str:
+    """``detail``, with a pointer to the own connector when the failure is its answer."""
+    match = _OWN_CONNECTOR_ERROR.search(detail)
+    if not match:
+        return detail
+    return (
+        f"{detail} — HTTP {match.group(1)} came from your own connector's management API, before "
+        "the partner was reached. If other partners fail the same way, check your EDC with the "
+        "connection test on the Setup page."
+    )
+
+
 def notification_types(roles: Sequence[str]) -> list[str]:
     """``dct:type``s for these roles; a partner without known roles needs all four."""
     selected = roles or list(NOTIFICATION_TYPES)
@@ -161,7 +178,7 @@ class EdcHealthChecker:
                 partner.bpnl, partner.connector_address
             )
         except DataspaceError as exc:
-            return CheckStep("discovery", name, "failed", scrub(str(exc)))
+            return CheckStep("discovery", name, "failed", own_connector_hint(scrub(str(exc))))
         return CheckStep(
             "discovery", name, "ok", f"{protocol} at {address} (counter-party {counter_party_id})"
         )

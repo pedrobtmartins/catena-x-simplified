@@ -356,3 +356,17 @@ def test_checks_are_unavailable_without_an_edc():
         assert test_client.get("/api/health").json()["can_check_partners"] is False
         response = test_client.post("/api/partners/checks", json={"level": "discovery"})
         assert response.status_code == 503
+
+
+def test_a_5xx_from_the_own_connector_says_so():
+    from catenax_simplified.dataspace.health import own_connector_hint
+
+    detail = own_connector_hint(
+        "connector discovery for X failed: [Connector Service]: It was not possible to get the "
+        "catalog from the EDC provider! Response code: [504]"
+    )
+    assert "HTTP 504 came from your own connector" in detail
+    assert (
+        own_connector_hint("negotiation failed: no valid policy")
+        == "negotiation failed: no valid policy"
+    )

@@ -6,9 +6,10 @@
 import { useCallback, useEffect, useState } from "react";
 import { api, ApiError, formatTime, syncState, type Health, type Me, type NotificationSummary, type SyncReport } from "./api";
 import { Compose } from "./Compose";
+import { DataChecksPage } from "./DataChecks";
 import { ThemeSwitch } from "./Theme";
 import { Login } from "./Login";
-import { BellIcon, ClockIcon, LogoMark, PartnersIcon, PartsIcon, SettingsIcon, SyncIcon } from "./icons";
+import { BellIcon, ClockIcon, FlagIcon, LogoMark, PartnersIcon, PartsIcon, SettingsIcon, SyncIcon } from "./icons";
 import { NotificationDetail } from "./NotificationDetail";
 import { Notifications } from "./Notifications";
 import { PartDetail } from "./PartDetail";
@@ -24,6 +25,7 @@ type Route =
   | { page: "partners" }
   | { page: "setup" }
   | { page: "login" }
+  | { page: "checks" }
   | { page: "notifications" }
   | { page: "notification"; id: number }
   | { page: "compose"; query: string };
@@ -39,6 +41,7 @@ function parseRoute(hash: string): Route {
   if (hash === "#/partners") return { page: "partners" };
   if (hash === "#/setup") return { page: "setup" };
   if (hash === "#/login") return { page: "login" };
+  if (hash === "#/data-checks") return { page: "checks" };
   return { page: "parts" };
 }
 
@@ -50,18 +53,20 @@ const TITLE: Record<Route["page"], string> = {
   partners: "Partners",
   setup: "Setup",
   login: "Admin sign-in",
+  checks: "Data checks",
   notifications: "Notifications",
   notification: "Notification",
   compose: "New notification",
 };
 
-const SECTION: Record<Route["page"], "parts" | "sync" | "partners" | "notifications" | "setup"> = {
+const SECTION: Record<Route["page"], "parts" | "sync" | "partners" | "notifications" | "setup" | "checks"> = {
   parts: "parts",
   part: "parts",
   sync: "sync",
   partners: "partners",
   setup: "setup",
   login: "setup",
+  checks: "checks",
   notifications: "notifications",
   notification: "notifications",
   compose: "notifications",
@@ -123,6 +128,12 @@ export function App() {
     const timer = setInterval(load, 30_000);
     return () => clearInterval(timer);
   }, [route, dataVersion]);
+
+  // Data check findings change only with a sync: counted once per sync for the menu.
+  const [findings, setFindings] = useState<number | null>(null);
+  useEffect(() => {
+    api.dataChecks().then((c) => setFindings(c.total), () => setFindings(null));
+  }, [dataVersion]);
 
   // Core connections still missing; the Setup page explains them.
   const unconfigured = health
@@ -207,6 +218,7 @@ export function App() {
               ["parts", "#/", <PartsIcon key="i" />, "Parts"],
               ["notifications", "#/notifications", <BellIcon key="i" />, "Notifications"],
               ["partners", "#/partners", <PartnersIcon key="i" />, "Partners"],
+              ["checks", "#/data-checks", <FlagIcon key="i" />, "Data checks"],
               ["sync", "#/sync", <ClockIcon key="i" />, "Sync history"],
               ["setup", "#/setup", <SettingsIcon key="i" />, "Setup"],
             ] as const
@@ -222,6 +234,11 @@ export function App() {
               {section === "setup" && unconfigured > 0 && (
                 <span className="badge badge-count" aria-label={`${unconfigured} to set up`}>
                   {unconfigured}
+                </span>
+              )}
+              {section === "checks" && findings !== null && findings > 0 && (
+                <span className="badge badge-count" aria-label={`${findings} to review`}>
+                  {findings}
                 </span>
               )}
               {section === "notifications" && summary && summary.inbound_new > 0 && (
@@ -242,6 +259,7 @@ export function App() {
           {route.page === "parts" && <PartList dataVersion={dataVersion} />}
           {route.page === "part" && <PartDetail id={route.id} dataVersion={dataVersion} />}
           {route.page === "sync" && <SyncHistory health={health} dataVersion={dataVersion} />}
+          {route.page === "checks" && <DataChecksPage dataVersion={dataVersion} ownBpnl={health?.own_bpnl ?? null} />}
           {route.page === "partners" && <Partners health={health} dataVersion={dataVersion} canEdit={canEdit} />}
           {route.page === "setup" && (
             <Setup

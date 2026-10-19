@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { api, type DataChecks, type DataFinding, type PartRef } from "./api";
 import { InfoIcon } from "./icons";
-import { Skeleton } from "./ui";
+import { ChipGroup, ErrorAlert, Skeleton } from "./ui";
 
 function Ref({ part, current }: { part: PartRef; current?: string }) {
   const label = (
@@ -156,7 +156,8 @@ export function DataChecksCard({ dataVersion }: { dataVersion: number }) {
       </div>
       <p className="muted card-gap">
         Contradictions in your own bills of material, found in the local cache. A serialized unit is in one place at a
-        time, so a part declared twice points to a twin to correct where it is published.
+        time, so a part declared twice points to a twin to correct where it is published.{" "}
+        <a href="#/data-checks">Open the data checks</a>
       </p>
       {error && <p className="error-text card-gap">{error}</p>}
       {!checks && !error && (
@@ -219,5 +220,145 @@ export function PartDataNotice({ id, dataVersion }: { id: string; dataVersion: n
         <a href="#/sync">All data checks</a>
       </div>
     </div>
+  );
+}
+
+function describe(p: PartRef): string {
+  return [p.name ?? p.global_asset_id, p.serial].filter(Boolean).join(" · ");
+}
+
+/** The findings as plain text, one line per part, for the team that publishes the twins. */
+function report(groups: Group[]): string {
+  const lines = ["Data checks: parts declared in more than one bill of material", ""];
+  for (const g of groups) {
+    const where =
+      g.kind === "two_levels"
+        ? `in ${describe(g.parents[0])} and again in its sub-assembly ${describe(g.parents[1])}`
+        : `in ${g.parents.map(describe).join(", ")}, which do not contain one another`;
+    lines.push(`${KIND_LABEL[g.kind]} (${g.findings.length}): declared ${where}`);
+    for (const f of g.findings) lines.push(`  ${f.part.global_asset_id}\t${f.partner_name ?? f.business_partner ?? ""}`);
+    lines.push("");
+  }
+  return lines.join("\n");
+}
+
+/** The Data checks page: every finding, with filters and a report to copy. */
+export function DataChecksPage({ dataVersion, ownBpnl }: { dataVersion: number; ownBpnl: string | null }) {
+  const [checks, setChecks] = useState<DataChecks | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [kind, setKind] = useState<DataFinding["kind"] | "all">("all");
+  const [supplier, setSupplier] = useState("all");
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    setError(null);
+    api.dataChecks().then(setChecks, (e: Error) => setError(e.message));
+  }, [dataVersion]);
+
+  const all = checks?.findings ?? [];
+  const OWN = "Your own parts";
+  const supplierOf = (f: DataFinding) =>
+    f.business_partner && f.business_partner === ownBpnl ? OWN : (f.partner_name ?? f.business_partner ?? "Unknown supplier");
+  const suppliers = [...new Set(all.map(supplierOf))].sort();
+  const shown = all.filter((f) => (kind === "all" || f.kind === kind) && (supplier === "all" || supplierOf(f) === supplier));
+  const groups = groupFindings(shown);
+  const assemblies = new Set(all.flatMap((f) => f.parents.map((p) => p.global_asset_id)));
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(report(groups));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      setError("The browser did not allow copying to the clipboard.");
+    }
+  };
+
+  return (
+    <>
+      <div className="page-head-row">
+        <div className="page-head">
+          <h1>Data checks</h1>
+          <p>
+            Contradictions in your own bills of material, found in the local cache after each sync. A serialized unit is in
+            one place at a time: a part declared twice points to a twin to correct where it is published.
+          </p>
+        </div>
+        <div className="actions">
+          <button type="button" className="btn btn-secondary" disabled={!groups.length} onClick={copy}>
+            {copied ? "Copied" : "Copy report"}
+          </button>
+        </div>
+      </div>
+      <ErrorAlert error={error} />
+      <div className="stats">
+        {[
+          [all.length, "Findings", "parts declared in more than one place"],
+          [groupFindings(all).length, "Causes", "pairs of assemblies behind them"],
+          [assemblies.size, "Assemblies", "own parts whose BoM is involved"],
+          [suppliers.filter((s) => s !== OWN).length, "Suppliers", "whose parts are concerned"],
+        ].map(([value, label, note]) => (
+          <div className="stat" key={label as string}>
+            <span className="overline">{label}</span>
+            <span className="stat-value">{checks ? value : <Skeleton width={36} height={28} />}</span>
+            <span className="stat-note">{note}</span>
+          </div>
+        ))}
+      </div>
+      {checks && all.length > 0 && (
+        <div className="filters">
+          <ChipGroup<DataFinding["kind"] | "all">
+            label="Kind"
+            options={[
+              { label: "All", value: "all" },
+              { label: "Two levels", value: "two_levels" },
+              { label: "Two assemblies", value: "two_assemblies" },
+            ]}
+            value={kind}
+            onChange={setKind}
+          />
+          <label className="field-inline">
+            <span className="sub">Supplier</span>
+            <select className="input" value={supplier} onChange={(e) => setSupplier(e.target.value)}>
+              <option value="all">All suppliers</option>
+              {suppliers.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      )}
+      <section className="card" aria-label="Findings">
+        {!checks && !error && <Skeleton width="80%" />}
+        {checks && all.length === 0 && (
+          <div className="empty-state">
+            <strong>No findings</strong>
+            <div className="empty-body">
+              Every part in your bills of material is declared in one place. The checks run on the cached data, so they
+              cover what the last sync read.
+            </div>
+          </div>
+        )}
+        {checks && all.length > 0 && groups.length === 0 && <p className="muted">No findings match these filters.</p>}
+        {groups.length > 0 && (
+          <ul className="findings first">
+            {groups.map((group) => (
+              <li key={group.key}>
+                <span className="badge badge-warn">{KIND_LABEL[group.kind]}</span>
+                <div className="stack-tight">
+                  <span>
+                    <GroupText group={group} />
+                  </span>
+                  <span className="sub">By supplier: {bySupplier(group.findings)}</span>
+                  <GroupParts group={group} />
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </>
   );
 }

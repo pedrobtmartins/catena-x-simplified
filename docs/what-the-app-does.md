@@ -61,8 +61,8 @@ It does **not**:
   registry, and records every run: twins, parts, relations, unsupported submodels and each
   problem, with the submodel it concerns.
 - Runs on demand (**Sync own twins**) or periodically (`CXS_SYNC_INTERVAL_SECONDS`).
-- **Checks the bills of material** it has read (`GET /api/data-checks`, shown in Sync history and on
-  the affected parts): a serialized unit is in one place at a time, so the app reports a part declared
+- **Checks the bills of material** it has read (`GET /api/data-checks`, on the **Data checks** page with a counter in
+  the menu, filters and a report to copy, in Sync history and on the affected parts): a serialized unit is in one place at a time, so the app reports a part declared
   in an assembly and again in one of its sub-assemblies, or in two own parts that do not contain one
   another (unless it is a batch). Findings sharing the same assemblies are listed together, since they
   usually have one cause: a twin to correct where it is published.
