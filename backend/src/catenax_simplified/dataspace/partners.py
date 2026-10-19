@@ -75,6 +75,19 @@ def parse_subprotocol_body(body: str | None) -> dict[str, str]:
     return result
 
 
+def _data_plane_error(url: str, status: int) -> str:
+    """A failed read through the partner's data plane, saying where it failed: this call already
+    went through the EDC (the URL and token come from the EDR)."""
+    message = (
+        f"GET {url} returned HTTP {status} from the partner's data plane (reached with the EDR)"
+    )
+    if status >= 500:
+        return f"{message}: the partner's data plane or the service behind it failed"
+    if status in (401, 403):
+        return f"{message}: it refused the access token"
+    return message
+
+
 class EdcPartnerClient:
     """Reads direct partners' twins through the own EDC: negotiates for the partner's DTR,
     looks twins up by Catena-X ID, then negotiates for each submodel's asset at the
@@ -130,7 +143,7 @@ class EdcPartnerClient:
         if response.status_code == 404:
             return None
         if not response.ok:
-            raise DataspaceError(f"GET {url} returned HTTP {response.status_code}")
+            raise DataspaceError(_data_plane_error(url, response.status_code))
         try:
             return response.json()
         except ValueError as exc:

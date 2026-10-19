@@ -1,4 +1,6 @@
-// Connectivity checks of a partner's connector: last result badge and the expandable panel.
+// Connectivity checks of a partner's connector: last result badge and the expandable panel. The
+// connector's status comes from discovery, the registry offer and the EDR access; the quality
+// notification offers are a separate use case, shown apart, and never make a connector degraded.
 import { useEffect, useState } from "react";
 import {
   api,
@@ -44,10 +46,25 @@ export const LEVELS: { level: CheckLevel; label: string; hint: string }[] = [
 export const FULL_CHECK_WARNING =
   "A full check negotiates a contract and opens a transfer process in your connector and the partner's. Continue?";
 
+const isNotification = (step: PartnerCheckStep) => step.key.startsWith("notification:");
+
+const NOTIFICATIONS: Record<PartnerCheck["notifications"], { label: string; badge: string }> = {
+  ready: { label: "Notifications ready", badge: "badge-ok" },
+  incomplete: { label: "Notifications incomplete", badge: "badge-warn" },
+  unchecked: { label: "Notifications not checked", badge: "badge-outline" },
+};
+
 /** A plain-text report of a check for the partner's connector team, with UTC timestamps so
  * they can find the calls in their logs. */
 export function partnerReport(check: PartnerCheck, partner: Partner, ownBpnl: string | null): string {
-  const outcome = check.status === "failed" ? "failed" : "showed problems";
+  const outcome =
+    check.status === "failed"
+      ? "failed"
+      : check.status === "degraded"
+        ? "showed problems"
+        : "worked, but some quality notification offers are missing";
+  const line = (step: PartnerCheckStep) => `- ${step.name}: ${STEP[step.status].label}${step.detail ? ` — ${step.detail}` : ""}`;
+  const notifications = check.steps.filter(isNotification);
   const lines = [
     `Hello${partner.name ? ` ${partner.name}` : ""},`,
     "",
@@ -60,9 +77,10 @@ export function partnerReport(check: PartnerCheck, partner: Partner, ownBpnl: st
     `Started:             ${utc(check.started_at)}`,
     `Finished:            ${utc(check.finished_at)}`,
     "",
-    "Steps:",
-    ...check.steps.map((step) => `- ${step.name}: ${STEP[step.status].label}${step.detail ? ` — ${step.detail}` : ""}`),
+    "Connector:",
+    ...check.steps.filter((s) => !isNotification(s)).map(line),
     "",
+    ...(notifications.length ? ["Quality notification offers:", ...notifications.map(line), ""] : []),
     "Thank you.",
   ];
   return lines.join("\n");
@@ -114,15 +132,16 @@ export function HealthBadge({ check }: { check: PartnerCheck | null }) {
       </span>
       <span className="sub">
         {check.level} · {formatDateTime(check.finished_at)}
+        {check.notifications === "incomplete" && " · notifications incomplete"}
       </span>
     </div>
   );
 }
 
-function Steps({ check }: { check: PartnerCheck }) {
+function StepList({ steps }: { steps: PartnerCheckStep[] }) {
   return (
     <ul className="check-steps">
-      {check.steps.map((step) => (
+      {steps.map((step) => (
         <li key={step.key}>
           <span className={`badge ${STEP[step.status].badge}`}>{STEP[step.status].label}</span>
           <strong>{step.name}</strong>
@@ -130,6 +149,35 @@ function Steps({ check }: { check: PartnerCheck }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+function Steps({ check }: { check: PartnerCheck }) {
+  const core = check.steps.filter((s) => !isNotification(s));
+  const notifications = check.steps.filter(isNotification);
+  const status = STATUS[check.status];
+  return (
+    <div className="check-groups">
+      <div className="check-group">
+        <p className="check-group-head">
+          <strong>Connector</strong> <span className={`badge ${status.badge}`}>{status.label}</span>
+          <span className="sub">discovery, registry offer and EDR access</span>
+        </p>
+        <StepList steps={core} />
+      </div>
+      {notifications.length > 0 && (
+        <div className="check-group">
+          <p className="check-group-head">
+            <strong>Quality notifications</strong>{" "}
+            <span className={`badge ${NOTIFICATIONS[check.notifications].badge}`}>
+              {NOTIFICATIONS[check.notifications].label}
+            </span>
+            <span className="sub">a separate use case: these offers do not change the connector's status</span>
+          </p>
+          <StepList steps={notifications} />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -208,7 +256,7 @@ export function HealthPanel({
       {latest ? (
         <>
           <Steps check={latest} />
-          {(latest.status === "failed" || latest.status === "degraded") && (
+          {(latest.status === "failed" || latest.status === "degraded" || latest.notifications === "incomplete") && (
             <div className="check-report">
               <CopyReport check={latest} partner={partner} ownBpnl={ownBpnl} />
             </div>

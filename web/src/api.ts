@@ -254,7 +254,10 @@ export interface PartnerCheck {
   id: number;
   bpnl: string;
   level: CheckLevel;
+  // The connector: discovery, registry offer and EDR access only.
   status: CheckStatus;
+  // The quality notification offers, a separate use case.
+  notifications: "ready" | "incomplete" | "unchecked";
   connector_address: string | null;
   started_at: string;
   finished_at: string;

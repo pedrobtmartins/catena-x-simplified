@@ -7,8 +7,9 @@ data (see ``dataspace.health.NOTIFICATION_TYPES``).
 from __future__ import annotations
 
 import logging
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from datetime import UTC, datetime
+from typing import Any
 
 from sqlalchemy.orm import Session, sessionmaker
 
@@ -19,10 +20,20 @@ from ..storage import PartnerCheckRepository, PartnerCheckRow, PartnerRepository
 log = logging.getLogger(__name__)
 
 
-def overall_status(steps: list[CheckStep]) -> str:
-    """One status for a check from its steps: failed, degraded (a warning), skipped
-    (development mode) or healthy.
-    """
+# Steps about the quality notification offers. They belong to another use case: a partner without
+# them still has a working connector, so they never change the connector's status.
+NOTIFICATION_PREFIX = "notification:"
+
+
+def is_notification_step(step: Any) -> bool:
+    return str(step.key).startswith(NOTIFICATION_PREFIX)
+
+
+def overall_status(steps: Sequence[Any]) -> str:
+    """The connector's status from its own steps (discovery, registry offer, EDR access):
+    failed, degraded (a warning), skipped (development mode) or healthy. Works on stored steps
+    too, so older checks are judged the same way."""
+    steps = [step for step in steps if not is_notification_step(step)]
     if any(step.status == "failed" for step in steps):
         return "failed"
     if any(step.status == "warn" for step in steps):
@@ -32,6 +43,18 @@ def overall_status(steps: list[CheckStep]) -> str:
     if any(step.status == "skipped" for step in steps):
         return "skipped"
     return "healthy"
+
+
+def notifications_status(steps: Sequence[Any]) -> str:
+    """Whether the partner's connector offers the quality notification assets this company
+    needs: ready, incomplete (one missing, failed or in an incompatible version) or unchecked
+    (not part of the check, or not reachable)."""
+    steps = [step for step in steps if is_notification_step(step)]
+    if not steps or all(step.status == "skipped" for step in steps):
+        return "unchecked"
+    if all(step.status == "ok" for step in steps):
+        return "ready"
+    return "incomplete"
 
 
 class PartnerHealth:

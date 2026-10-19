@@ -7,7 +7,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Annotated, Literal
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
 from ..notifications import NotificationType, Severity, Status
 
@@ -276,11 +276,23 @@ class PartnerCheckOut(BaseModel):
     id: int
     bpnl: str
     level: str  # discovery | catalog | full
+    # The connector: from discovery, registry offer and EDR access only.
     status: str  # healthy | degraded | skipped (development mode) | failed
+    # The quality notification offers, a separate use case: ready | incomplete | unchecked.
+    notifications: str = "unchecked"
     connector_address: str | None
     started_at: UtcDatetime
     finished_at: UtcDatetime
     steps: list[PartnerCheckStepOut]
+
+    @model_validator(mode="after")
+    def _judge(self) -> PartnerCheckOut:
+        # Recomputed from the steps, so checks stored before the split read the same way.
+        from ..traceability.partner_health import notifications_status, overall_status
+
+        self.status = overall_status(self.steps)
+        self.notifications = notifications_status(self.steps)
+        return self
 
 
 class PartnerCheckPage(BaseModel):
