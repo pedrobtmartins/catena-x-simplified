@@ -234,7 +234,8 @@ code,
   display: flex;
   flex-direction: column;
   gap: 24px;
-  max-width: 1320px;
+  /* Wide screens use the room: the structure and the tables gain the most. */
+  max-width: 1680px;
 }
 
 .page-head {
@@ -2563,7 +2564,8 @@ th {
   align-items: start;
 }
 
-@media (max-width: 1100px) {
+/* Below this the diagram needs the whole width; the panel goes under it. */
+@media (max-width: 1400px) {
   .ps-layout {
     grid-template-columns: 1fr;
   }
@@ -2608,6 +2610,10 @@ th {
   stroke: var(--text-3);
   stroke-width: 2;
   stroke-dasharray: none;
+}
+
+.ps-edge.stack {
+  stroke-dasharray: 3 3;
 }
 
 .ps-edge.flagged {
