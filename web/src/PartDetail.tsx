@@ -98,7 +98,10 @@ export function PartDetail({ id, dataVersion }: { id: string; dataVersion: numbe
       <nav className="breadcrumb" aria-label="Breadcrumb">
         <a href="#/">Parts</a>
         <span aria-hidden="true">/</span>
-        <span className="mono">{serial ?? id}</span>
+        {/* A VAN can be a very long token: cut here, whole in the tooltip and on the page below. */}
+        <span className="mono" title={serial ?? id}>
+          {(serial ?? id).length > 40 ? `${(serial ?? id).slice(0, 39)}…` : (serial ?? id)}
+        </span>
       </nav>
 
       {error && (

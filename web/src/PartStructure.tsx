@@ -16,10 +16,15 @@ type Row =
   | { type: "root" | "own" | "leaf"; key: string; depth: number; id: string; link: StructureLink | null; inGroup?: boolean }
   | { type: "group"; key: string; depth: number; supplier: string; members: StructureLink[] };
 
-const COL = 238;
-const WIDTH = { root: 230, own: 230, group: 200, leaf: 200 } as const;
+// Columns share the box's width, within these bounds; boxes leave room for the links between.
+const MIN_COL = 220;
+const MAX_COL = 420;
+const LINK_ROOM = 38;
+// The parts of an open supplier group stack under its header, indented.
+const INDENT = 18;
 const HEIGHT = { root: 58, own: 58, group: 44, leaf: 42 } as const;
 const GAP = 12;
+const STACK_GAP = 6;
 const TOP = 48;
 const LEFT = 16;
 
@@ -89,33 +94,55 @@ function Diagram({
 }) {
   const focus = useRef<string | null>(null);
   const box = useRef<HTMLDivElement>(null);
-  // Leaves are stacked top to bottom; a parent sits at the middle of its children.
+  const [available, setAvailable] = useState(0);
+  useEffect(() => {
+    const el = box.current;
+    if (!el) return;
+    const observer = new ResizeObserver(([entry]) => setAvailable(entry.contentRect.width));
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  // Columns share the visible width; a parent sits at the middle of its children; the parts of
+  // an open group stack under the group, in the same column (they are on the same level).
   const layout = useMemo(() => {
+    const depth = Math.max(0, ...rows.map((r) => r.depth));
+    const col = Math.min(MAX_COL, Math.max(MIN_COL, (available - 2 * LEFT) / (depth + 1)));
+    const nodeWidth = col - LINK_ROOM;
     const kids = new Map<string, Row[]>();
     for (const r of rows) {
       const parent = r.key.slice(0, r.key.lastIndexOf("/"));
       kids.set(parent, [...(kids.get(parent) ?? []), r]);
     }
-    const pos = new Map<string, { x: number; y: number; h: number }>();
+    const pos = new Map<string, { x: number; y: number; h: number; w: number }>();
     let y = TOP;
     const place = (r: Row) => {
       const children = kids.get(r.key) ?? [];
       const h = HEIGHT[r.type];
-      const x = LEFT + r.depth * COL;
+      const x = LEFT + r.depth * col;
+      if (r.type === "group") {
+        pos.set(r.key, { x, y, h, w: nodeWidth });
+        y += h + STACK_GAP;
+        for (const c of children) {
+          pos.set(c.key, { x: x + INDENT, y, h: HEIGHT.leaf, w: nodeWidth - INDENT });
+          y += HEIGHT.leaf + STACK_GAP;
+        }
+        y += GAP - STACK_GAP;
+        return;
+      }
       if (!children.length) {
-        pos.set(r.key, { x, y, h });
+        pos.set(r.key, { x, y, h, w: nodeWidth });
         y += h + GAP;
         return;
       }
       children.forEach(place);
       const first = pos.get(children[0].key)!;
       const last = pos.get(children[children.length - 1].key)!;
-      pos.set(r.key, { x, y: (first.y + first.h / 2 + last.y + last.h / 2) / 2 - h / 2, h });
+      pos.set(r.key, { x, y: (first.y + first.h / 2 + last.y + last.h / 2) / 2 - h / 2, h, w: nodeWidth });
     };
     if (rows.length) place(rows[0]);
-    const depth = Math.max(0, ...rows.map((r) => r.depth));
-    return { pos, width: LEFT + depth * COL + WIDTH.own + LEFT, height: y + 12, depth };
-  }, [rows]);
+    return { pos, col, width: LEFT + depth * col + nodeWidth + LEFT, height: y + 12, depth };
+  }, [rows, available]);
 
   useEffect(() => {
     if (!focus.current) return;
@@ -135,7 +162,7 @@ function Diagram({
     <div className="ps-canvas-box" ref={box}>
       <div className="ps-canvas" style={{ width: layout.width, height: layout.height }}>
         {Array.from({ length: layout.depth + 1 }, (_, d) => (
-          <span key={d} className="ps-col-label" style={{ left: LEFT + d * COL }}>
+          <span key={d} className="ps-col-label" style={{ left: LEFT + d * layout.col }}>
             {d === 0 ? "This part" : `Level ${d}`}
           </span>
         ))}
@@ -146,7 +173,20 @@ function Diagram({
             const p = layout.pos.get(parentKey);
             const c = layout.pos.get(r.key);
             if (!parent || !p || !c) return null;
-            const x1 = p.x + WIDTH[parent.type];
+            if (r.type === "leaf" && r.inGroup) {
+              // A short tick from the group's guide: same level, not a level below.
+              const gx = p.x + INDENT / 2;
+              const cy = c.y + c.h / 2;
+              const flaggedLeaf = flags.has(r.id);
+              return (
+                <path
+                  key={r.key}
+                  d={`M${gx},${p.y + p.h} V${cy} H${c.x}`}
+                  className={`ps-edge stack${flaggedLeaf ? " flagged" : ""}${query && !matches(r) ? " dim" : ""}`}
+                />
+              );
+            }
+            const x1 = p.x + p.w;
             const y1 = p.y + p.h / 2;
             const x2 = c.x;
             const y2 = c.y + c.h / 2;
@@ -174,7 +214,8 @@ function Diagram({
               type="button"
               data-key={r.key}
               className={classes.filter(Boolean).join(" ")}
-              style={{ left: p.x, top: p.y, width: WIDTH[r.type], height: p.h }}
+              style={{ left: p.x, top: p.y, width: p.w, height: p.h }}
+              title={title}
               aria-expanded={expandable ? expanded.has(r.key) : undefined}
               onClick={() => activate(r)}
             >
@@ -276,7 +317,7 @@ function Table({
                   onKeyDown={onKey}
                 >
                   <td>
-                    <span className="ps-tree-cell" style={{ paddingLeft: r.depth * 22 }}>
+                    <span className="ps-tree-cell" style={{ paddingLeft: r.depth * 22 + (r.type === "leaf" && r.inGroup ? 18 : 0) }}>
                       <span className="ps-chev" aria-hidden="true">
                         {expandable ? (expanded.has(r.key) ? "▾" : "▸") : ""}
                       </span>
@@ -558,7 +599,8 @@ export function PartStructure({ id, dataVersion }: { id: string; dataVersion: nu
         }
         out.push({ type: "group", key: gkey, depth: depth + 1, supplier, members });
         if (expanded.has(gkey))
-          for (const m of members) out.push({ type: "leaf", key: `${gkey}/${m.child}`, depth: depth + 2, id: m.child, link: m, inGroup: true });
+          // Same level as the group: the group only gathers them.
+          for (const m of members) out.push({ type: "leaf", key: `${gkey}/${m.child}`, depth: depth + 1, id: m.child, link: m, inGroup: true });
       }
     };
     walk(structure.root, 0, null, structure.root, new Set([structure.root]));
