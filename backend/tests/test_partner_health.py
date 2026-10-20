@@ -1,19 +1,25 @@
+import threading
+from types import SimpleNamespace
+
 import pytest
 import responses
 import scenario
 from fakes import FakePartnerClient, FakeRegistry
 from fastapi.testclient import TestClient
 from responses import matchers
+from tractusx_sdk.dataspace.adapters.adapter import Adapter
 
 from catenax_simplified.api import create_app
 from catenax_simplified.config import Settings
 from catenax_simplified.dataspace.edc import DCT_TYPE_KEYS, Partner
+from catenax_simplified.dataspace.edc_trace import Exchange, edc_reason, install, recording
 from catenax_simplified.dataspace.health import (
     LEVELS,
     CheckStep,
     DirectHealthChecker,
     EdcHealthChecker,
     dataset_ids,
+    likely_cause,
     notification_types,
     scrub,
 )
@@ -23,6 +29,7 @@ from catenax_simplified.traceability.partner_health import overall_status
 
 PARTNER = Partner("BPNL000000000T2A", "https://edc.tier2/api/v1/dsp")
 DTR_PLANE = "https://edc.tier2/api/public/dtr"
+MANAGEMENT = "https://edc.own/management"
 RECEIVE_INVESTIGATION = NotificationType.INVESTIGATION.asset_type("receive")
 UPDATE_ALERT = NotificationType.ALERT.asset_type("update")
 SUPPLIER_TYPES = [RECEIVE_INVESTIGATION, UPDATE_ALERT]
@@ -358,18 +365,127 @@ def test_checks_are_unavailable_without_an_edc():
         assert response.status_code == 503
 
 
-def test_a_5xx_from_the_own_connector_says_so():
-    from catenax_simplified.dataspace.health import own_connector_hint
+def test_a_refused_management_call_points_at_the_apps_credentials():
+    step = CheckStep("dtr_offer", "Registry offer", "failed", "catalog request failed")
+    refused = Exchange("POST", f"{MANAGEMENT}/v3/catalog/request", 401, 5, "", "")
+    assert "refused the app's credentials" in likely_cause(step, [refused], None)
 
-    detail = own_connector_hint(
+
+def test_a_5xx_without_a_reason_points_at_the_own_connector():
+    step = CheckStep(
+        "discovery",
+        "Connector discovery",
+        "failed",
         "connector discovery for X failed: [Connector Service]: It was not possible to get the "
-        "catalog from the EDC provider! Response code: [504]"
+        "catalog from the EDC provider! Response code: [504]",
     )
-    assert "HTTP 504 came from your own connector" in detail
-    assert (
-        own_connector_hint("negotiation failed: no valid policy")
-        == "negotiation failed: no valid policy"
+    assert "Your connector's management API answered HTTP 504" in likely_cause(step, [], None)
+    nothing = CheckStep("dtr_offer", "Registry offer", "failed", "something odd")
+    assert likely_cause(nothing, [], None) is None
+
+
+class SdkLikeConsumer(FakeConsumer):
+    """Calls the own EDC's management API through an SDK adapter session, as the SDK does, and
+    fails with the SDK's message that keeps only the status code."""
+
+    def __init__(self, **kwargs):
+        super().__init__(_healthy_catalogs(), **kwargs)
+        self.adapter = Adapter(base_url=MANAGEMENT)
+        self.contract_negotiations = SimpleNamespace(get_by_id=self._negotiation)
+
+    def get_discovery_info(self, bpnl, counter_party_address=None):
+        response = self.adapter.session.post(
+            f"{MANAGEMENT}/v4alpha/connectordiscovery/dspversionparams"
+        )
+        if response.status_code != 200:
+            raise ConnectionError(
+                "[Connector Service]: It was not possible to get the catalog from the EDC "
+                f"provider! Response code: [{response.status_code}]"
+            )
+        return super().get_discovery_info(bpnl, counter_party_address)
+
+    def do_dsp(self, **kwargs):
+        raise RuntimeError(
+            "[Connector Service]: [https://edc.tier2/api/v1/dsp] The EDR Negotiation [neg-42] "
+            "was TERMINATED by the provider!"
+        )
+
+    def _negotiation(self, oid):
+        body = {"state": "TERMINATED", "errorDetail": "Policy in ContractOffer is not valid"}
+        return SimpleNamespace(ok=True, json=lambda: body)
+
+
+@responses.activate
+def test_a_failed_step_shows_what_the_own_edc_answered():
+    responses.post(
+        f"{MANAGEMENT}/v4alpha/connectordiscovery/dspversionparams",
+        status=502,
+        json=[{"message": "Request to counter-party timed out (Authorization: Bearer abc.def)"}],
     )
+    consumer = SdkLikeConsumer()
+    checker = EdcHealthChecker(consumer, None)
+    # The checker installs on the SDK service it is given; this fake's session is passed in.
+    install({"adapter": consumer.adapter})
+
+    step = checker.check(PARTNER, "full", [])[0]
+
+    assert step.status == "failed"
+    assert "Response code: [502]" in step.detail
+    assert "came from your own connector" not in step.detail
+    info = step.info
+    assert info["reason"].startswith("Request to counter-party timed out")
+    assert "abc.def" not in info["reason"]
+    assert "did not answer in time" in info["cause"]
+    assert [(c["method"], c["status"]) for c in info["calls"]] == [("POST", 502)]
+    assert info["calls"][0]["url"].endswith("/dspversionparams")
+    assert info["calls_total"] == 1 and info["duration_ms"] >= 0
+
+
+def test_a_terminated_negotiation_shows_why_it_ended():
+    consumer = SdkLikeConsumer()
+    consumer.get_discovery_info = FakeConsumer.get_discovery_info.__get__(consumer)
+    steps = _by_key(EdcHealthChecker(consumer, None).check(PARTNER, "full", []))
+
+    access = steps["registry_access"]
+    assert access.status == "failed"
+    assert access.info["reason"] == (
+        "negotiation neg-42 TERMINATED: Policy in ContractOffer is not valid"
+    )
+    assert "ended the contract negotiation" in access.info["cause"]
+    # Steps that passed carry their duration only.
+    assert set(steps["discovery"].info) == {"duration_ms"}
+
+
+def test_calls_are_recorded_only_by_the_thread_that_asks():
+    adapter = Adapter(base_url=MANAGEMENT)
+    install({"adapter": adapter})
+    install({"adapter": adapter})  # once per session
+    with responses.RequestsMock() as mock:
+        mock.get(f"{MANAGEMENT}/x", status=500, body="boom")
+        adapter.session.get(f"{MANAGEMENT}/x")  # nobody recording
+        with recording() as calls:
+            seen = []
+            worker = threading.Thread(
+                target=lambda: seen.append(adapter.session.get(f"{MANAGEMENT}/x"))
+            )
+            worker.start()
+            worker.join()
+            adapter.session.get(f"{MANAGEMENT}/x")
+    assert [(c.status, c.response) for c in calls] == [(500, "boom")]
+    assert len(adapter.session.hooks["response"]) == 1
+
+
+@pytest.mark.parametrize(
+    "body, reason",
+    [
+        ('[{"message": "a"}, {"message": "b"}, {"message": "a"}]', "a; b"),
+        ('{"errorDetail": "provider said no"}', "provider said no"),
+        ("plain text", "plain text"),
+        ("", None),
+    ],
+)
+def test_edc_reason(body, reason):
+    assert edc_reason(body) == reason
 
 
 def test_notification_offers_do_not_change_the_connectors_status():

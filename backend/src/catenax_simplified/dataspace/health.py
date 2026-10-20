@@ -11,19 +11,25 @@ Three levels, each including the previous one:
 
 Every check starts with fresh connector discovery; negotiated contracts and EDRs are still reused
 through the SDK's connection manager, as for partner reads.
+
+Each step records how long it took and, when it fails or warns, what the own EDC's management API
+actually answered (``edc_trace``), why a negotiation or transfer was ended (the EDC's
+``errorDetail``) and a likely cause, so the error says more than the SDK's status code.
 """
 
 from __future__ import annotations
 
 import re
-from collections.abc import Iterator, Mapping, Sequence
-from dataclasses import dataclass
+import time
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from dataclasses import dataclass, replace
 from typing import Any, Protocol
 
 import requests
 
 from ..notifications.messages import NotificationType
 from .edc import DCT_TYPE_KEY, DCT_TYPE_KEYS, ConnectorConsumer, EdcNegotiator, Partner, equals
+from .edc_trace import Exchange, edc_reason, install, recording
 from .notifications import choose_offer, offers_in
 from .partners import DTR_ASSET_TYPE
 from .ports import DataspaceError
@@ -60,6 +66,9 @@ class CheckStep:
     name: str
     status: str  # ok | warn | failed | skipped
     detail: str
+    # duration_ms; on a failure or warning also reason (what the EDC said), cause (a likely
+    # explanation), calls (the failed management API calls) and calls_total.
+    info: dict[str, Any] | None = None
 
 
 class PartnerHealthChecker(Protocol):
@@ -78,16 +87,98 @@ class PartnerHealthChecker(Protocol):
 _OWN_CONNECTOR_ERROR = re.compile(r"Response code: \[(5\d\d)\]")
 
 
-def own_connector_hint(detail: str) -> str:
-    """``detail``, with a pointer to the own connector when the failure is its answer."""
-    match = _OWN_CONNECTOR_ERROR.search(detail)
-    if not match:
-        return detail
-    return (
-        f"{detail} — HTTP {match.group(1)} came from your own connector's management API, before "
-        "the partner was reached. If other partners fail the same way, check your EDC with the "
-        "connection test on the Setup page."
-    )
+# A likely cause from what was said, first match wins: (words in the answers, explanation).
+_CAUSES: list[tuple[tuple[str, ...], str]] = [
+    (
+        ("no accepted usage policies",),
+        "Set the usage policies your company accepts on the Setup page.",
+    ),
+    (
+        ("timed out", "timeout", "read time out", "gateway time-out"),
+        "The partner's connector did not answer in time: it may be down or overloaded, or a "
+        "firewall drops the connection. Try again later; if it persists, ask the partner to check "
+        "their connector.",
+    ),
+    (
+        (
+            "unknownhost",
+            "unknown host",
+            "name or service not known",
+            "could not resolve",
+            "nodename nor servname",
+            "no such host",
+        ),
+        "Your connector cannot resolve the partner's DSP address: check it for typos, or find the "
+        "current one with connector discovery.",
+    ),
+    (
+        ("connection refused", "connectexception", "no route to host"),
+        "Nothing answers at the partner's DSP address: the connector is down, or the address or "
+        "port is wrong.",
+    ),
+    (
+        ("pkix", "certificate", "sslhandshake", "ssl handshake", "tls handshake"),
+        "TLS failed between your connector and the partner's: an expired or untrusted certificate "
+        "on either side.",
+    ),
+    (
+        (
+            "unauthorized",
+            "forbidden",
+            "not authorized",
+            "credential",
+            "verifiable presentation",
+            "invalid token",
+            "http 401",
+            "http 403",
+            "[401]",
+            "[403]",
+        ),
+        "The partner's connector did not accept your identity: your membership or BPN credential "
+        "in the wallet, or the partner's access policy for your BPNL. Ask the partner whether your "
+        "BPNL is allowed, and check your wallet credentials.",
+    ),
+    (
+        ("terminated", "policy", "contract offer", "constraint"),
+        "The partner's connector ended the contract negotiation: usually the policy we accept does "
+        "not match the one offered, or a constraint (FrameworkAgreement, Membership, BPNL, usage "
+        "purpose) is not met. The partner's reason, if it gave one, is above.",
+    ),
+]
+
+
+def likely_cause(step: CheckStep, failed: Sequence[Exchange], reason: str | None) -> str | None:
+    """A likely explanation of a failed step from the EDC's answers, or ``None``."""
+    if any(c.status in (401, 403) for c in failed):
+        return (
+            "Your connector's management API refused the app's credentials: check the EDC API key "
+            "or OAuth client on the Setup page, and run its connection test."
+        )
+    text = " ".join([step.detail, reason or "", *(c.response for c in failed)]).lower()
+    for words, cause in _CAUSES:
+        if any(word in text for word in words):
+            return cause
+    statuses = {c.status for c in failed} | {
+        int(m.group(1)) for m in _OWN_CONNECTOR_ERROR.finditer(step.detail)
+    }
+    if step.key == "discovery" and 404 in statuses:
+        return (
+            "No DSP endpoint answered at the partner's address: check the path (often ends in "
+            "/api/v1/dsp)."
+        )
+    server_errors = sorted(code for code in statuses if code >= 500)
+    if server_errors and not reason:
+        return (
+            f"Your connector's management API answered HTTP {server_errors[0]} without saying why: "
+            "your connector failed, or gave up waiting for the partner's. If other partners fail "
+            "the same way, check your EDC with the connection test on the Setup page."
+        )
+    if server_errors:
+        return (
+            f"Your connector could not get an answer from the partner's (HTTP {server_errors[0]}); "
+            "what it reported is above."
+        )
+    return None
 
 
 def notification_types(roles: Sequence[str]) -> list[str]:
@@ -139,6 +230,7 @@ class EdcHealthChecker:
         self._policies = accepted_policies
         self._session = session or requests.Session()
         self._timeout = timeout
+        install(consumer)
 
     def check(
         self, partner: Partner, level: str, notification_types: Sequence[str]
@@ -150,12 +242,15 @@ class EdcHealthChecker:
             raise ValueError(f"unknown level {level!r}")
         # A new negotiator per check: discovery is not served from an earlier check's cache.
         edc = EdcNegotiator(self._consumer, self._policies)
-        steps = [self._discovery(edc, partner)]
+        steps = [self._traced(lambda: self._discovery(edc, partner))]
         reachable = steps[0].status == "ok"
         if level in ("catalog", "full"):
             if reachable:
-                steps.append(self._dtr_offer(edc, partner))
-                steps.extend(self._notification_offer(edc, partner, t) for t in notification_types)
+                steps.append(self._traced(lambda: self._dtr_offer(edc, partner)))
+                steps.extend(
+                    self._traced(lambda t=t: self._notification_offer(edc, partner, t))
+                    for t in notification_types
+                )
             else:
                 steps.append(_skipped("dtr_offer", "Digital Twin Registry offer", "not reachable"))
                 steps.extend(
@@ -164,12 +259,73 @@ class EdcHealthChecker:
                 )
         if level == "full":
             if reachable and steps[1].status == "ok":
-                steps.append(self._registry_access(edc, partner))
+                steps.append(self._traced(lambda: self._registry_access(edc, partner)))
             else:
                 steps.append(
                     _skipped("registry_access", "Registry access (EDR)", "no registry offer")
                 )
         return steps
+
+    def _traced(self, run: Callable[[], CheckStep]) -> CheckStep:
+        """``run()``, with how long it took and, for a failure or warning, what the own EDC
+        answered."""
+        started = time.monotonic()
+        with recording() as calls:
+            step = run()
+        info: dict[str, Any] = {"duration_ms": int((time.monotonic() - started) * 1000)}
+        if step.status in ("failed", "warn"):
+            info.update(self._failure_details(step, calls))
+        return replace(step, info=info)
+
+    def _failure_details(self, step: CheckStep, calls: Sequence[Exchange]) -> dict[str, Any]:
+        failed = [c for c in calls if not c.ok]
+        reasons = [r for c in reversed(failed) if (r := edc_reason(c.response))]
+        reason = reasons[0] if reasons else None
+        ended = self._why_ended(step.detail, calls)
+        if ended:
+            reason = f"{reason}; {ended}" if reason else ended
+        details: dict[str, Any] = {
+            "calls_total": len(calls),
+            "calls": [
+                {
+                    "method": c.method,
+                    "url": c.url,
+                    "status": c.status,
+                    "elapsed_ms": c.elapsed_ms,
+                    "request": scrub(c.request, 1500),
+                    "response": scrub(c.response, 1500),
+                }
+                for c in failed[-5:]
+            ],
+        }
+        if reason:
+            details["reason"] = scrub(reason, 800)
+        if cause := likely_cause(step, failed, reason):
+            details["cause"] = cause
+        return details
+
+    def _why_ended(self, detail: str, calls: Sequence[Exchange]) -> str | None:
+        """Why the own EDC ended a negotiation or transfer (its ``errorDetail``), when the
+        error names one."""
+        if match := re.search(r"Negotiation \[([\w:-]+)\]", detail):
+            return self._error_detail("contract_negotiations", "negotiation", match.group(1))
+        if "edr" in detail.lower():
+            for call in reversed(calls):
+                if match := re.search(r"/edrs/([^/]+)/dataaddress", call.url):
+                    return self._error_detail("transfer_processes", "transfer", match.group(1))
+        return None
+
+    def _error_detail(self, controller: str, what: str, oid: str) -> str | None:
+        try:
+            response = getattr(self._consumer, controller).get_by_id(oid)
+            data = response.json() if response is not None and response.ok else {}
+        except Exception:  # best effort: the check's own result stands without it
+            return None
+        state = data.get("state") or data.get("edc:state")
+        error = data.get("errorDetail") or data.get("edc:errorDetail")
+        if not (state or error):
+            return None
+        return f"{what} {oid} {state or ''}{f': {error}' if error else ''}".strip()
 
     def _discovery(self, edc: EdcNegotiator, partner: Partner) -> CheckStep:
         name = "Connector discovery"
@@ -178,7 +334,7 @@ class EdcHealthChecker:
                 partner.bpnl, partner.connector_address
             )
         except DataspaceError as exc:
-            return CheckStep("discovery", name, "failed", own_connector_hint(scrub(str(exc))))
+            return CheckStep("discovery", name, "failed", scrub(str(exc)))
         return CheckStep(
             "discovery", name, "ok", f"{protocol} at {address} (counter-party {counter_party_id})"
         )

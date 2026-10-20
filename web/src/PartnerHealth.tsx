@@ -63,7 +63,14 @@ export function partnerReport(check: PartnerCheck, partner: Partner, ownBpnl: st
       : check.status === "degraded"
         ? "showed problems"
         : "worked, but some quality notification offers are missing";
-  const line = (step: PartnerCheckStep) => `- ${step.name}: ${STEP[step.status].label}${step.detail ? ` — ${step.detail}` : ""}`;
+  const line = (step: PartnerCheckStep) =>
+    [
+      `- ${step.name}: ${STEP[step.status].label}${step.detail ? ` — ${step.detail}` : ""}`,
+      ...(step.info?.reason ? [`    Our connector reported: ${step.info.reason}`] : []),
+      ...(step.info?.calls ?? []).map(
+        (c) => `    ${c.method} ${c.url} → HTTP ${c.status} after ${duration(c.elapsed_ms)}`,
+      ),
+    ].join("\n");
   const notifications = check.steps.filter(isNotification);
   const lines = [
     `Hello${partner.name ? ` ${partner.name}` : ""},`,
@@ -84,6 +91,10 @@ export function partnerReport(check: PartnerCheck, partner: Partner, ownBpnl: st
     "Thank you.",
   ];
   return lines.join("\n");
+}
+
+function duration(ms: number): string {
+  return ms < 1000 ? `${ms} ms` : `${(ms / 1000).toFixed(1)} s`;
 }
 
 /** "2026-10-16T09:17:51.284086Z" → "2026-10-16 09:17:51 UTC" */
@@ -138,14 +149,62 @@ export function HealthBadge({ check }: { check: PartnerCheck | null }) {
   );
 }
 
+/** What the own EDC said when a step failed: a likely cause, its reason and the failed calls. */
+function StepWhy({ info }: { info: NonNullable<PartnerCheckStep["info"]> }) {
+  const calls = info.calls ?? [];
+  if (!info.cause && !info.reason && !calls.length) return null;
+  return (
+    <div className="check-why">
+      {info.cause && (
+        <p>
+          <span className="overline">Likely cause</span> {info.cause}
+        </p>
+      )}
+      {info.reason && (
+        <p>
+          <span className="overline">Your connector reported</span> <span className="check-reason">{info.reason}</span>
+        </p>
+      )}
+      {calls.length > 0 && (
+        <details>
+          <summary>
+            {calls.length === 1 ? "The failed call" : `The ${calls.length} failed calls`}
+            {info.calls_total ? ` (of ${info.calls_total} made)` : ""}
+          </summary>
+          {calls.map((call, i) => (
+            <div className="check-call" key={i}>
+              <code>
+                {call.method} {call.url} → HTTP {call.status} after {duration(call.elapsed_ms)}
+              </code>
+              {call.response && <pre>{call.response}</pre>}
+              {call.request && (
+                <details>
+                  <summary>Request sent</summary>
+                  <pre>{call.request}</pre>
+                </details>
+              )}
+            </div>
+          ))}
+        </details>
+      )}
+    </div>
+  );
+}
+
 function StepList({ steps }: { steps: PartnerCheckStep[] }) {
   return (
     <ul className="check-steps">
       {steps.map((step) => (
         <li key={step.key}>
           <span className={`badge ${STEP[step.status].badge}`}>{STEP[step.status].label}</span>
-          <strong>{step.name}</strong>
-          <span className="check-detail">{step.detail}</span>
+          <strong>
+            {step.name}
+            {step.info?.duration_ms !== undefined && <span className="sub"> · {duration(step.info.duration_ms)}</span>}
+          </strong>
+          <span className="check-detail">
+            {step.detail}
+            {step.info && <StepWhy info={step.info} />}
+          </span>
         </li>
       ))}
     </ul>

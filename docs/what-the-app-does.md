@@ -135,8 +135,14 @@ real work, at three cumulative levels:
 3. **Full**: negotiates the DTR and reads one shell descriptor through the access token. This
    creates contracts in both connectors, so it asks for confirmation.
 
-Checks run one at a time and are stored per partner. A failed check can be copied as a report to
-send to the partner.
+Checks run one at a time and are stored per partner. Every step shows how long it took. A step
+that fails or warns also shows what your own connector actually reported (the body of its
+management API's answer, which the Tractus-X SDK reduces to a status code), why a negotiation or
+transfer was ended (the connector's `errorDetail`), the failed calls with their answers, and a
+likely cause: the partner's connector not answering, an address that does not resolve, TLS,
+identity or credentials, a policy mismatch, or the app's own credentials for your connector.
+Credentials are removed before anything is stored. A failed check can be copied as a report to
+send to the partner, with those details.
 
 ### 5. Exchanges quality notifications
 
