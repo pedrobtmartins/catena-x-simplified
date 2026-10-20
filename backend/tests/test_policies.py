@@ -78,6 +78,52 @@ def test_a_missing_or_different_constraint_does_not_match():
     )
 
 
+def test_an_offer_naming_its_asset_as_target_matches_the_policy_accepted_for_any_asset():
+    # As a DSP 2025-1 connector (TE Connectivity's) offers its DTR: UsagePurpose with isAnyOf, a
+    # single value instead of a list, and the asset in "target".
+    offer = {
+        "permission": [
+            {
+                "action": "use",
+                "constraint": [
+                    {
+                        "and": [
+                            {
+                                "leftOperand": "UsagePurpose",
+                                "operator": "isAnyOf",
+                                "rightOperand": "cx.core.digitalTwinRegistry:1",
+                            },
+                            {
+                                "leftOperand": "Membership",
+                                "operator": "eq",
+                                "rightOperand": "active",
+                            },
+                        ]
+                    }
+                ],
+            }
+        ],
+        "target": "ac88aede-d86e-4fd7-9d1c-08bf37657afd",
+    }
+    accepted = {
+        "permission": {
+            "action": "use",
+            "constraint": {
+                "and": [
+                    {"leftOperand": "Membership", "operator": "eq", "rightOperand": "active"},
+                    {
+                        "leftOperand": "UsagePurpose",
+                        "operator": "isAnyOf",
+                        "rightOperand": ["cx.core.digitalTwinRegistry:1"],
+                    },
+                ]
+            },
+        }
+    }
+    assert same_policy(offer, accepted)
+    assert same_policy({**offer, "odrl:target": {"@id": "other-asset"}}, accepted)
+
+
 def test_canonical_form():
     assert canonical(JUPITER_OFFER) == {
         "permission": {
