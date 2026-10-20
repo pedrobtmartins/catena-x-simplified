@@ -176,9 +176,11 @@ def build_connector_discovery(
     if settings.dev_direct or auth is None:
         return None
     if settings.edc_discovery_url:
-        return EdcDiscovery(settings.edc_discovery_url, auth)
+        return EdcDiscovery(settings.edc_discovery_url, auth, dsp_path=settings.dsp_default_path)
     if settings.discovery_finder_url:
-        return SdkConnectorDiscovery(settings.discovery_finder_url, auth)
+        return SdkConnectorDiscovery(
+            settings.discovery_finder_url, auth, dsp_path=settings.dsp_default_path
+        )
     return None
 
 

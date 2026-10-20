@@ -188,3 +188,29 @@ def test_partner_input_is_validated():
         response = client.put(f"/api/partners/{NEW}", json={"connector_address": "edc.example"})
         assert response.status_code == 422
         assert client.get("/api/partners").json() == []
+
+
+@responses.activate
+def test_an_endpoint_registered_without_a_path_gets_the_dsp_path():
+    responses.post(
+        EDC_DISCOVERY,
+        json=[
+            {
+                "bpn": NEW,
+                "connectorEndpoint": [
+                    "https://bare.example",
+                    "https://bare.example/",
+                    "https://sovity.example/control/api/v1/dsp",
+                ],
+            }
+        ],
+    )
+    assert EdcDiscovery(EDC_DISCOVERY, FakeOAuth()).find(NEW) == [
+        "https://bare.example/api/v1/dsp",
+        "https://sovity.example/control/api/v1/dsp",
+    ]
+    assert EdcDiscovery(EDC_DISCOVERY, FakeOAuth(), dsp_path="").find(NEW) == [
+        "https://bare.example",
+        "https://bare.example/",
+        "https://sovity.example/control/api/v1/dsp",
+    ]

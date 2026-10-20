@@ -69,6 +69,9 @@ class Settings(BaseSettings):
     # EDC Discovery (…/api/administration/connectors/discovery): when set, asked directly, without
     # the Discovery Finder. Some operators publish only this address.
     edc_discovery_url: str | None = None
+    # Added to a discovered connector endpoint that has no path (a bare host answers 404 on the
+    # Dataspace Protocol's well-known endpoint); empty adds nothing.
+    dsp_default_path: str = "/api/v1/dsp"
     # BPDM Pool API, up to the version segment (e.g. https://business-partners.example/pool/api):
     # partners' legal names by BPNL.
     bpdm_pool_url: str | None = None

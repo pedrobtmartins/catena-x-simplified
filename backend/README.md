@@ -73,6 +73,7 @@ started from. [`.env.example`](.env.example) lists them all with comments; see a
 | `CXS_NOTIFICATION_ASSET_PREFIX` | Prefix of the asset, policy and contract IDs (default `cxs-qualitynotification`) |
 | `CXS_DEV_DIRECT`                | **Development only.** Reach partners without EDCs: notifications are posted to the partner apps (`CXS_PARTNER_CONNECTORS` = their base URLs), partner twins read from `CXS_DEV_PARTNER_DTRS` (BPNL → DTR URL with API path). Never in a dataspace |
 | `CXS_SYNC_TWIN_IDS`             | Load only these own twins, e.g. to test with a few vehicles of a registry with millions of twins: AAS IDs (or globalAssetIds) one per line, or any text containing them — every `urn:uuid:…` is taken, so a CSV can be pasted (also on the Setup page, at most 10,000). Own children in their bills of material are loaded too; the cache then holds only this subset. Empty: the whole DTR |
+| `CXS_DSP_DEFAULT_PATH`          | Added to a connector endpoint discovery returns without a path (default `/api/v1/dsp`; empty adds nothing) |
 | `CXS_SYNC_INTERVAL_SECONDS`     | Periodic sync (own twins, then partners); `0` (default) disables it   |
 | `CXS_PARTNER_SYNC_PARALLEL_PARTNERS` | Partners a partner sync reads at once (1–16, default 4)          |
 | `CXS_PARTNER_SYNC_PARALLEL_TWINS` | Twins of one partner read at once (1–16, default 4); keep it low: it is load on the partner's registry and data plane |
