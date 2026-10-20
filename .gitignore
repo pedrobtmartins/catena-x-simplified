@@ -223,3 +223,6 @@ __marimo__/
 *.db
 node_modules/
 web/dist/
+
+# macOS
+.DS_Store
