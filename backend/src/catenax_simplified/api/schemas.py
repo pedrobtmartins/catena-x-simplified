@@ -5,7 +5,7 @@ field comments say what a value means where the name alone does not.
 from __future__ import annotations
 
 from datetime import UTC, datetime
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
 
@@ -284,6 +284,8 @@ class PartnerCheckStepOut(BaseModel):
     name: str
     status: str  # ok | warn | failed | skipped
     detail: str
+    # duration_ms; for a failure or warning also reason, cause, calls and calls_total.
+    info: dict[str, Any] | None = None
 
 
 class PartnerCheckOut(BaseModel):

@@ -1616,6 +1616,69 @@ a.btn-secondary:hover {
   color: var(--text-2);
   font-size: 13px;
   word-break: break-word;
+  min-width: 0;
+}
+
+/* what the own EDC said when a check step failed */
+.check-why {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface-subtle);
+  border: 1px solid var(--divider);
+  color: var(--text);
+  min-width: 0;
+}
+
+.check-why p {
+  margin: 0;
+  line-height: 1.45;
+}
+
+.check-why .overline {
+  margin-right: 6px;
+}
+
+.check-reason {
+  font-family: var(--mono);
+  font-size: 12px;
+}
+
+.check-why summary {
+  cursor: pointer;
+  color: var(--primary);
+  font-size: 13px;
+}
+
+.check-call {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 8px;
+  min-width: 0;
+}
+
+.check-call code {
+  font-family: var(--mono);
+  font-size: 12px;
+  word-break: break-all;
+}
+
+.check-call pre {
+  margin: 0;
+  max-height: 220px;
+  overflow: auto;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--surface);
+  border: 1px solid var(--divider);
+  font-family: var(--mono);
+  font-size: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .check-history summary {

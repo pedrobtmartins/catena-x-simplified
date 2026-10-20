@@ -93,10 +93,9 @@ class ClientCredentials(AuthBase):
         return request
 
 
-def authenticate_sdk_service(service: object, auth: AuthBase) -> int:
-    """Attach ``auth`` to every HTTP session inside an SDK connector service and return how many
-    there are. The SDK sets static headers once; a session auth adds a fresh token per request.
-    A service holds several adapters (one per controller group), so all of them are walked."""
+def sdk_adapters(service: object) -> list[Adapter]:
+    """Every HTTP adapter inside an SDK connector service: it holds several (one per controller
+    group), so all of them are walked."""
     seen: set[int] = set()
     adapters: list[Adapter] = []
 
@@ -119,6 +118,13 @@ def authenticate_sdk_service(service: object, auth: AuthBase) -> int:
             walk(child, depth + 1)
 
     walk(service, 0)
+    return adapters
+
+
+def authenticate_sdk_service(service: object, auth: AuthBase) -> int:
+    """Attach ``auth`` to every HTTP session inside an SDK connector service and return how many
+    there are. The SDK sets static headers once; a session auth adds a fresh token per request."""
+    adapters = sdk_adapters(service)
     for adapter in adapters:
         adapter.session.auth = auth
     return len(adapters)

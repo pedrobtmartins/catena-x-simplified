@@ -250,11 +250,30 @@ export type CheckLevel = "discovery" | "catalog" | "full";
 // "skipped": nothing failed, but the dataspace part was not checked (development mode, no EDC).
 export type CheckStatus = "healthy" | "degraded" | "skipped" | "failed";
 
+// A call to the own EDC's management API that failed during a check, with its answer.
+export interface CheckCall {
+  method: string;
+  url: string;
+  status: number;
+  elapsed_ms: number;
+  request: string;
+  response: string;
+}
+
 export interface PartnerCheckStep {
   key: string;
   name: string;
   status: "ok" | "warn" | "failed" | "skipped";
   detail: string;
+  // How long the step took; for a failure or warning also what the own EDC said (reason), a
+  // likely cause and the failed calls. Checks stored before have none.
+  info?: {
+    duration_ms?: number;
+    reason?: string;
+    cause?: string;
+    calls?: CheckCall[];
+    calls_total?: number;
+  } | null;
 }
 
 export interface PartnerCheck {
