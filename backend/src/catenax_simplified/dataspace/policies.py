@@ -20,6 +20,9 @@ _CATENAX = (
     "https://w3id.org/catenax/2025/9/policy/",
 )
 _METADATA = ("@id", "@type", "@context")
+# Terms that say which asset an offer is for, not what it allows: some connectors put the asset in
+# the offer's ``target``, which an accepted policy (written once for any asset) cannot know.
+_NOT_TERMS = ("target",)
 
 
 def _strip(value: str, prefixes: tuple[str, ...]) -> str:
@@ -39,8 +42,8 @@ def _term(value: Any) -> Any:
 
 
 def canonical(value: Any) -> Any:
-    """``value`` with prefixes, ``@id``/``@type`` and single-element lists removed and lists
-    sorted, so that equal policies compare equal."""
+    """``value`` with prefixes, ``@id``/``@type``, the offer's ``target`` and single-element
+    lists removed and lists sorted, so that equal policies compare equal."""
     if isinstance(value, dict):
         if set(value) <= {"@id", "@type"} and "@id" in value:
             return _term(value)
@@ -49,6 +52,8 @@ def canonical(value: Any) -> Any:
             if key in _METADATA:
                 continue
             name = _term(key)
+            if name in _NOT_TERMS:
+                continue
             item = canonical(item)
             if item == []:
                 continue  # "prohibition": [] is the same as no prohibition
