@@ -1,8 +1,9 @@
 """Caches the twins of direct partners that own parts are linked to (one level only).
 
 For every partner named in the own parts' BoM (suppliers) and usage (customers) relations, the
-counterpart twins are looked up in the partner's registry and their SerialPart/Batch submodel is
-read. Partners' own BoM or usage is never read: deeper levels travel through notifications.
+counterpart twins are looked up in the partner's registry and their part submodel (SerialPart,
+Batch or JustInSequencePart) is read. Partners' own BoM or usage is never read: deeper levels
+travel through notifications.
 
 A sync can also be limited to a selection of those twins (the supplier parts under one assembly,
 picked in the UI): it then reads only them, and leaves the rest of the cache and the partners'
@@ -46,7 +47,6 @@ from ..storage import (
 
 log = logging.getLogger(__name__)
 
-PART_ASPECTS = {aspects.AspectType.SERIAL_PART, aspects.AspectType.BATCH}
 # The partner's registry answering one twin's lookup with an error is that twin's problem; this
 # many in a row means it is failing for all of them, so the rest are not tried.
 MAX_LOOKUP_ERRORS_IN_A_ROW = 5
@@ -75,7 +75,7 @@ class PartnerSyncResult:
     # Twins not read again: their part was read less than ``max_age`` ago (not a full sync).
     twins_fresh: int = 0
     removed_parts: int = 0
-    # Twins found whose SerialPart/Batch submodel was read and cached.
+    # Twins found whose part submodel (SerialPart, Batch, JustInSequencePart) was read and cached.
     parts_cached: int = 0
     duration_seconds: float = 0.0
     # ok | partial | failed | no_connector | backoff (left alone after failing in a row)
@@ -638,14 +638,25 @@ class PartnerSync:
         return _TwinRead(gid, "cached" if part else "unreadable", part=part, issues=issues)
 
     def _read_part(self, partner: Partner, twin, gid: str, issues: list[str]):
-        refs = [
-            ref
-            for ref in twin.submodels
-            if (supported := aspects.lookup(ref.semantic_id)) and supported.type in PART_ASPECTS
-        ]
+        """The twin's part, from its preferred part submodel (``aspects.part_preference``), or
+        the next one if that cannot be read. Part submodels of different aspects are reported:
+        the twin contradicts itself; so is a semantic ID whose fragment contradicts its
+        namespace (it is read by its namespace)."""
+        refs = sorted(
+            (ref for ref in twin.submodels if aspects.part_preference(ref.semantic_id)),
+            key=lambda ref: aspects.part_preference(ref.semantic_id),
+        )
         if not refs:
-            issues.append(f"{gid}: no supported SerialPart or Batch submodel")
+            issues.append(f"{gid}: no supported SerialPart, Batch or JustInSequencePart submodel")
+            # e.g. a part published under a BoM namespace: say what the fragment claims
+            for ref in twin.submodels:
+                if reason := aspects.contradiction(ref.semantic_id, among=aspects.PART_TYPES):
+                    issues.append(f"{gid}: {reason}")
             return None
+        types = aspects.part_types(ref.semantic_id for ref in refs)
+        if len(types) > 1:
+            names = ", ".join(t.value for t in types)
+            issues.append(f"{gid}: twin has part submodels of different aspects ({names})")
         for ref in refs:
             try:
                 part = aspects.parse(ref.semantic_id, self._client.read_submodel(partner, ref))
@@ -655,6 +666,8 @@ class PartnerSync:
             if part.global_asset_id != normalize_global_asset_id(gid):
                 issues.append(f"{gid}: submodel describes {part.global_asset_id}")
                 continue
+            if reason := aspects.contradiction(ref.semantic_id):
+                issues.append(f"{gid}: read by its namespace: {reason}")
             return part
         return None
 

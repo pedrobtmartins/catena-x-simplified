@@ -39,8 +39,8 @@ class PartRepository:
     def upsert_part(
         self, part: Part, *, manufacturer_id: str | None, is_own: bool, synced_at: datetime
     ) -> None:
-        """Insert or update a part from its SerialPart or Batch aspect. ``is_own`` marks the
-        participant's own parts; partner parts are cached copies.
+        """Insert or update a part from its part aspect (SerialPart, Batch or JustInSequencePart).
+        ``is_own`` marks the participant's own parts; partner parts are cached copies.
         """
         row = self._session.get(PartRow, part.global_asset_id) or PartRow(
             global_asset_id=part.global_asset_id

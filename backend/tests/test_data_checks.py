@@ -85,9 +85,19 @@ def test_a_serialized_part_in_two_unrelated_assemblies_is_reported_a_batch_is_no
     ]
 
 
-def test_the_unit_is_named_by_its_instance_id_not_its_manufacturer():
-    from catenax_simplified.api.app import instance_id
+def test_a_jis_part_is_a_unit_and_is_reported_in_two_unrelated_assemblies(session):
+    """A just-in-sequence part is one physical unit, delivered into one sequence slot."""
+    session.add_all(
+        [
+            _part("vehicle-1"),
+            _part("vehicle-2"),
+            _part("seat", kind="jis", own=False),
+            _bom("vehicle-1", "seat"),
+            _bom("vehicle-2", "seat"),
+        ]
+    )
+    session.flush()
 
-    assert instance_id({"manufacturerId": OWN, "partInstanceId": "SN-1"}) == "SN-1"
-    assert instance_id({"manufacturerId": OWN, "batchId": "LOT-7"}) == "LOT-7"
-    assert instance_id({"manufacturerId": OWN}) is None
+    assert bom_findings(PartRepository(session)) == [
+        DataFinding("two_assemblies", "seat", SUPPLIER, ("vehicle-1", "vehicle-2")),
+    ]

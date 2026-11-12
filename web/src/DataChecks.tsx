@@ -1,4 +1,4 @@
-// Data checks on the own bills of material: a serialized unit can only be in one place.
+// Data checks on the own bills of material: a unit (serialized or just-in-sequence) can only be in one place.
 import { useEffect, useState } from "react";
 import { api, type DataChecks, type DataFinding, type PartRef } from "./api";
 import { InfoIcon } from "./icons";
@@ -155,8 +155,8 @@ export function DataChecksCard({ dataVersion }: { dataVersion: number }) {
         )}
       </div>
       <p className="muted card-gap">
-        Contradictions in your own bills of material, found in the local cache. A serialized unit is in one place at a
-        time, so a part declared twice points to a twin to correct where it is published.{" "}
+        Contradictions in your own bills of material, found in the local cache. A unit (serialized or just-in-sequence)
+        is in one place at a time, so a part declared twice points to a twin to correct where it is published.{" "}
         <a href="#/data-checks">Open the data checks</a>
       </p>
       {error && <p className="error-text card-gap">{error}</p>}
@@ -280,8 +280,9 @@ export function DataChecksPage({ dataVersion, ownBpnl }: { dataVersion: number; 
         <div className="page-head">
           <h1>Data checks</h1>
           <p>
-            Contradictions in your own bills of material, found in the local cache after each sync. A serialized unit is in
-            one place at a time: a part declared twice points to a twin to correct where it is published.
+            Contradictions in your own bills of material, found in the local cache after each sync. A unit (serialized or
+            just-in-sequence) is in one place at a time: a part declared twice points to a twin to correct where it is
+            published.
           </p>
         </div>
         <div className="actions">

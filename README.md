@@ -4,7 +4,7 @@ A lightweight, interoperable traceability application for Catena-X, based on the
 Traceability KIT (8.0.0) and the Eclipse Tractus-X 26.03 release.
 
 - Quality Alerts and Quality Investigations (Notification API 1.2.1 and 2.0.0)
-- SerialPart/Batch/BoM/Usage aspect models, v3 and v4
+- SerialPart/Batch/JustInSequencePart/BoM/Usage aspect models, v3 and v4
 - Saturn (DSP 2025-1), and Jupiter (DSP 0.8) for partners not yet moved; EDC, DTR and identity
   are participant prerequisites
 
@@ -34,7 +34,8 @@ the app (mock, three-company demo, next to a real EDC and DTR), what to ask your
 what to check when something does not work.
 
 Runs the app against a mock participant (a small DTR and submodel server with six battery
-modules, mixing SerialPart 3.0.0 and 4.0.0) — no dataspace needed.
+modules: SerialPart 3.0.0, and JustInSequencePart 3.0.0 and 4.0.0 for those delivered in sequence)
+— no dataspace needed.
 
 Prerequisites: Python 3.12+ with [uv](https://docs.astral.sh/uv/), Node.js 22.
 

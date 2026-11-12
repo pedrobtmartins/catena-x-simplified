@@ -25,7 +25,8 @@ uv run pytest
 uv run ruff check . && uv run ruff format --check .
 ```
 
-Run against the mock participant (6 battery modules, mixing SerialPart 3.0.0 and 4.0.0):
+Run against the mock participant (6 battery modules: SerialPart 3.0.0, and JustInSequencePart
+3.0.0, 4.0.0 and industry_core 4.0.0 for the modules delivered in sequence):
 
 ```bash
 uv run python devtools/mock_participant.py --port 8081 &
@@ -181,7 +182,7 @@ Partners call the Traceability KIT's Notification API through our EDC:
 | POST   | `/api/qualitynotifications/update`   | Status update → `200` (`404` unknown, `422` not allowed by the state model) |
 
 Partner sync reads only the twins own parts are linked to (one level) and only their
-SerialPart/Batch submodels — never a partner's BoM or usage. Contract agreements and access tokens
+SerialPart/Batch/JustInSequencePart submodels — never a partner's BoM or usage. Contract agreements and access tokens
 are reused through the Tractus-X SDK's connection manager (in memory, per process).
 
 Quality notifications: an **alert** goes to the direct customers of the affected own parts, an

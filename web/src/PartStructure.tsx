@@ -1,12 +1,13 @@
 // The part page's structure: everything under the part (own levels all the way down, other
 // companies' parts as leaves grouped per supplier) as a diagram or a table, and where the part is
-// used, path by path up to the products. A part declared in two places is marked: a serialized
-// unit is in one place at a time. The supplier parts under a selected part can be read from the
+// used, path by path up to the products. A part declared in two places is marked: a unit
+// (serialized or just-in-sequence) is in one place at a time. The supplier parts under a selected part can be read from the
 // partners right there, without a full partner sync.
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import {
   api,
   formatDateTime,
+  kindLabels,
   type PartnerSyncReport,
   waitForPartnerSync,
   type PartStructure as Structure,
@@ -449,17 +450,18 @@ function Panel({
   const link = links.find((l) => l.child === id) ?? null;
   const flag = flags.get(id);
   const name = (gid: string) => parts.get(gid)?.name ?? shortId(gid);
+  const labels = kindLabels(part?.kind);
   const rows: [string, string][] = part?.own
     ? [
-        ["Serial", part.serial ?? "—"],
+        [labels.identifier, part.serial ?? "—"],
         ["Part number", part.part_number ?? "—"],
         ["Contains", `${links.filter((l) => l.parent === id).length} parts`],
       ]
     : part?.cached
       ? [
           ["Supplier", maker(part, link)],
-          ["Type", part.kind === "batch" ? "Batch" : "Serialized part"],
-          [part.kind === "batch" ? "Batch" : "Serial", part.serial ?? "—"],
+          ["Type", labels.type],
+          [labels.identifier, part.serial ?? "—"],
           ["Supplier part no.", part.part_number ?? "—"],
           ["Our part no.", part.customer_part_number ?? "—"],
           ["Produced", [part.production_date?.slice(0, 10), part.country].filter(Boolean).join(" · ") || "—"],
@@ -481,7 +483,7 @@ function Panel({
         {rows.map(([k, v]) => (
           <div key={k} className="contents">
             <dt>{k}</dt>
-            <dd className={["Catena-X ID", "Serial", "Batch"].includes(k) ? "mono" : undefined}>{v}</dd>
+            <dd className={k === "Catena-X ID" || k === labels.identifier ? "mono" : undefined}>{v}</dd>
           </div>
         ))}
       </dl>
@@ -582,7 +584,7 @@ function WhereUsedView({
           </p>
           {used.paths.length > 1 && products.length < used.paths.length && part?.kind !== "batch" && (
             <div className="alert alert-warn">
-              A serialized unit is in one place at a time: {used.paths.length} paths mean it is declared more than once. The
+              A unit is in one place at a time: {used.paths.length} paths mean it is declared more than once. The
               data checks list it.
             </div>
           )}

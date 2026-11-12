@@ -1,11 +1,13 @@
 """Checks on the own parts' bills of material, run on the local cache.
 
-A serialized unit is in one place at a time. Two patterns in the published BoMs contradict that:
+A unit (a serialized or a just-in-sequence part) is in one place at a time. Two patterns in the
+published BoMs contradict that:
 
 - **two levels**: a part is declared in an assembly's BoM and again in the BoM of one of that
   assembly's own sub-assemblies (a BoM that was partly flattened);
 - **two assemblies**: a part is declared in the BoMs of two own parts that do not contain one
-  another. Normal for a batch, so it is not reported when the cached part is a batch.
+  another. Normal for a batch (a lot), so it is not reported when the cached part is a batch;
+  a part not cached yet counts as a unit.
 
 Nothing here reaches the dataspace; the findings point the publishing team to the twins to fix.
 """
@@ -16,6 +18,7 @@ from dataclasses import dataclass
 from itertools import combinations
 from typing import Literal
 
+from ..aspects import PartKind
 from ..storage import PartRepository
 
 MAX_DEPTH = 12
@@ -75,7 +78,7 @@ def bom_findings(repository: PartRepository) -> list[DataFinding]:
             findings.append(DataFinding("two_levels", child_id, partner, (assembly, sub_assembly)))
         if unrelated:
             cached = repository.get_part(child_id)
-            if cached is None or cached.kind != "batch":
+            if cached is None or cached.kind != PartKind.BATCH:
                 findings.append(
                     DataFinding("two_assemblies", child_id, partner, tuple(sorted(unrelated)))
                 )

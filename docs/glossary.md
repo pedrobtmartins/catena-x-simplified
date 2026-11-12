@@ -33,12 +33,13 @@ Catena-X and Eclipse Tractus-X terms as they are used in this project.
 |------|---------|
 | **DTR** (Digital Twin Registry) | A participant's registry of digital twins, implementing the AAS Registry API v3. It holds **shell descriptors**, each with **submodel descriptors** that point to the data. |
 | **AAS** (Asset Administration Shell) | The Industrie 4.0 standard the registry and submodel APIs follow. |
-| **Digital twin** | A shell descriptor for one real object. Industry Core defines **PartType** (a catalog part) and **PartInstance** (a serialized part or a batch). |
+| **Digital twin** | A shell descriptor for one real object. Industry Core defines **PartType** (a catalog part) and **PartInstance** (a serialized part, a batch or a just-in-sequence part). |
 | **Catena-X ID / `globalAssetId`** | The network-wide ID of a twin, `urn:uuid:<UUIDv4>`. Called `catenaXId` in the v3 aspect models. |
 | **Submodel** | One aspect of a twin (e.g. its SerialPart data), served by a submodel server. Read in the value-only form at `<href>/$value`. |
 | **`semanticId`** | The aspect model a submodel follows, e.g. `urn:samm:io.catenax.serial_part:3.0.0#SerialPart`. The app picks its adapter by this ID. |
 | **Aspect model / SAMM** | A data model in the Semantic Aspect Meta Model, published in `eclipse-tractusx/sldt-semantic-models`. |
 | **SerialPart / Batch** | Aspect models for a serialized part and a production batch. |
+| **JustInSequencePart (JIS)** | Aspect model for a part delivered just in sequence into a customer's production line: one unit, identified by the combination of its JIS call identifiers (`jisNumber`, `parentOrderNumber`, `jisCallDate`). |
 | **SingleLevelBomAsBuilt** | The direct children of a part as built (its bill of materials, one level). |
 | **SingleLevelUsageAsBuilt** | The direct parents a part was built into (one level up). |
 | **v3 / v4 / industry_core** | Aspect model versions in use: v3 (`catenaXId`, still in release status), v4 (`globalAssetId`, 26.03) and the same v4 moved to the `io.catenax.industry_core.*` namespace (26.09). |

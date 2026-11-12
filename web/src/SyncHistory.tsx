@@ -28,6 +28,7 @@ function StateBadge({ run }: { run: SyncReport }) {
 const ASPECT_NAMES: Record<string, string> = {
   serial_part: "SerialPart",
   batch: "Batch",
+  just_in_sequence_part: "JustInSequencePart",
   single_level_bom_as_built: "SingleLevelBomAsBuilt",
   single_level_usage_as_built: "SingleLevelUsageAsBuilt",
 };

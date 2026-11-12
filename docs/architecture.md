@@ -137,6 +137,7 @@ models repository. The app accepts every version in use and normalizes them into
 |--------------------|-----------------------------------------------------------------------------------------------|
 | `Part` (serial)    | `io.catenax.serial_part:3.0.0`, `3.0.1`, `4.0.0`; `io.catenax.industry_core.serial_part:4.0.0` |
 | `Part` (batch)     | `io.catenax.batch:3.0.0`, `3.0.1`, `4.0.0`; `io.catenax.industry_core.batch:4.0.0`             |
+| `Part` (jis)       | `io.catenax.just_in_sequence_part:3.0.0`, `4.0.0`; `io.catenax.industry_core.just_in_sequence_part:4.0.0` |
 | `BomRelation`      | `io.catenax.single_level_bom_as_built:3.0.0`, `4.0.0`; `io.catenax.industry_core.single_level_bom_as_built:4.0.0` |
 | `UsageRelation`    | `io.catenax.single_level_usage_as_built:3.0.0`, `4.0.0`; `io.catenax.industry_core.single_level_usage_as_built:4.0.0` |
 
@@ -144,6 +145,27 @@ Main v3 → v4 differences (mapped in the adapters): `catenaXId` → `globalAsse
 `catenaXsiteId` → `siteId`, `classificationID` → `classificationId`, `date` → `productionDate`,
 quantity 2.0.0 → 3.0.0. The concrete version is chosen from the submodel's `semanticId` in the DTR;
 no code outside `aspects` is aware of versions.
+
+The `semanticId` is also the only thing that tells the part aspects apart: SerialPart, Batch and
+JustInSequencePart payloads of one generation have the same fields. Its `namespace:version` picks
+the aspect, as it names the model and so the payload's schema. A `#<Aspect>` fragment naming
+another element (`#serialPart`, or `#JustInSequencePart` under `serial_part`) is read by the
+namespace all the same and reported to correct: dropping it would lose the part or the relations,
+and with them a partner's data. Only then, the payload must have the model's main content
+(`childItems`, `parentItems`, `partTypeInformation`), so that, say, a usage payload under the BoM
+namespace is refused rather than read as an empty BoM that erases the twin's real one.
+
+A twin should have one part submodel. With several, it is cached once, from (1) a unit
+(JustInSequencePart, SerialPart) before a batch, since a unit read as a batch escapes the data
+checks; then (2) the newest release (industry_core 4, io.catenax 4, 3.x), the one its publisher
+most likely keeps current; then (3) JustInSequencePart before SerialPart at the same release; then
+(4) the newest version of one aspect. Part submodels of different aspects on one twin are reported;
+two versions of one aspect (normal while migrating) are not.
+
+A just-in-sequence part is one unit, like a serialized part (the data checks treat both alike; only
+a batch may be in several places). It is labelled by the combination of its `jisNumber`,
+`parentOrderNumber` and `jisCallDate`, as the model says no one of them identifies it alone
+(`aspects/identifiers.py`, the only place a part's label is computed).
 
 Invalidated versions (SerialPart 1.x/2.x, BoM 1.x/2.x) are not supported.
 
@@ -253,8 +275,10 @@ an investigation with Tier-2.
   `eclipse-tractusx/sldt-semantic-models`; the SDK-based DTR client against mocked AAS v3 HTTP
   responses.
 - **Local development**: `backend/devtools/mock_participant.py` serves a small DTR + submodel
-  server (battery modules mixing SerialPart 3.0.0 and 4.0.0), enough to run the API and UI without
-  a dataspace. It is not a conformance test.
+  server (battery modules: SerialPart 3.0.0, and JustInSequencePart in its three versions for the
+  modules delivered in sequence to the OEM), enough to run the API and UI without a dataspace. It
+  is not a conformance test. Its JIS payloads are the official examples with other values, checked
+  against the official schemas in the tests.
 - **Three-company demo**: `backend/devtools/demo_network.py` runs Tier-2 (SerialPart/Usage 3.0.0),
   Tier-1 and the OEM, each with its own app, database and mock registry. In this development mode
   (`CXS_DEV_DIRECT`) partner twins are read straight from the partners' registries and

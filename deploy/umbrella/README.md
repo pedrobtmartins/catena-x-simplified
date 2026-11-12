@@ -6,7 +6,7 @@ its own EDC, Digital Twin Registry, submodel server and an instance of this appl
 | Company | Umbrella participant | BPNL | EDC API key | App release |
 |---|---|---|---|---|
 | Tier-2 (cells, SerialPart 3) | `tx-data-provider` | `BPNL00000003AYRE` | `TEST2` | `cxs-tier2` |
-| Tier-1 (modules) | `dataconsumerOne` | `BPNL00000003AZQP` | `TEST1` | `cxs-tier1` |
+| Tier-1 (modules, JustInSequencePart for the OEM) | `dataconsumerOne` | `BPNL00000003AZQP` | `TEST1` | `cxs-tier1` |
 | OEM (vehicles) | `dataconsumerTwo` | `BPNL00000003AVTH` | `TEST3` | `cxs-oem` |
 
 Files here:

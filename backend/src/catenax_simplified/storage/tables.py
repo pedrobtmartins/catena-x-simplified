@@ -18,8 +18,9 @@ class Base(DeclarativeBase):
 
 
 class PartRow(Base):
-    """A part read from a SerialPart or Batch aspect: an own part, or a direct partner's part
-    cached by the partner sync. Keyed by its Catena-X ID (``globalAssetId``).
+    """A part read from a SerialPart, Batch or JustInSequencePart aspect: an own part, or a
+    direct partner's part cached by the partner sync. Keyed by its Catena-X ID
+    (``globalAssetId``). ``kind``: serial, batch or jis (``aspects.PartKind``).
     """
 
     __tablename__ = "parts"

@@ -2487,6 +2487,14 @@ th {
   font-size: 13px;
 }
 
+/* A part's identifier in the parts list. A JIS call ("number / order / date") wraps between its
+   values instead of widening the table, never inside one; a single value (a serial, a VIN) stays
+   whole on one line. (More specific than td.cell-mono, which keeps other mono cells on one line.) */
+td.cell-mono.cell-identifier {
+  max-width: 22ch;
+  white-space: normal;
+}
+
 /* Serials and VANs can be long tokens: one line, the whole value in the tooltip. */
 .ref-serial {
   display: inline-block;

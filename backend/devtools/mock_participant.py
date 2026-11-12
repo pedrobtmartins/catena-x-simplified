@@ -5,7 +5,9 @@ lookup endpoints (``/api/v3/lookup/shells``, ``/api/v3/shell-descriptors/{id}``)
 submodels of one of three companies of a small battery supply chain:
 
 - ``tier1`` (default): six battery modules, mixing v3 and v4 aspect models; cells from Tier-2,
-  even modules installed in the OEM's vehicles;
+  even modules delivered just in sequence into the OEM's vehicles and published as
+  JustInSequencePart (module 2: industry_core 4.0.0, module 4: 4.0.0, module 6: 3.0.0), odd
+  modules as SerialPart 3.0.0;
 - ``tier2``: the cells of those modules, published with SerialPart 3.0.0 and
   SingleLevelUsageAsBuilt 3.0.0 (a supplier that has not migrated yet);
 - ``oem``: three vehicles built from the even modules (v4).
@@ -27,6 +29,7 @@ from __future__ import annotations
 
 import argparse
 import base64
+import copy
 import json
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -43,6 +46,86 @@ BOM_V3 = "urn:samm:io.catenax.single_level_bom_as_built:3.0.0#SingleLevelBomAsBu
 BOM_V4 = "urn:samm:io.catenax.single_level_bom_as_built:4.0.0#SingleLevelBomAsBuilt"
 USAGE_V3 = "urn:samm:io.catenax.single_level_usage_as_built:3.0.0#SingleLevelUsageAsBuilt"
 USAGE_V4 = "urn:samm:io.catenax.single_level_usage_as_built:4.0.0#SingleLevelUsageAsBuilt"
+JIS_V3 = "urn:samm:io.catenax.just_in_sequence_part:3.0.0#JustInSequencePart"
+JIS_V4 = "urn:samm:io.catenax.just_in_sequence_part:4.0.0#JustInSequencePart"
+JIS_IC = "urn:samm:io.catenax.industry_core.just_in_sequence_part:4.0.0#JustInSequencePart"
+
+# The official JustInSequencePart example payloads (gen/JustInSequencePart.json), verbatim, from
+# eclipse-tractusx/sldt-semantic-models at commit ff04cc7c4915eb29ed2b5656d9e7d45b31079c04,
+# CC-BY-4.0, Eclipse Tractus-X contributors. Kept in this file because the umbrella seed ships
+# it alone (deploy/umbrella/seed-job.sh); tests/test_mock_participant.py checks that they equal
+# tests/fixtures/aspects. The demo's JIS modules are these with other values (``_jis_part``).
+JIS_EXAMPLES: dict[str, dict[str, Any]] = {
+    JIS_V3: {
+        "localIdentifiers": [{"value": "12345678ABC", "key": "jisNumber"}],
+        "manufacturingInformation": {
+            "date": "2022-02-04T14:48:54",
+            "country": "HUR",
+            "sites": [{"catenaXsiteId": "BPNS1234567890ZZ", "function": "production"}],
+        },
+        "catenaXId": "urn:uuid:580d3adf-1981-44a0-a214-13d6ceed9379",
+        "partTypeInformation": {
+            "partClassification": [
+                {
+                    "classificationStandard": "GIN 20510-21513",
+                    "classificationID": "1004712",
+                    "classificationDescription": "Generic standard for classification of parts "
+                    "in the automotive industry.",
+                }
+            ],
+            "manufacturerPartId": "123-0.740-3434-A",
+            "customerPartId": "PRT-12345",
+            "nameAtManufacturer": "Mirror left",
+            "nameAtCustomer": "side element A",
+        },
+    },
+    JIS_V4: {
+        "localIdentifiers": [{"value": "BID12345678", "key": "manufacturerId"}],
+        "manufacturingInformation": {
+            "country": "DEU",
+            "sites": [{"siteId": "BPNSP5KFOmKwPXHU", "function": "production"}],
+            "productionDate": "2025-09-26",
+        },
+        "globalAssetId": "aC799196-3E4E-d0Ad-2d6F-e1130EfdF6Fc",
+        "partTypeInformation": {
+            "partClassification": [
+                {
+                    "standard": "GIN 20510-21513",
+                    "description": "Generic standard for classification of parts in the "
+                    "automotive industry.",
+                    "id": "1004712",
+                }
+            ],
+            "manufacturerPartId": "123-0.740-3434-A",
+            "customerPartId": "PRT-12345",
+            "nameAtManufacturer": "Mirror left",
+            "nameAtCustomer": "side element A",
+        },
+    },
+    JIS_IC: {
+        "localIdentifiers": [{"value": "BID12345678", "key": "manufacturerId"}],
+        "manufacturingInformation": {
+            "country": "DEU",
+            "sites": [{"siteId": "BPNSR5ftcGHMMhJE", "function": "production"}],
+            "productionDate": "2025-09-26",
+        },
+        "globalAssetId": "urn:uuid:3D08aed3-1C97-aEe1-ed7A-ebEf91FaFbc7",
+        "partTypeInformation": {
+            "partClassification": [
+                {
+                    "standard": "GIN 20510-21513",
+                    "description": "Generic standard for classification of parts in the "
+                    "automotive industry.",
+                    "id": "1004712",
+                }
+            ],
+            "manufacturerPartId": "123-0.740-3434-A",
+            "customerPartId": "PRT-12345",
+            "nameAtManufacturer": "Mirror left",
+            "nameAtCustomer": "side element A",
+        },
+    },
+}
 
 
 def _uuid(prefix: str, n: int) -> str:
@@ -66,6 +149,39 @@ def _items(ids: list[str], key: str, bpnl: str, potential: bool | None = None) -
         items.append(item)
     return items
 
+
+def _jis_part(semantic_id: str, gid: str, maker: str, vehicle: int, n: int) -> dict[str, Any]:
+    """Battery module ``n``, called just in sequence for the OEM's vehicle ``vehicle``: the
+    official example of that version with the module's values. Only values change (the fields
+    stay as in the example), and they keep to the official schema (v3 dates with a time zone)."""
+    payload = copy.deepcopy(JIS_EXAMPLES[semantic_id])
+    v3 = semantic_id == JIS_V3
+    payload["catenaXId" if v3 else "globalAssetId"] = gid
+    payload["localIdentifiers"] = [
+        {"value": maker, "key": "manufacturerId"},
+        {"value": f"JIS-T1-{vehicle:06d}", "key": "jisNumber"},
+        {"value": f"OEM-ORD-2026-{vehicle:04d}", "key": "parentOrderNumber"},
+        {"value": f"2026-0{n}-14", "key": "jisCallDate"},
+    ]
+    info = payload["manufacturingInformation"]
+    info["country"] = "PRT"
+    if v3:
+        info["date"] = f"2026-0{n}-15T10:00:00Z"
+        info["sites"][0]["catenaXsiteId"] = "BPNS00000000T1S1"
+    else:
+        info["productionDate"] = f"2026-0{n}-15"
+        info["sites"][0]["siteId"] = "BPNS00000000T1S1"
+    payload["partTypeInformation"].update(
+        manufacturerPartId="BM-48V-12S",
+        customerPartId="OEM-BAT-0815",
+        nameAtManufacturer="Battery module 48V",
+        nameAtCustomer="HV battery module",
+    )
+    return payload
+
+
+# The part aspect of the even modules, delivered just in sequence into the OEM's vehicles.
+JIS_MODULES = {2: JIS_IC, 4: JIS_V4, 6: JIS_V3}
 
 PARTICIPANTS = {"tier1": TIER1, "tier2": TIER2, "oem": OEM}
 VEHICLES = [_uuid("eeeeeeee", n) for n in range(1, 4)]
@@ -231,36 +347,15 @@ def build_dataset(
                     BOM_V3: {"catenaXId": module, "childItems": _items(cells, "catenaXId", TIER2)},
                 },
             )
-        else:
+        else:  # even modules: JIS parts, with v4 relations
             aspects = {
-                SERIAL_PART_V4: {
-                    "globalAssetId": module,
-                    "localIdentifiers": [{"key": "partInstanceId", "value": serial}],
-                    "manufacturingInformation": {
-                        "productionDate": f"2026-0{n}-15",
-                        "country": "PRT",
-                        "sites": [{"siteId": "BPNS00000000T1S1", "function": "production"}],
-                    },
-                    "partTypeInformation": {
-                        "manufacturerPartId": "BM-48V-12S",
-                        "nameAtManufacturer": "Battery module 48V",
-                        "customerPartId": "OEM-BAT-0815",
-                        "nameAtCustomer": "HV battery module",
-                        "partClassification": [
-                            {
-                                "standard": "GIN 20510-21513",
-                                "id": "1004712",
-                                "description": "Battery",
-                            }
-                        ],
-                    },
-                },
+                JIS_MODULES[n]: _jis_part(JIS_MODULES[n], module, TIER1, n // 2, n),
                 BOM_V4: {
                     "globalAssetId": module,
                     "childItems": _items(cells, "globalAssetId", TIER2),
                 },
             }
-            # v4 modules also publish where they were installed (one vehicle each).
+            # Even modules also publish where they were installed (one vehicle each).
             aspects[USAGE_V4] = {
                 "globalAssetId": module,
                 "parentItems": _items([vehicles[n // 2 - 1]], "globalAssetId", OEM, False),

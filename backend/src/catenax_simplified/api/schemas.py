@@ -7,8 +7,9 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from typing import Annotated, Any, Literal
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, Field, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, Field, computed_field, model_validator
 
+from ..aspects import instance_id
 from ..notifications import NotificationType, Severity, Status
 
 
@@ -31,9 +32,10 @@ class ClassificationOut(BaseModel):
 
 
 class PartOut(BaseModel):
-    """A cached part (own or a partner's) as read from its SerialPart or Batch aspect, in any
-    supported version. ``kind``: serial or batch; ``semantic_id``: the aspect model it was
-    read from.
+    """A cached part (own or a partner's) as read from its SerialPart, Batch or
+    JustInSequencePart aspect, in any supported version. ``kind``: serial, batch or jis;
+    ``semantic_id``: the aspect model it was read from; ``serial``: the identifier a person knows
+    the unit or lot by (see ``aspects.identifiers``).
     """
 
     model_config = ConfigDict(from_attributes=True)
@@ -53,6 +55,11 @@ class PartOut(BaseModel):
     site_ids: list[str]
     classifications: list[ClassificationOut]
     synced_at: UtcDatetime
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def serial(self) -> str | None:
+        return instance_id(self.local_identifiers, self.kind)
 
 
 class PartListItem(PartOut):
