@@ -65,8 +65,10 @@ class SyncReport:
 
 
 class OwnTwinSync:
-    """Reads the own twins from the DTR into the local cache: their part aspect (SerialPart or
-    Batch) and their BoM and usage relations, in any supported version.
+    """Reads the own twins from the DTR into the local cache: their part aspect (SerialPart,
+    Batch or JustInSequencePart) and their BoM and usage relations, in any supported version.
+    A twin with several part submodels is cached once, from the one ``aspects.part_preference``
+    puts first; part submodels of different aspects are reported, as the twin contradicts itself.
 
     With ``twin_ids`` only those twins and, through their BoMs, their own children are
     read; otherwise the whole registry. A twin or submodel that cannot be read is reported
@@ -209,7 +211,13 @@ class OwnTwinSync:
                     )
                 )
                 continue
+            if reason := aspects.contradiction(ref.semantic_id):
+                # Read all the same (see aspects.registry); the publisher should correct it.
+                report.issues.append(
+                    SyncIssue(twin_id, ref.semantic_id, f"read by its namespace: {reason}")
+                )
             parsed.append(result)
+        parsed = self._one_part(twin, twin_id, parsed, report)
 
         synced_at = self._clock()
         with self._session_factory.begin() as session:
@@ -227,3 +235,26 @@ class OwnTwinSync:
                     repository.replace_relations(result)
                     report.relation_sets += 1
         return parsed
+
+    @staticmethod
+    def _one_part(
+        twin: TwinRef,
+        twin_id: str,
+        parsed: list[aspects.Part | aspects.Relations],
+        report: SyncReport,
+    ) -> list[aspects.Part | aspects.Relations]:
+        """The relations read from the twin and, of its parts, only the preferred one."""
+        parts = [r for r in parsed if isinstance(r, aspects.Part)]
+        chosen = min(parts, key=lambda p: aspects.part_preference(p.semantic_id), default=None)
+        types = aspects.part_types(ref.semantic_id for ref in twin.submodels)
+        if len(types) > 1:
+            read_as = f"read as {chosen.semantic_id}" if chosen else "none could be read"
+            names = ", ".join(t.value for t in types)
+            report.issues.append(
+                SyncIssue(
+                    twin_id,
+                    None,
+                    f"twin has part submodels of different aspects ({names}); {read_as}",
+                )
+            )
+        return [r for r in parsed if not isinstance(r, aspects.Part) or r is chosen]

@@ -2,7 +2,8 @@
 
 Two payload shapes are in use in the network:
 
-* ``v3`` — SerialPart/Batch 3.x, SingleLevelBomAsBuilt/SingleLevelUsageAsBuilt 3.0.0
+* ``v3`` — SerialPart/Batch 3.x, JustInSequencePart 3.0.0,
+  SingleLevelBomAsBuilt/SingleLevelUsageAsBuilt 3.0.0
   (``catenaXId``, ``catenaXsiteId``, ``date``, ``classificationID`` …);
 * ``v4`` — the 4.0.0 models, both under ``io.catenax.*`` (26.03) and
   ``io.catenax.industry_core.*`` (26.09), which share the same payload
@@ -34,8 +35,10 @@ def _id_key(shape: str) -> str:
 
 
 def parse_part(payload: Mapping[str, Any], kind: PartKind, shape: str, semantic_id: str) -> Part:
-    """A SerialPart or Batch payload, v3 or v4 shape, into the internal ``Part``. v3 field
-    names (``catenaXId``, ``date``, ``classificationID`` …) are mapped to the v4 ones.
+    """A SerialPart, Batch or JustInSequencePart payload, v3 or v4 shape, into the internal
+    ``Part`` of the given kind. v3 field names (``catenaXId``, ``date``, ``classificationID`` …)
+    are mapped to the v4 ones. The three aspects share these fields, so the kind comes from the
+    semantic ID (see ``registry``), never from the payload.
     """
     info = payload.get("manufacturingInformation") or {}
     type_info = payload.get("partTypeInformation") or {}

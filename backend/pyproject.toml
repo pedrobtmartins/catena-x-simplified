@@ -28,6 +28,7 @@ dev = [
     "responses>=0.25",
     "httpx>=0.26,<0.29",
     "ruff>=0.6",
+    "jsonschema>=4.20",
 ]
 
 [build-system]

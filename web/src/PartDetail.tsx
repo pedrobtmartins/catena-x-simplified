@@ -2,7 +2,7 @@
 // cannot), data check findings, its structure and where it is used (PartStructure), its
 // attributes and the submodels they were read from.
 import { useEffect, useState } from "react";
-import { api, formatDateTime, instanceId, parseSemanticId, type Part, type PartTree } from "./api";
+import { api, formatDateTime, kindLabels, parseSemanticId, type Part, type PartTree } from "./api";
 import { composeHref } from "./Compose";
 import { CopyIcon } from "./icons";
 import { PartDataNotice } from "./DataChecks";
@@ -66,7 +66,7 @@ export function PartDetail({ id, dataVersion }: { id: string; dataVersion: numbe
 
   const part = tree?.part;
   const model = part ? parseSemanticId(part.semantic_id) : null;
-  const serial = part ? instanceId(part.local_identifiers) : undefined;
+  const serial = part?.serial ?? undefined;
   // Own part: investigate its supplier parts; partner part: investigate the part itself.
   const investigate = !tree
     ? []
@@ -127,7 +127,7 @@ export function PartDetail({ id, dataVersion }: { id: string; dataVersion: numbe
             <div className="detail-title">
               <div className="badges">
                 {part.is_own && <span className="badge badge-own">Own part</span>}
-                <span className="badge badge-outline">{part.kind === "batch" ? "Batch" : "Serialized"}</span>
+                <span className="badge badge-outline">{kindLabels(part.kind).badge}</span>
                 <span className={`badge ${model.major === 3 ? "badge-v3" : "badge-v4"}`}>
                   {model.name} {model.version}
                 </span>

@@ -11,10 +11,13 @@ from enum import StrEnum
 
 
 class PartKind(StrEnum):
-    """A serialized part (one unit) or a batch (a lot)."""
+    """A serialized part (one unit), a batch (a lot) or a just-in-sequence part (one unit,
+    identified by its JIS call). Only a batch may be in several places at once.
+    """
 
     SERIAL = "serial"
     BATCH = "batch"
+    JIS = "jis"
 
 
 class RelationSource(StrEnum):
@@ -35,7 +38,8 @@ class Classification:
 
 @dataclass(frozen=True)
 class Part:
-    """A serialized part or a batch (Industry Core "PartInstance" twin)."""
+    """A serialized part, a batch or a just-in-sequence part (Industry Core "PartInstance"
+    twin)."""
 
     global_asset_id: str
     kind: PartKind

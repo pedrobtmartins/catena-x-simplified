@@ -8,9 +8,12 @@ export interface Classification {
   description: string | null;
 }
 
+/** serial: a serialized unit; batch: a lot; jis: a just-in-sequence unit. */
+export type PartKind = "serial" | "batch" | "jis";
+
 export interface Part {
   global_asset_id: string;
-  kind: "serial" | "batch";
+  kind: PartKind;
   semantic_id: string;
   manufacturer_id: string | null;
   is_own: boolean;
@@ -24,6 +27,8 @@ export interface Part {
   site_ids: string[];
   classifications: Classification[];
   synced_at: string;
+  // The identifier a person knows the unit or lot by (backend: aspects/identifiers.py).
+  serial: string | null;
 }
 
 export interface PartListItem extends Part {
@@ -73,10 +78,16 @@ export interface SyncReport {
   issues: SyncIssue[];
 }
 
-// The identifier that names one unit or lot; manufacturerId only says who made it.
-export function instanceId(localIdentifiers: Record<string, string>): string | undefined {
-  for (const key of ["partInstanceId", "van", "batchId"]) if (localIdentifiers[key]) return localIdentifiers[key];
-  return Object.entries(localIdentifiers).find(([k]) => k !== "manufacturerId")?.[1];
+/** How each kind of part is named for a person: as a badge, as a type, and what its `serial` is. */
+export const KIND_LABELS: Record<PartKind, { badge: string; type: string; identifier: string }> = {
+  serial: { badge: "Serialized", type: "Serialized part", identifier: "Serial" },
+  batch: { badge: "Batch", type: "Batch", identifier: "Batch" },
+  jis: { badge: "Just-in-sequence", type: "Just-in-sequence part", identifier: "JIS call" },
+};
+
+/** The labels of a part's kind; an unknown or missing kind is shown as a serialized part. */
+export function kindLabels(kind: string | null | undefined) {
+  return KIND_LABELS[(kind ?? "serial") as PartKind] ?? KIND_LABELS.serial;
 }
 
 export interface PolicyEntry {
@@ -299,7 +310,7 @@ export interface PartnerSyncResult {
   // Not read again: read less than the maximum age ago (a sync that is not full).
   twins_fresh: number;
   removed_parts: number;
-  // Twins found whose SerialPart/Batch submodel was read and cached.
+  // Twins found whose part submodel (SerialPart, Batch, JustInSequencePart) was read and cached.
   parts_cached: number;
   duration_seconds: number;
   status: string;
@@ -501,7 +512,7 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
 
 export interface PartQuery {
   search?: string;
-  kind?: "serial" | "batch";
+  kind?: PartKind;
   aspectMajor?: number;
   limit: number;
   offset: number;
@@ -673,9 +684,11 @@ export function shortId(id: string): string {
   return match ? `${match[1]}-…-${match[2]}` : id;
 }
 
-/** Every local identifier of a part, for the Serial / batch column. */
+/** Every local identifier of a part with its key, e.g. "jisNumber: J-1, jisCallDate: 2026-04-14". */
 export function localIdentifiers(part: Part): string {
-  return Object.values(part.local_identifiers).join(", ");
+  return Object.entries(part.local_identifiers)
+    .map(([key, value]) => `${key}: ${value}`)
+    .join(", ");
 }
 
 /** A run is an error when its listing did not finish, a warning when some twins had issues. */

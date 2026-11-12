@@ -89,6 +89,7 @@ postgres = [
 [package.dev-dependencies]
 dev = [
     { name = "httpx" },
+    { name = "jsonschema" },
     { name = "pytest" },
     { name = "responses" },
     { name = "ruff" },
@@ -112,6 +113,7 @@ provides-extras = ["postgres"]
 [package.metadata.requires-dev]
 dev = [
     { name = "httpx", specifier = ">=0.26,<0.29" },
+    { name = "jsonschema", specifier = ">=4.20" },
     { name = "pytest", specifier = ">=8" },
     { name = "responses", specifier = ">=0.25" },
     { name = "ruff", specifier = ">=0.6" },

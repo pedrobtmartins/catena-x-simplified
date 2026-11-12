@@ -25,6 +25,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from starlette.concurrency import run_in_threadpool
 
 from ..admin import ConfigStore, SecretBox, effective_settings
+from ..aspects import instance_id
 from ..aspects.registry import SUPPORTED
 from ..config import Settings
 from ..dataspace import DataspaceError, SubmodelReader, TwinRegistry
@@ -240,20 +241,6 @@ def stats(session: SessionDep, request: Request) -> StatsOut:
     return StatsOut(**PartRepository(session).stats(request.app.state.settings.own_bpnl))
 
 
-# The identifier that names one unit or lot; manufacturerId only says who made it.
-INSTANCE_KEYS = ("partInstanceId", "van", "batchId")
-
-
-def instance_id(local_identifiers: dict[str, str]) -> str | None:
-    """The identifier that names one unit or lot in a part's local identifiers (``partInstanceId``,
-    ``van``, ``batchId``), else any other than ``manufacturerId``.
-    """
-    for key in INSTANCE_KEYS:
-        if local_identifiers.get(key):
-            return local_identifiers[key]
-    return next((v for k, v in local_identifiers.items() if k != "manufacturerId"), None)
-
-
 @router.get("/data-checks", response_model=DataChecksOut)
 def data_checks(
     session: SessionDep,
@@ -271,7 +258,7 @@ def data_checks(
 
     def ref(gid: str) -> PartRefOut:
         row = parts.get(gid)
-        serial = instance_id(row.local_identifiers) if row else None
+        serial = instance_id(row.local_identifiers, row.kind) if row else None
         return PartRefOut(
             global_asset_id=gid, name=row.name_at_manufacturer if row else None, serial=serial
         )
@@ -295,7 +282,7 @@ def data_checks(
 def list_parts(
     session: SessionDep,
     search: str | None = None,
-    kind: Annotated[str | None, Query(pattern="^(serial|batch)$")] = None,
+    kind: Annotated[str | None, Query(pattern="^(serial|batch|jis)$")] = None,
     aspect_major: Annotated[int | None, Query(ge=1, le=99)] = None,
     own_only: bool = False,
     limit: Annotated[int, Query(ge=1, le=500)] = 50,
@@ -303,7 +290,8 @@ def list_parts(
 ) -> PartPage:
     """Cached parts, own and partner (or own only), by name, with how many parents and children
     each has. ``search`` matches the Catena-X ID, part numbers and names; ``kind`` filters
-    serialized parts or batches, ``aspect_major`` the aspect model's major version (3 or 4)."""
+    serialized parts, batches or just-in-sequence parts (``serial``, ``batch``, ``jis``),
+    ``aspect_major`` the aspect model's major version (3 or 4)."""
     repository = PartRepository(session)
     rows, total = repository.list_parts(
         search=search,
@@ -360,7 +348,7 @@ def _structure_parts(
                 own=(row.is_own if row else False) or maker == own_bpnl,
                 kind=row.kind if row else None,
                 name=row.name_at_manufacturer if row else None,
-                serial=instance_id(row.local_identifiers) if row else None,
+                serial=instance_id(row.local_identifiers, row.kind) if row else None,
                 part_number=row.manufacturer_part_id if row else None,
                 manufacturer_id=maker,
                 manufacturer_name=names.get(maker) if maker else None,

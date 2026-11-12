@@ -48,11 +48,16 @@ It does **not**:
   |---|---|
   | Part (serialized) | SerialPart 3.0.0, 3.0.1, 4.0.0; industry_core SerialPart 4.0.0 |
   | Part (batch) | Batch 3.0.0, 3.0.1, 4.0.0; industry_core Batch 4.0.0 |
+  | Part (just-in-sequence) | JustInSequencePart 3.0.0, 4.0.0; industry_core JustInSequencePart 4.0.0 |
   | Components | SingleLevelBomAsBuilt 3.0.0, 4.0.0; industry_core 4.0.0 |
   | Customers | SingleLevelUsageAsBuilt 3.0.0, 4.0.0; industry_core 4.0.0 |
 
   Versions are mixed freely; each is mapped to the same internal model, so a partner on
-  SerialPart 3 and one on 4 look the same in the app.
+  SerialPart 3 and one on 4 look the same in the app. The aspect is told by the submodel's
+  `semanticId`'s namespace (the payloads of the three part aspects have the same fields), also
+  when its `#<Aspect>` fragment names something else, which is reported. A twin with several part
+  submodels is read once: a unit before a batch, then the newest release, then JustInSequencePart
+  before SerialPart; it is reported if they are of different aspects.
 - Reads each submodel **directly** (optionally rewriting the public address to an internal one).
   When the data plane refuses a direct read because it wants a contract (HTTP 401/403), the app
   reads the company's own submodels **through its own EDC**, like a partner's: one negotiation per
@@ -64,7 +69,7 @@ It does **not**:
   background: the API answers at once (HTTP 202), the top bar counts twins and parts as they are
   read (`GET /api/sync/status`), and `?wait=true` waits for the run, for scripts.
 - **Checks the bills of material** it has read (`GET /api/data-checks`, on the **Data checks** page with a counter in
-  the menu, filters and a report to copy, in Sync history and on the affected parts): a serialized unit is in one place at a time, so the app reports a part declared
+  the menu, filters and a report to copy, in Sync history and on the affected parts): a unit (serialized or just-in-sequence) is in one place at a time, so the app reports a part declared
   in an assembly and again in one of its sub-assemblies, or in two own parts that do not contain one
   another (unless it is a batch). Findings sharing the same assemblies are listed together, since they
   usually have one cause: a twin to correct where it is published.
@@ -73,8 +78,10 @@ It does **not**:
 
 *UI: **Parts**, part detail · API: `GET /api/parts`, `/api/parts/{id}`, `/api/parts/{id}/tree`, `/api/parts/{id}/structure`, `/api/parts/{id}/where-used`, `/api/stats`*
 
-- A searchable list of own parts (by Catena-X ID, part number or name; serialized or batch;
-  aspect model v3 or v4), with counts of own parts, links to suppliers and links to customers.
+- A searchable list of own parts (by Catena-X ID, part number or name; serialized, batch or
+  just-in-sequence; aspect model v3 or v4), with counts of own parts, links to suppliers and links
+  to customers. A part is shown with the identifier of its unit or lot; a just-in-sequence part's
+  is its JIS call (`jisNumber / parentOrderNumber / jisCallDate`).
 - Per part: its attributes, the submodels they came from, and its **structure**: everything under
   it, as a diagram or a table. Own parts open level by level all the way down, since the company
   knows its own BoMs; another company's part stays a leaf (one level across companies, as the KIT
@@ -95,8 +102,9 @@ It does **not**:
 - Partner **names** come from the BPDM Pool, directly or through an EDC where the operating
   company offers it that way (the Cofinity-X Business Partner Explorer).
 - **Partner sync** (`POST /api/partners/sync`): for every partner, negotiates access to its DTR,
-  looks up the counterpart twins of the own relations by Catena-X ID and reads their SerialPart or
-  Batch. It reads nothing else: no partner bill of materials, no partner usage.
+  looks up the counterpart twins of the own relations by Catena-X ID and reads their SerialPart,
+  Batch or JustInSequencePart. It reads nothing else: no partner bill of materials, no partner
+  usage.
   A lookup the partner's registry fails is reported for that twin and the sync goes on; it stops
   for that partner only when its registry cannot be reached, or after five lookups failed in a row.
   Several partners are read at once, and a few twins of each (`CXS_PARTNER_SYNC_PARALLEL_*`);

@@ -1,13 +1,13 @@
 // The Parts page: counts of own parts and their supplier and customer links, then the searchable
 // list of cached parts (own and partners'), filtered by kind and aspect model version.
 import { useEffect, useMemo, useState } from "react";
-import { api, localIdentifiers, parseSemanticId, shortId, type PartPage, type Stats } from "./api";
+import { api, localIdentifiers, parseSemanticId, shortId, type PartKind, type PartPage, type Stats } from "./api";
 import { SearchIcon } from "./icons";
 import { ChipGroup, EmptyState, Skeleton, SkeletonRows } from "./ui";
 
 const PAGE_SIZE = 50;
 
-type Kind = "serial" | "batch" | undefined;
+type Kind = PartKind | undefined;
 type Major = 3 | 4 | undefined;
 
 function versionSplit(stats: Stats): { v3: number; v4: number; other: number } {
@@ -19,6 +19,21 @@ function versionSplit(stats: Stats): { v3: number; v4: number; other: number } {
     else split.other += count;
   }
   return split;
+}
+
+/** A label that may break only between its values ("JIS-1 / ORD-7 / 2026-04-14"), never inside one. */
+function IdentifierLines({ label }: { label: string }) {
+  const values = label.split(" / ");
+  return (
+    <>
+      {values.map((value, i) => (
+        <span key={i}>
+          {i > 0 && " "}
+          <span className="nowrap">{i < values.length - 1 ? `${value} /` : value}</span>
+        </span>
+      ))}
+    </>
+  );
 }
 
 function plural(n: number, one: string, many: string) {
@@ -81,6 +96,9 @@ export function PartList({ dataVersion }: { dataVersion: number }) {
             <span className="stat-note">
               {plural(stats.own_parts_by_kind.serial ?? 0, "serialized part", "serialized parts")} ·{" "}
               {plural(stats.own_parts_by_kind.batch ?? 0, "batch", "batches")}
+              {(stats.own_parts_by_kind.jis ?? 0) > 0 && (
+                <> · {plural(stats.own_parts_by_kind.jis, "just-in-sequence part", "just-in-sequence parts")}</>
+              )}
             </span>
           </div>
           <div className="stat">
@@ -139,6 +157,7 @@ export function PartList({ dataVersion }: { dataVersion: number }) {
             { label: "All", value: undefined },
             { label: "Serial", value: "serial" },
             { label: "Batch", value: "batch" },
+            { label: "JIS", value: "jis" },
           ]}
         />
         <ChipGroup<Major>
@@ -167,7 +186,7 @@ export function PartList({ dataVersion }: { dataVersion: number }) {
           <thead>
             <tr>
               <th scope="col">Part</th>
-              <th scope="col">Serial / batch</th>
+              <th scope="col">Identifier</th>
               <th scope="col">Part number</th>
               <th scope="col">Aspect model</th>
               <th scope="col">Produced</th>
@@ -187,7 +206,10 @@ export function PartList({ dataVersion }: { dataVersion: number }) {
                       {customer && <span className="sub">{customer}</span>}
                     </a>
                   </td>
-                  <td className="cell-mono">{localIdentifiers(part) || "—"}</td>
+                  {/* The unit's or lot's label (a JIS part's is its JIS call); every identifier on hover. */}
+                  <td className="cell-mono cell-identifier" title={localIdentifiers(part) || undefined}>
+                    {part.serial ? <IdentifierLines label={part.serial} /> : "—"}
+                  </td>
                   <td className="cell-mono">{part.manufacturer_part_id ?? "—"}</td>
                   <td>
                     <span className={`badge ${model.major === 3 ? "badge-v3" : "badge-v4"}`}>
