@@ -25,7 +25,7 @@ partner in the UI. Phase 3 (real connectors) is done: on the Tractus-X umbrella 
 companies with their own EDCs read each other's twins and pass a quality alert Tier-2 → Tier-1 →
 OEM; and a one-off local test synced 303 twins from a production registry through a real EDC.
 See [what has been verified](docs/what-the-app-does.md#what-has-been-verified) and
-[the phases](docs/architecture.md#10-phases).
+[the phases](docs/architecture.md#10-phases). What comes next is in the [roadmap](ROADMAP.md).
 
 ## Quick start
 
