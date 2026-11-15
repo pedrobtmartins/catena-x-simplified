@@ -242,3 +242,5 @@ Not verified yet: notifications with a real partner outside the lab — that is 
   is already supported.
 - Contracts and tokens kept across restarts; single sign-on with the company's identity
   provider; checking a notification's sender against the contract's BPNL.
+
+Each of these has an issue in the [roadmap](../ROADMAP.md).
